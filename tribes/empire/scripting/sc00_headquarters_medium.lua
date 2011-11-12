@@ -6,7 +6,7 @@ use("aux", "infrastructure")
 
 set_textdomain("tribe_empire")
 
-return {
+init = {
    name = _ "Headquarters medium",
    func =  function(p, shared_in_start)
 
@@ -77,3 +77,4 @@ return {
 end
 }
 
+return init

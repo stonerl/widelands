@@ -2,7 +2,7 @@
 packet_version="2"
 
 [player_1]
-name="Scenario player "
+name="Scenario player"
 tribe="atlanteans"
 ai=
 closeable="false"
@@ -10,11 +10,11 @@ closeable="false"
 [player_2]
 name="The opposing player"
 tribe="empire"
-ai=
+ai="Aggressive"
 closeable="false"
 
 [player_3]
 name="The allied player"
 tribe="barbarians"
-ai=
+ai="Aggressive"
 closeable="false"
