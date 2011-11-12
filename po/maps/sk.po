@@ -6,15 +6,15 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Widelands svn4322\n"
 "Report-Msgid-Bugs-To: widelands-public@lists.sourceforge.net\n"
-"POT-Creation-Date: 2011-09-04 19:59+0000\n"
+"POT-Creation-Date: 2011-10-03 11:44+0000\n"
 "PO-Revision-Date: 2011-09-09 13:10+0000\n"
 "Last-Translator: Miroslav Remák <Unknown>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"X-Launchpad-Export-Date: 2011-09-10 04:39+0000\n"
-"X-Generator: Launchpad (build 13900)\n"
+"X-Launchpad-Export-Date: 2011-10-04 04:40+0000\n"
+"X-Generator: Launchpad (build 14071)\n"
 
 #: ../../campaigns/cconfig:64
 msgid "01 - Eyes in the Dark"
@@ -39,10 +39,6 @@ msgstr ""
 #: ../../campaigns/cconfig:74
 msgid "03 - This Land is our Land"
 msgstr "03 - Táto zem je našou zemou"
-
-#: ../../maps/Enemy in sight.wmf/elemental:9
-msgid "A Multiplayer-battle-map on a X-Shaped island."
-msgstr "Mapa bitky pre viacerých hráčov na ostrove v tvare X."
 
 #: ../../maps/Comet Island.wmf/elemental:9
 msgid ""
@@ -80,6 +76,14 @@ msgid ""
 msgstr ""
 "Mystické územie s rôznymi krajinami, ktoré sú všetky skrížené niekoľkými "
 "veľkými riekami."
+
+#: ../../maps/MP Scenarios/Island Hopping.wmf/elemental:9
+msgid ""
+"A special tournament in atlantean culture is the so named \"Island "
+"Hopping\", where two or more groups try to reach the center island as fast "
+"as possible, to be the first building up a castle on the top of the center "
+"mountain."
+msgstr ""
 
 #: ../../maps/Impact.wmf/elemental:9
 msgid ""
@@ -175,10 +179,6 @@ msgstr "Lesy Elfov"
 msgid "Empire - The Months of Exile"
 msgstr "Impérium - Mesiace vo vyhnanstve"
 
-#: ../../maps/Enemy in sight.wmf/elemental:7
-msgid "Enemy in sight"
-msgstr "Nepriateľ nadohľad"
-
 #: ../../maps/Finlakes.wmf/elemental:9
 msgid "Finnish Lakes"
 msgstr "Fínske jazerá"
@@ -253,6 +253,10 @@ msgstr ""
 "kmeň prebrali na tomto ostrove uprostred ohňa a lávy? Zatiaľ to vyzerá tak, "
 "že ste sám(a), no nikto nevie... Čo sa môže stať, keď stretnete nepriateľský "
 "kmeň?"
+
+#: ../../maps/MP Scenarios/Island Hopping.wmf/elemental:7
+msgid "Island Hopping"
+msgstr ""
 
 #: ../../maps/Islands at war.wmf/elemental:9
 msgid "Islands at war"
@@ -393,6 +397,10 @@ msgstr ""
 "nepriateľa. To bola ich skaza. V jednu noc v marci zaútočilo na jeho "
 "nepripravenú armádu 100 barbarských pešiakov a úplne ju rozprášilo. Prežil "
 "len on a hŕstka jeho vojakov."
+
+#: ../../maps/MP Scenarios/Smugglers.wmf/elemental:9
+msgid "Smugglers"
+msgstr ""
 
 #: ../../maps/The Far North.wmf/elemental:11
 msgid ""
@@ -643,3 +651,10 @@ msgstr ""
 "Stojíte na ostrove korunovanom mohutnými horami, ktoré vo svojom vnútri "
 "ukrývajú zázračný poklad - Zelenú planinu, ktorú je ťažko získať, ale ľahko "
 "stratiť, takže ak ju chcete, majte na vedomí aj iné kmene."
+
+#: ../../maps/MP Scenarios/Smugglers.wmf/elemental:11
+msgid ""
+"Your well established smuggling routes suddenly got busy: Two other tribes "
+"appeared and now a rivalry under smugglers has been started: Which team will "
+"be the first to smuggle a certain number of wares?"
+msgstr ""

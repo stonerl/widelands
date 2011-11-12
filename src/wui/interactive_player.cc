@@ -189,25 +189,25 @@ m_toggle_help
 	m_encyclopedia.constr = boost::lambda::bind
 		(boost::lambda::new_ptr<EncyclopediaWindow>(),
 		 boost::ref(*this),
-		 boost::lambda::_1);
+		 boost::ref(m_encyclopedia));
 	m_options.constr = boost::lambda::bind
 		(boost::lambda::new_ptr<GameOptionsMenu>(),
 		 boost::ref(*this),
-		 boost::lambda::_1,
+		 boost::ref(m_options),
 		 boost::ref(m_mainm_windows));
 	m_statisticsmenu.constr = boost::lambda::bind
 		(boost::lambda::new_ptr<GameMainMenu>(),
 		 boost::ref(*this),
-		 boost::lambda::_1,
+		 boost::ref(m_statisticsmenu),
 		 boost::ref(m_mainm_windows));
 	m_objectives.constr = boost::lambda::bind
 		(boost::lambda::new_ptr<GameObjectivesMenu>(),
 		 boost::ref(*this),
-		 boost::lambda::_1);
+		 boost::ref(m_objectives));
 	m_message_menu.constr = boost::lambda::bind
 		(boost::lambda::new_ptr<GameMessageMenu>(),
 		 boost::ref(*this),
-		 boost::lambda::_1);
+		 boost::ref(m_message_menu));
 
 #ifdef DEBUG //  only in debug builds
 	addCommand
@@ -365,9 +365,7 @@ Widelands::Player_Number Interactive_Player::player_number() const
 void Interactive_Player::node_action()
 {
 	Map const & map = egbase().map();
-#ifndef DEBUG
 	if (player().vision(Map::get_index(get_sel_pos().node, map.get_width())))
-#endif
 	{
 		// Special case for buildings
 		if (upcast(Building, building, map.get_immovable(get_sel_pos().node)))
@@ -427,12 +425,15 @@ bool Interactive_Player::handle_key(bool const down, SDL_keysym const code)
 			g_gr->toggle_fullscreen();
 			return true;
 
+		case SDLK_KP7:
+			if (code.mod & KMOD_NUM)
+				break;
 		case SDLK_HOME:
 			move_view_to(game().map().get_starting_pos(m_player_number));
 			return true;
 
-		case SDLK_RETURN:
 		case SDLK_KP_ENTER:
+		case SDLK_RETURN:
 			if (!m_chatProvider | !m_chatenabled)
 				break;
 

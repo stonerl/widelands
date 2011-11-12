@@ -17,29 +17,31 @@
  *
  */
 
-#include "constructionsite.h"
+#include <cstdio>
+#include <sstream>
+
+#include "upcast.h"
+#include "wexception.h"
+
 #include "economy/flag.h"
 #include "economy/request.h"
-#include "game.h"
-#include "game_data_error.h"
-#include "wui/interactive_player.h"
+#include "graphic/font.h"
+#include "graphic/font_handler.h"
+#include "graphic/rendertarget.h"
 #include "io/filesystem/filesystem.h"
 #include "io/filesystem/layered_filesystem.h"
+#include "profile/profile.h"
+#include "sound/sound_handler.h"
+#include "wui/interactive_player.h"
+
+#include "constructionsite.h"
+#include "game.h"
+#include "game_data_error.h"
 #include "map.h"
 #include "player.h"
 #include "productionsite.h"
-#include "profile/profile.h"
-#include "graphic/rendertarget.h"
-#include "graphic/font.h"
-#include "graphic/font_handler.h"
-#include "sound/sound_handler.h"
 #include "tribe.h"
-#include "upcast.h"
-#include "wexception.h"
 #include "worker.h"
-
-#include <cstdio>
-#include <sstream>
 
 namespace Widelands {
 
@@ -79,6 +81,10 @@ Building_Descr::Building_Descr
 	} catch (_wexception const & e) {
 		throw game_data_error("size: %s", e.what());
 	}
+
+	m_helptext_script = directory + "/help.lua";
+	if (not g_fs->FileExists(m_helptext_script))
+		m_helptext_script = "";
 
 	// Parse build options
 	m_buildable = global_s.get_bool("buildable", true);
@@ -318,9 +324,13 @@ Flag & Building::base_flag()
  */
 uint32_t Building::get_playercaps() const throw () {
 	uint32_t caps = 0;
-	if (descr().is_destructible())
+	const Building_Descr & d = descr();
+	if (d.is_destructible()) {
 		caps |= 1 << PCap_Bulldoze;
-	if (descr().enhancements().size())
+		if (d.is_buildable() or d.is_enhanced())
+			caps |= 1 << PCap_Dismantle;
+	}
+	if (d.enhancements().size())
 		caps |= 1 << PCap_Enhancable;
 	return caps;
 }

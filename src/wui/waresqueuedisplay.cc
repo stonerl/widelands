@@ -17,83 +17,62 @@
  *
  */
 
+#include <algorithm>
+
 #include "waresqueuedisplay.h"
 
 #include "economy/request.h"
 #include "economy/wares_queue.h"
 #include "graphic/rendertarget.h"
 #include "interactive_gamebase.h"
-#include "logic/item_ware_descr.h"
 #include "logic/player.h"
-#include "ui_basic/button.h"
 
-
-static char const * pic_queue_background = "pics/queue_background.png";
-
-static char const * pic_priority_low       = "pics/low_priority_button.png";
-static char const * pic_priority_normal    = "pics/normal_priority_button.png";
-static char const * pic_priority_high      = "pics/high_priority_button.png";
-static char const * pic_priority_low_on    = "pics/low_priority_on.png";
-static char const * pic_priority_normal_on = "pics/normal_priority_on.png";
-static char const * pic_priority_high_on   = "pics/high_priority_on.png";
-
-/**
- * This passive class displays the status of a WaresQueue.
- * It updates itself automatically through think().
- */
-struct WaresQueueDisplay : public UI::Panel {
-	enum {
-		CellWidth = WARE_MENU_PIC_WIDTH,
-		Border = 4,
-		Height = WARE_MENU_PIC_HEIGHT + 2 * Border,
-	};
-
-public:
-	WaresQueueDisplay
-		(UI::Panel             * parent,
-		 int32_t x, int32_t y,
-		 uint32_t                maxw,
-		 Widelands::WaresQueue *);
-	~WaresQueueDisplay();
-
-	virtual void think();
-	virtual void draw(RenderTarget &);
-
-protected:
-	virtual void update_desired_size();
-
-private:
-	Widelands::WaresQueue * m_queue;
-	uint32_t         m_max_width;
-	PictureID        m_icon;            //< Index to ware's picture
-	PictureID        m_pic_background;
-
-	uint32_t         m_cache_size;
-	uint32_t         m_cache_filled;
-	uint32_t         m_display_size;
-};
+static char const * pic_priority_low     = "pics/low_priority_button.png";
+static char const * pic_priority_normal  = "pics/normal_priority_button.png";
+static char const * pic_priority_high    = "pics/high_priority_button.png";
+static char const * pic_max_fill_indicator = "pics/max_fill_indicator.png";
 
 WaresQueueDisplay::WaresQueueDisplay
 	(UI::Panel * const parent,
-	 int32_t const x, int32_t const y, uint32_t const maxw,
-	 Widelands::WaresQueue * const queue)
+	 int32_t const x, int32_t const y,
+	 Interactive_GameBase  & igb,
+	 Widelands::Building   & building,
+	 Widelands::WaresQueue * const queue,
+	 bool show_only)
 :
-UI::Panel(parent, x, y, 0, Height),
+UI::Panel(parent, x, y, 0, 28),
+m_igb(igb),
+m_building(building),
 m_queue(queue),
-m_max_width(maxw),
-m_pic_background(g_gr->get_picture(PicMod_Game, pic_queue_background)),
-m_cache_size(queue->get_size()),
+m_priority_radiogroup(0),
+m_increase_max_fill(0),
+m_decrease_max_fill(0),
+m_ware_index(queue->get_ware()),
+m_ware_type(Widelands::Request::WARE),
+m_max_fill_indicator(g_gr->get_picture(PicMod_Game, pic_max_fill_indicator)),
+m_cache_size(queue->get_max_size()),
 m_cache_filled(queue->get_filled()),
-m_display_size(0)
+m_total_height(0),
+m_show_only(show_only)
 {
 	const Widelands::Item_Ware_Descr & ware =
 		*queue->owner().tribe().get_ware_descr(m_queue->get_ware());
 	set_tooltip(ware.descname().c_str());
 
 	m_icon = ware.icon();
-	m_pic_background = g_gr->create_grayed_out_pic(m_icon);
+	m_icon_grey = g_gr->create_grayed_out_pic(m_icon);
+	m_icon_grey = g_gr->create_changed_luminosity_pic(m_icon_grey, 0.65);
 
-	update_desired_size();
+	uint32_t pw, ph;
+	g_gr->get_picture_size(m_max_fill_indicator, pw, ph);
+
+	uint32_t priority_button_height = show_only ? 0 : 3 * PriorityButtonSize;
+	uint32_t picture_height = show_only ? WARE_MENU_PIC_HEIGHT :
+		std::max(WARE_MENU_PIC_HEIGHT, static_cast<int32_t>(ph));
+
+	m_total_height = std::max(priority_button_height, picture_height) + 2 * Border;
+
+	max_size_changed();
 
 	set_think(true);
 }
@@ -107,16 +86,23 @@ WaresQueueDisplay::~WaresQueueDisplay()
  *
  * This is useful for construction sites, whose queues shrink over time.
  */
-void WaresQueueDisplay::update_desired_size()
+void WaresQueueDisplay::max_size_changed()
 {
-	m_display_size = (m_max_width - 2 * Border) / CellWidth;
+	uint32_t pbs = m_show_only ? 0 : PriorityButtonSize;
+	uint32_t ctrl_b_size = m_show_only ? 0 : 2 * WARE_MENU_PIC_WIDTH;
 
-	m_cache_size = m_queue->get_size();
+	m_cache_size = m_queue->get_max_size();
 
-	if (m_cache_size < m_display_size)
-		m_display_size = m_cache_size;
+	update_priority_buttons();
+	update_max_fill_buttons();
 
-	set_desired_size(m_display_size * CellWidth + 2 * Border, Height);
+	if (m_cache_size <= 0) {
+		set_desired_size(0, 0);
+	} else {
+		set_desired_size
+			(m_cache_size * (CellWidth + CellSpacing) + pbs + ctrl_b_size + 2 * Border,
+			 m_total_height);
+	}
 }
 
 /**
@@ -124,8 +110,8 @@ void WaresQueueDisplay::update_desired_size()
  */
 void WaresQueueDisplay::think()
 {
-	if (static_cast<uint32_t>(m_queue->get_size()) != m_cache_size)
-		update_desired_size();
+	if (static_cast<uint32_t>(m_queue->get_max_size()) != m_cache_size)
+		max_size_changed();
 
 	if (static_cast<uint32_t>(m_queue->get_filled()) != m_cache_filled)
 		update();
@@ -136,184 +122,166 @@ void WaresQueueDisplay::think()
  */
 void WaresQueueDisplay::draw(RenderTarget & dst)
 {
-	if (!m_display_size)
+	if (!m_cache_size)
 		return;
 
 	m_cache_filled = m_queue->get_filled();
 
-	uint32_t nr_wares_to_draw = std::min(m_cache_filled, m_display_size);
-	uint32_t nr_empty_to_draw = m_display_size - nr_wares_to_draw;
-	Point point(Border, Border);
-	for (; nr_wares_to_draw; --nr_wares_to_draw, point.x += CellWidth)
+	uint32_t nr_wares_to_draw = std::min(m_cache_filled, m_cache_size);
+	uint32_t nr_empty_to_draw = m_cache_size - nr_wares_to_draw;
+
+	Point point;
+	point.x = Border + (m_show_only ? 0 : CellWidth + CellSpacing);
+	point.y = Border + (m_total_height - 2 * Border - WARE_MENU_PIC_HEIGHT) / 2;
+
+	for (; nr_wares_to_draw; --nr_wares_to_draw, point.x += CellWidth + CellSpacing)
 		dst.blit(point, m_icon);
-	for (; nr_empty_to_draw; --nr_empty_to_draw, point.x += CellWidth)
-		dst.blit(point, m_pic_background);
+	for (; nr_empty_to_draw; --nr_empty_to_draw, point.x += CellWidth + CellSpacing)
+		dst.blit(point, m_icon_grey);
+
+	if (not m_show_only) {
+		uint32_t pw, ph;
+		g_gr->get_picture_size(m_max_fill_indicator, pw, ph);
+		point.y = Border;
+		point.x = Border + CellWidth + CellSpacing +
+			(m_queue->get_max_fill() * (CellWidth + CellSpacing)) - CellSpacing / 2 - pw / 2;
+		dst.blit(point, m_max_fill_indicator);
+	}
 }
 
 /**
- * This button is used to change the priority of a wares queue.
- *
- * It maintains its enabled state automatically.
+ * Updates priority buttons of the WaresQueue
  */
-struct WareQueuePriorityButton : UI::Button {
-	WareQueuePriorityButton
-		(UI::Panel * parent,
-		 int32_t x, int32_t y, uint32_t w, uint32_t h,
-		 const char * picture_enabled, const char * picture_disabled,
-		 const std::string & tooltip,
-		 Interactive_GameBase & igb,
-		 Widelands::Building & building,
-		 int32_t ware_type,
-		 Widelands::Ware_Index ware_index,
-		 int32_t priority);
-
-private:
-	void clicked();
-	void think();
-	void set_pic(PictureID picid);
-
-	void update_enabled();
-
-	Interactive_GameBase & m_igb;
-	Widelands::Building & m_building;
-	int32_t m_ware_type;
-	Widelands::Ware_Index m_ware_index;
-	int32_t m_priority;
-
-	PictureID m_picture_enabled;
-	PictureID m_picture_disabled;
-};
-
-WareQueuePriorityButton::WareQueuePriorityButton
-	(UI::Panel * parent,
-	 int32_t x, int32_t y, uint32_t w, uint32_t h,
-	 const char * picture_enabled, const char * picture_disabled,
-	 const std::string & tooltip,
-	 Interactive_GameBase & igb,
-	 Widelands::Building & building,
-	 int32_t ware_type,
-	 Widelands::Ware_Index ware_index,
-	 int32_t priority)
-:
-UI::Button
-	(parent, "priority_button",
-	 x, y, w, h,
-	 g_gr->get_picture(PicMod_UI, "pics/but4.png"),
-	 g_gr->get_no_picture(),
-	 tooltip),
-m_igb(igb),
-m_building(building),
-m_ware_type(ware_type),
-m_ware_index(ware_index),
-m_priority(priority),
-m_picture_enabled
-	(g_gr->get_resized_picture
-		(g_gr->get_picture(PicMod_Game,  picture_enabled),
-		 w, h, Graphic::ResizeMode_Clip)),
-m_picture_disabled
-	(g_gr->get_resized_picture
-		(g_gr->get_picture(PicMod_Game,  picture_disabled),
-		 w, h, Graphic::ResizeMode_Clip))
+void WaresQueueDisplay::update_priority_buttons()
 {
-	update_enabled();
-
-	set_think(true);
-}
-
-void WareQueuePriorityButton::clicked()
-{
-	m_igb.game().send_player_set_ware_priority
-		(m_building, m_ware_type, m_ware_index, m_priority);
-	set_think(true);
-}
-
-void WareQueuePriorityButton::think()
-{
-	update_enabled();
-}
-
-void WareQueuePriorityButton::set_pic(PictureID const picid)
-{
-	m_title.clear();
-
-	if (m_pic_custom_disabled == picid)
+	delete m_priority_radiogroup;
+	if (m_cache_size <= 0 or m_show_only)
 		return;
 
-	m_pic_custom_disabled = picid;
-	m_pic_custom = g_gr->create_grayed_out_pic(picid);
+	m_priority_radiogroup = new UI::Radiogroup();
 
-	update();
-}
+	Point pos = Point(m_cache_size * CellWidth + Border, 0);
+	pos.x = (m_cache_size + 2) * (CellWidth + CellSpacing) + Border;
+	pos.y = Border + (m_total_height - 2 * Border - 3 * PriorityButtonSize) / 2;
 
-void WareQueuePriorityButton::update_enabled()
-{
-	bool allow_changes = m_igb.can_act(m_building.owner().player_number());
-	bool enabled = m_building.get_priority(m_ware_type, m_ware_index, false) != m_priority;
+	m_priority_radiogroup->add_button
+			(this,
+			pos,
+			g_gr->get_resized_picture
+				(g_gr->get_picture(PicMod_Game,  pic_priority_high),
+				PriorityButtonSize, PriorityButtonSize, Graphic::ResizeMode_Clip),
+			_("Highest priority"));
+	pos.y += PriorityButtonSize;
+	m_priority_radiogroup->add_button
+			(this,
+			pos,
+			g_gr->get_resized_picture
+				(g_gr->get_picture(PicMod_Game,  pic_priority_normal),
+				PriorityButtonSize, PriorityButtonSize, Graphic::ResizeMode_Clip),
+			_("Normal priority"));
+	pos.y += PriorityButtonSize;
+	m_priority_radiogroup->add_button
+			(this,
+			pos,
+			g_gr->get_resized_picture
+				(g_gr->get_picture(PicMod_Game,  pic_priority_low),
+				PriorityButtonSize, PriorityButtonSize, Graphic::ResizeMode_Clip),
+			_("Lowest priority"));
 
-	set_enabled(allow_changes && enabled);
-	set_pic(enabled ? m_picture_enabled : m_picture_disabled);
+	int32_t priority = m_building.get_priority(m_ware_type, m_ware_index, false);
+	switch (priority) {
+	case HIGH_PRIORITY:
+		m_priority_radiogroup->set_state(0);
+		break;
+	case DEFAULT_PRIORITY:
+		m_priority_radiogroup->set_state(1);
+		break;
+	case LOW_PRIORITY:
+		m_priority_radiogroup->set_state(2);
+		break;
+	default:
+		break;
+	}
+
+	m_priority_radiogroup->changedto.set
+		(this, &WaresQueueDisplay::radiogroup_changed);
+
+	bool const can_act = m_igb.can_act(m_building.owner().player_number());
+	if (not can_act)
+		m_priority_radiogroup->set_enabled(false);
 }
 
 /**
- * Allocate a new panel that displays the given wares queue and shows
- * priority buttons that can be manipulated if appropriate.
+ * Updates the desired size buttons
  */
-UI::Panel * create_wares_queue_display
-	(UI::Panel * parent,
-	 Interactive_GameBase & igb,
-	 Widelands::Building & b,
-	 Widelands::WaresQueue * const wq,
-	 int32_t width)
+void WaresQueueDisplay::update_max_fill_buttons() {
+	delete m_increase_max_fill;
+	delete m_decrease_max_fill;
+	if (m_cache_size <= 0 or m_show_only)
+		return;
+
+	uint32_t x = Border;
+	uint32_t y = Border + (m_total_height - 2 * Border - WARE_MENU_PIC_WIDTH) / 2;
+
+	m_decrease_max_fill = new UI::Callback_Button
+		(this, "decrease_max_fill",
+		 x, y, WARE_MENU_PIC_WIDTH, WARE_MENU_PIC_HEIGHT,
+		 g_gr->get_picture(PicMod_UI, "pics/but4.png"),
+		 g_gr->get_picture(PicMod_UI, "pics/scrollbar_left.png"),
+		 boost::bind(&WaresQueueDisplay::decrease_max_fill_clicked, boost::ref(*this)),
+		 _("Decrease the number of wares you want to be stored here."));
+
+	x = Border + (m_cache_size + 1) * (CellWidth + CellSpacing);
+	m_increase_max_fill = new UI::Callback_Button
+		(this, "increase_max_fill",
+		 x, y, WARE_MENU_PIC_WIDTH, WARE_MENU_PIC_HEIGHT,
+		 g_gr->get_picture(PicMod_UI, "pics/but4.png"),
+		 g_gr->get_picture(PicMod_UI, "pics/scrollbar_right.png"),
+		 boost::bind(&WaresQueueDisplay::increase_max_fill_clicked, boost::ref(*this)),
+		 _("Increase the number of wares you want to be stored here."));
+
+	// Disable those buttons for replay watchers
+	bool const can_act = m_igb.can_act(m_building.owner().player_number());
+	if (not can_act) {
+		m_increase_max_fill->set_enabled(false);
+		m_decrease_max_fill->set_enabled(false);
+	}
+}
+
+/**
+ * Update priority when radiogroup has changed
+ */
+void WaresQueueDisplay::radiogroup_changed(int32_t state)
 {
-	const int32_t priority_buttons_width = WaresQueueDisplay::Height / 3;
-	UI::Box * hbox = new UI::Box (parent, 0, 0, UI::Box::Horizontal);
-	WaresQueueDisplay & wqd =
-		*new WaresQueueDisplay(hbox, 0, 0, width - priority_buttons_width, wq);
+	int32_t priority = 0;
 
-	hbox->add(&wqd, UI::Box::AlignTop);
-
-	if (wq->get_ware()) {
-		// Add priority buttons
-		UI::Box * vbox = new UI::Box (hbox, 0, 0, UI::Box::Vertical);
-		int32_t ware_type = Widelands::Request::WARE;
-		Widelands::Ware_Index ware_index = wq->get_ware();
-
-		vbox->add
-			(new WareQueuePriorityButton
-			 	(vbox, 0, 0,
-			 	 priority_buttons_width,
-			 	 priority_buttons_width,
-			 	 pic_priority_high,
-			 	 pic_priority_high_on,
-			 	 _("Highest priority"),
-			 	 igb, b, ware_type, ware_index,
-			 	 HIGH_PRIORITY),
-			 UI::Box::AlignTop);
-		vbox->add
-			(new WareQueuePriorityButton
-			 	(vbox, 0, 0,
-			 	 priority_buttons_width,
-			 	 priority_buttons_width,
-			 	 pic_priority_normal,
-			 	 pic_priority_normal_on,
-			 	 _("Normal priority"),
-			 	 igb, b, ware_type, ware_index,
-			 	 DEFAULT_PRIORITY),
-			 UI::Box::AlignTop);
-		vbox->add
-			(new WareQueuePriorityButton
-			 	(vbox, 0, 0,
-			 	 priority_buttons_width,
-			 	 priority_buttons_width,
-			 	 pic_priority_low,
-			 	 pic_priority_low_on,
-			 	 _("Lowest priority"),
-			 	 igb, b, ware_type, ware_index,
-			 	 LOW_PRIORITY),
-			 UI::Box::AlignTop);
-
-		hbox->add(vbox, UI::Box::AlignCenter);
+	switch (state) {
+	case 0: priority = HIGH_PRIORITY;
+		break;
+	case 1: priority = DEFAULT_PRIORITY;
+		break;
+	case 2: priority = LOW_PRIORITY;
+		break;
+	default:
+		return;
 	}
 
-	return hbox;
+	m_igb.game().send_player_set_ware_priority
+			(m_building, m_ware_type, m_ware_index, priority);
+};
+
+/**
+ * One of the buttons to increase or decrease the amount of wares
+ * stored here has been clicked
+ */
+void WaresQueueDisplay::decrease_max_fill_clicked() {
+	int32_t cur = m_queue->get_max_fill();
+	m_igb.game().send_player_set_ware_max_fill
+			(m_building, m_ware_index, cur - 1);
 }
+void WaresQueueDisplay::increase_max_fill_clicked() {
+	int32_t cur = m_queue->get_max_fill();
+	m_igb.game().send_player_set_ware_max_fill
+			(m_building, m_ware_index, cur + 1);
+}
+

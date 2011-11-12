@@ -19,51 +19,32 @@
 
 #include "plot_area.h"
 
+#include "i18n.h"
 #include "constants.h"
 #include "graphic/font.h"
 #include "graphic/font_handler.h"
 #include "graphic/graphic.h"
 #include "graphic/rendertarget.h"
 
+
 #include "ui_basic/panel.h"
 
 #include <cstdio>
+#include <boost/lexical_cast.hpp>
 
+static const uint32_t minutes = 60 * 1000;
+static const uint32_t hours = 60 * 60 * 1000;
+static const uint32_t days = 24 * 60 * 60 * 1000;
 
-/*
- * Where to draw tics
- */
-static const int32_t how_many_ticks[] = {
-	5,  // 15 Mins
-	3,  // 30 Mins
-	6,  // 1  H
-	4,  // 2  H
-	4,  // 4  H
-	4,  // 8  H
-	4,  // 16 H
+const uint32_t WUIPlot_Area::time_in_ms[] = {
+	15 * minutes,
+	30 * minutes,
+	1  * hours,
+	2  * hours,
+	5  * hours,
+	10 * hours,
+	30 * hours
 };
-
-static const int32_t max_x[] = {
-	15,
-	30,
-	60,
-	120,
-	4,
-	8,
-	16
-};
-
-static const uint32_t time_in_ms[] = {
-	15      * 60 * 1000,
-	30      * 60 * 1000,
-	1  * 60 * 60 * 1000,
-	2  * 60 * 60 * 1000,
-	4  * 60 * 60 * 1000,
-	8  * 60 * 60 * 1000,
-	16 * 60 * 60 * 1000,
-};
-
-#define NR_SAMPLES 30   // How many samples per diagramm when relative plotting
 
 #define BG_PIC "pics/plot_area_bg.png"
 #define LINE_COLOR RGBColor(0, 0, 0)
@@ -74,27 +55,285 @@ WUIPlot_Area::WUIPlot_Area
 	 int32_t const x, int32_t const y, int32_t const w, int32_t const h)
 :
 UI::Panel (parent, x, y, w, h),
-m_time    (TIME_ONE_HOUR),
-m_plotmode(PLOTMODE_ABSOLUTE)
+spacing(5),
+space_at_bottom(15),
+space_at_right(5),
+m_time    (TIME_GAME),
+m_plotmode(PLOTMODE_ABSOLUTE),
+m_game_time_id(0)
 {}
 
+
+uint32_t WUIPlot_Area::get_game_time() {
+	uint32_t game_time = 0;
+
+	// Find running time of the game, based on the plot data
+	for (uint32_t plot = 0; plot < m_plotdata.size(); ++plot)
+		if (game_time < m_plotdata[plot].dataset->size() * m_sample_rate)
+			game_time = m_plotdata[plot].dataset->size() * m_sample_rate;
+	return game_time;
+}
+
+uint32_t WUIPlot_Area::get_plot_time() {
+	if (m_time == TIME_GAME) {
+		// Start with the game time
+		uint32_t time_in_ms_ = get_game_time();
+
+		// Round up to a nice nearest multiple.
+		// Either a multiple of 4 min
+		// Either a multiple of 20 min
+		// or a multiple of 2h
+		// or a multiple of 20h
+		// or a multiple of 4 days
+		if (time_in_ms_ > 8 * days) {
+			time_in_ms_ += - (time_in_ms_ % (4 * days)) + 4 * days;
+		} else if (time_in_ms_ > 40 * hours) {
+			time_in_ms_ += - (time_in_ms_ % (20 * hours)) + 20 * hours;
+		} else if (time_in_ms_ > 4 * hours) {
+			time_in_ms_ += - (time_in_ms_ % (2 * hours)) + 2 * hours;
+		} else {
+			time_in_ms_ += - (time_in_ms_ % (15 * minutes)) + 15 * minutes;
+		}
+		return time_in_ms_;
+	} else {
+		return time_in_ms[m_time];
+	}
+}
+
+WUIPlot_Area::UNIT WUIPlot_Area::get_suggested_unit(uint32_t game_time) {
+	// Find a nice unit for max_x
+	if (game_time > 4 * days) {
+		return UNIT_DAY;
+	} else if (game_time > 4 * hours) {
+		return UNIT_HOUR;
+	} else {
+		return UNIT_MIN;
+	}
+}
+
+std::string WUIPlot_Area::get_unit_name(UNIT unit) {
+	switch (unit) {
+		case UNIT_DAY:  return _("d");
+		case UNIT_HOUR: return _("h");
+		case UNIT_MIN:  return _("min");
+	}
+	return "invalid";
+}
+
+uint32_t WUIPlot_Area::ms_to_unit(UNIT unit, uint32_t ms) {
+	switch (unit) {
+		case UNIT_DAY: return ms / days;
+		case UNIT_HOUR: return ms / hours;
+		case UNIT_MIN: return ms / minutes;
+	}
+	return -1;
+}
+
+std::vector<std::string> WUIPlot_Area::get_labels() {
+	std::vector<std::string> labels;
+	for (int32_t i = 0; i < m_game_time_id; i++) {
+		UNIT unit = get_suggested_unit(time_in_ms[i]);
+		uint32_t val = ms_to_unit(unit, time_in_ms[i]);
+		labels.push_back(boost::lexical_cast<std::string>(val) + get_unit_name(unit));
+	}
+	labels.push_back(_("game"));
+	return labels;
+}
+
+/**
+ * Find the last predefined time span that is less than the game time. If this
+ * is called from the outside, e.g. from a slider, then from that moment on
+ * this class assumes that values passed to set_time_id adhere to the new
+ * choice of time spans.
+ * We start to search with i=1 to ensure that at least one option besides
+ * "game" will be offered to the user.
+ */
+int32_t WUIPlot_Area::get_game_time_id() {
+	uint32_t game_time = get_game_time();
+	uint32_t i;
+	for (i = 1; i < 7 && time_in_ms[i] <= game_time; i++) {
+	}
+	m_game_time_id = i;
+	return m_game_time_id;
+}
 
 /*
  * Draw this. This is the main function
  */
 void WUIPlot_Area::draw(RenderTarget & dst) {
 
+	uint32_t time_in_ms_;
+
+	float const xline_length = get_inner_w() - space_at_right  - spacing;
+	float const yline_length = get_inner_h() - space_at_bottom - spacing;
+
+
+	time_in_ms_ = draw_diagram(dst, xline_length, yline_length);
+
+	// How many do we take together when relative ploting
+	const int32_t how_many = calc_how_many(time_in_ms_);
+
+	uint32_t max = 0;
+	//  Find the maximum value.
+	if (m_plotmode == PLOTMODE_ABSOLUTE)  {
+		for (uint32_t i = 0; i < m_plotdata.size(); ++i)
+			if (m_plotdata[i].showplot) {
+				for (uint32_t l = 0; l < m_plotdata[i].dataset->size(); ++l)
+					if (max < (*m_plotdata[i].dataset)[l])
+						max = (*m_plotdata[i].dataset)[l];
+			}
+	} else {
+		for (uint32_t plot = 0; plot < m_plotdata.size(); ++plot)
+			if (m_plotdata[plot].showplot) {
+
+				std::vector<uint32_t> const & dataset = *m_plotdata[plot].dataset;
+
+				uint32_t add = 0;
+				//  Relative data, first entry is always zero.
+				for (uint32_t i = 0; i < dataset.size(); ++i) {
+					add += dataset[i];
+					if (0 == ((i + 1) % how_many)) {
+						if (max < add)
+							max = add;
+						add = 0;
+					}
+				}
+			}
+	}
+
+	//  print the maximal value into the top right corner
+	char buffer[200];
+	sprintf(buffer, "%u", max);
+
+	draw_value
+		(dst, buffer, RGBColor(60, 125, 0),
+		 Point(get_inner_w() - space_at_right - 2, spacing + 2));
+
+	//  plot the pixels
+	float sub =
+		xline_length
+		/
+		(static_cast<float>(time_in_ms_)
+		 /
+		 static_cast<float>(m_sample_rate));
+	for (uint32_t plot = 0; plot < m_plotdata.size(); ++plot)
+		if (m_plotdata[plot].showplot) {
+
+			RGBColor color = m_plotdata[plot].plotcolor;
+			std::vector<uint32_t> const * dataset = m_plotdata[plot].dataset;
+
+			std::vector<uint32_t> m_data;
+			if (m_plotmode == PLOTMODE_RELATIVE) {
+				uint32_t add = 0;
+				// Relative data, first entry is always zero
+				m_data.push_back(0);
+				for (uint32_t i = 0; i < dataset->size(); ++i) {
+					add += (*dataset)[i];
+					if (0 == ((i + 1) % how_many)) {
+						m_data.push_back(add);
+						add = 0;
+					}
+				}
+
+				dataset = &m_data;
+				sub = xline_length / static_cast<float>(nr_samples);
+			}
+
+			draw_plot_line
+				(dst, dataset, yline_length, max, sub, color, get_inner_h() - space_at_bottom);
+		}
+}
+
+/**
+ * calculate how many values are taken together when plot mode is relative
+ */
+int32_t WUIPlot_Area::calc_how_many(uint32_t time_in_ms_) {
+	int32_t how_many = static_cast<int32_t>
+			((static_cast<float>(time_in_ms_)
+				/
+				static_cast<float>(nr_samples))
+				/
+				static_cast<float>(m_sample_rate));
+
+	return how_many;
+}
+
+/**
+ * scale the values from dataset down to the available space and draw a single plot line
+ * \param dataset the y values of the line
+ * \param sub horizontal difference between 2 y values
+ */
+void WUIPlot_Area::draw_plot_line
+		(RenderTarget & dst, std::vector<uint32_t> const * dataset, float const yline_length,
+		 uint32_t const highest_scale, float const sub, RGBColor const color, int32_t const yoffset)
+{
+
+	float posx = get_inner_w() - space_at_right;
+
+	int32_t lx = get_inner_w() - space_at_right;
+	int32_t ly = yoffset;
+	for (int32_t i = dataset->size() - 1; i > 0 and posx > spacing; --i) {
+		int32_t const curx = static_cast<int32_t>(posx);
+		int32_t       cury = yoffset;
+
+		//scale the line to the available space
+		if (int32_t value = (*dataset)[i]) {
+			const float length_y =
+				yline_length
+				/
+				(static_cast<float>(highest_scale) / static_cast<float>(value));
+			cury -= static_cast<int32_t>(length_y);
+		}
+
+		dst.draw_line(lx, ly, curx, cury, color);
+
+		posx -= sub;
+
+		lx = curx;
+		ly = cury;
+	}
+}
+
+/**
+ * draw the background and the axis of the diagram
+ */
+uint32_t WUIPlot_Area::draw_diagram
+	(RenderTarget & dst, float const xline_length, float const yline_length) {
+
+	uint32_t time_in_ms_, how_many_ticks, max_x;
+	char buffer[200];
+
+	time_in_ms_ = get_plot_time();
+	UNIT unit = get_suggested_unit(time_in_ms_);
+	max_x = ms_to_unit(unit, time_in_ms_);
+
+	// Find a nice division of max_x
+	if (max_x % 5 == 0) {
+		if (max_x <= 10) {
+			how_many_ticks = 5;
+		} else {
+			how_many_ticks = max_x / 5;
+			while (how_many_ticks > 7 && how_many_ticks % 2 == 0) {
+				how_many_ticks /= 2;
+			}
+			while (how_many_ticks > 7 && how_many_ticks % 3 == 0) {
+				how_many_ticks /= 3;
+			}
+			while (how_many_ticks > 7 && how_many_ticks % 5 == 0) {
+				how_many_ticks /= 5;
+			}
+			while (how_many_ticks > 7 && how_many_ticks % 7 == 0) {
+				how_many_ticks /= 7;
+			}
+		}
+	} else {
+		how_many_ticks = 4;
+	}
+
 	// first, tile the background
 	dst.tile
 		(Rect(Point(0, 0), get_inner_w(), get_inner_h()),
 		 g_gr->get_picture(PicMod_Game, BG_PIC), Point(0, 0));
-
-	int32_t const spacing         =  5;
-	int32_t const space_at_bottom = 15;
-	int32_t const space_at_right  =  5;
-
-	float const xline_length = get_inner_w() - space_at_right  - spacing;
-	float const yline_length = get_inner_h() - space_at_bottom - spacing;
 
 	// Draw coordinate system
 	// X Axis
@@ -123,10 +362,10 @@ void WUIPlot_Area::draw(RenderTarget & dst) {
 	UI::TextStyle xtickstyle(UI::TextStyle::ui_small());
 	xtickstyle.fg = RGBColor(255, 0, 0);
 
-	float sub = xline_length / how_many_ticks[m_time];
+	float sub = xline_length / how_many_ticks;
 	float posx = get_inner_w() - space_at_right;
-	char buffer[200];
-	for (int32_t i = 0; i <= how_many_ticks[m_time]; ++i) {
+
+	for (uint32_t i = 0; i <= how_many_ticks; ++i) {
 		dst.draw_line
 			(static_cast<int32_t>(posx), get_inner_h() - space_at_bottom,
 			 static_cast<int32_t>(posx), get_inner_h() - space_at_bottom + 3,
@@ -134,13 +373,13 @@ void WUIPlot_Area::draw(RenderTarget & dst) {
 
 		snprintf
 			(buffer, sizeof(buffer),
-			 "%u", max_x[m_time] / how_many_ticks[m_time] * i);
+			 "%u", max_x / how_many_ticks * i);
 
 		UI::g_fh->draw_text
 			(dst, xtickstyle,
 			 Point
 			 	(static_cast<int32_t>(posx),
-			 	 get_inner_h() - space_at_bottom + 4),
+			 	 get_inner_h() - space_at_bottom + 10),
 			 buffer,
 			 UI::Align_Center);
 		posx -= sub;
@@ -158,113 +397,29 @@ void WUIPlot_Area::draw(RenderTarget & dst) {
 		 spacing + ((get_inner_h() - space_at_bottom) - spacing) / 2,
 		 LINE_COLOR);
 
-	uint32_t max = 0;
-	//  Find the maximum value.
-	if (m_plotmode == PLOTMODE_ABSOLUTE)  {
-		for (uint32_t i = 0; i < m_plotdata.size(); ++i)
-			if (m_plotdata[i].showplot) {
-				for (uint32_t l = 0; l < m_plotdata[i].dataset->size(); ++l)
-					if (max < (*m_plotdata[i].dataset)[l])
-						max = (*m_plotdata[i].dataset)[l];
-			}
-	} else {
-		for (uint32_t plot = 0; plot < m_plotdata.size(); ++plot)
-			if (m_plotdata[plot].showplot) {
+	//  print the used unit
+	UI::g_fh->draw_text
+		(dst, xtickstyle,
+		 Point(2, spacing + 2),
+		 get_unit_name(unit), UI::Align_CenterLeft);
 
-				std::vector<uint32_t> const & dataset = *m_plotdata[plot].dataset;
+	return time_in_ms_;
+}
 
-				// How many do we take together
-				int32_t const how_many =
-					static_cast<int32_t>
-					((static_cast<float>(time_in_ms[m_time])
-					  /
-					  static_cast<float>(NR_SAMPLES))
-					 /
-					 static_cast<float>(m_sample_rate));
+/**
+ * print the string into the RenderTarget.
+ */
+void WUIPlot_Area::draw_value
+	(RenderTarget & dst, const char * value, RGBColor color, Point pos)
+{
 
-				uint32_t add = 0;
-				//  Relative data, first entry is always zero.
-				for (uint32_t i = 0; i < dataset.size(); ++i) {
-					add += dataset[i];
-					if (0 == ((i + 1) % how_many)) {
-						if (max < add)
-							max = add;
-						add = 0;
-					}
-				}
-			}
-	}
-
-	//  print the maximal value
-	sprintf(buffer, "%u", max);
 	UI::TextStyle ymarkstyle(UI::TextStyle::ui_small());
-	ymarkstyle.fg = RGBColor(120, 255, 0);
+	ymarkstyle.fg = color;
 
 	UI::g_fh->draw_text
 		(dst, ymarkstyle,
-		 Point(get_inner_w() - space_at_right - 2, spacing),
-		 buffer, UI::Align_CenterRight);
-
-	//  plot the pixels
-	sub =
-		xline_length
-		/
-		(static_cast<float>(time_in_ms[m_time])
-		 /
-		 static_cast<float>(m_sample_rate));
-	for (uint32_t plot = 0; plot < m_plotdata.size(); ++plot)
-		if (m_plotdata[plot].showplot) {
-
-			RGBColor color = m_plotdata[plot].plotcolor;
-			std::vector<uint32_t> const * dataset = m_plotdata[plot].dataset;
-
-			std::vector<uint32_t> m_data;
-			if (m_plotmode == PLOTMODE_RELATIVE) {
-				//  How many do we take together.
-				const int32_t how_many = static_cast<int32_t>
-				((static_cast<float>(time_in_ms[m_time])
-				  /
-				  static_cast<float>(NR_SAMPLES))
-				 /
-				 static_cast<float>(m_sample_rate));
-
-				uint32_t add = 0;
-				// Relative data, first entry is always zero
-				m_data.push_back(0);
-				for (uint32_t i = 0; i < dataset->size(); ++i) {
-					add += (*dataset)[i];
-					if (0 == ((i + 1) % how_many)) {
-						m_data.push_back(add);
-						add = 0;
-					}
-				}
-
-				dataset = &m_data;
-				sub = xline_length / static_cast<float>(NR_SAMPLES);
-			}
-
-			posx = get_inner_w() - space_at_right;
-
-			int32_t lx = get_inner_w() - space_at_right;
-			int32_t ly = get_inner_h() - space_at_bottom;
-			for (int32_t i = dataset->size() - 1; i > 0 and posx > spacing; --i) {
-				int32_t const curx = static_cast<int32_t>(posx);
-				int32_t       cury = get_inner_h() - space_at_bottom;
-				if (int32_t value = (*dataset)[i]) {
-					const float length_y =
-						yline_length
-						/
-						(static_cast<float>(max) / static_cast<float>(value));
-					cury -= static_cast<int32_t>(length_y);
-				}
-				dst.draw_line(lx, ly, curx, cury, color);
-
-				posx -= sub;
-
-				lx = curx;
-				ly = cury;
-			}
-		}
+		 pos,
+		 value, UI::Align_CenterRight);
 }
 
 /*
@@ -281,6 +436,8 @@ void WUIPlot_Area::register_plot_data
 	m_plotdata[id].dataset   = data;
 	m_plotdata[id].showplot  = false;
 	m_plotdata[id].plotcolor = color;
+
+	get_game_time_id();
 }
 
 /*
@@ -292,13 +449,19 @@ void WUIPlot_Area::show_plot(uint32_t const id, bool const t) {
 };
 
 /*
- * set time
- */
-void WUIPlot_Area::set_time(TIME const id) {m_time = id;}
-
-/*
  * Set sample rate the data uses
  */
 void WUIPlot_Area::set_sample_rate(uint32_t const id) {
 	m_sample_rate = id;
+}
+
+
+void WUIPlot_Area_Slider::draw(RenderTarget & dst) {
+	int32_t new_game_time_id = m_plot_area.get_game_time_id();
+	if (new_game_time_id != m_last_game_time_id) {
+		m_last_game_time_id = new_game_time_id;
+		set_labels(m_plot_area.get_labels());
+		slider.set_value(m_plot_area.get_time_id());
+	}
+	UI::DiscreteSlider::draw(dst);
 }

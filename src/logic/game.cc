@@ -566,9 +566,14 @@ bool Game::run
 	SyncReset();
 
 	if (loader_ui) {
-		// (re)load the look of the street
-		g_gr->set_world(map().get_world_name());
 		load_graphics(*loader_ui);
+
+#ifdef WIN32
+		//  Clear the event queue before starting game because we don't want
+		//  to handle events at game start that happened during loading procedure.
+		SDL_Event event;
+		while (SDL_PollEvent(&event));
+#endif
 
 		g_sound_handler.change_music("ingame", 1000, 0);
 
@@ -741,6 +746,14 @@ void Game::send_player_bulldoze (PlayerImmovable & pi, bool const recurse)
 		 	(get_gametime(), pi.owner().player_number(), pi, recurse));
 }
 
+void Game::send_player_dismantle (PlayerImmovable & pi)
+{
+	send_player_command
+		(*new Cmd_DismantleBuilding
+		 	(get_gametime(), pi.owner().player_number(), pi));
+}
+
+
 void Game::send_player_build
 	(int32_t const pid, Coords const coords, Building_Index const id)
 {
@@ -797,6 +810,21 @@ void Game::send_player_set_ware_priority
 		 	 index,
 		 	 prio));
 }
+
+void Game::send_player_set_ware_max_fill
+	(PlayerImmovable &       imm,
+	 Ware_Index        const index,
+	  int32_t          const max_fill)
+{
+	send_player_command
+		(*new Cmd_SetWareMaxFill
+		 	(get_gametime(),
+		 	 imm.owner().player_number(),
+		 	 imm,
+		 	 index,
+		 	 max_fill));
+}
+
 
 void Game::send_player_change_training_options
 	(TrainingSite & ts, int32_t const atr, int32_t const val)

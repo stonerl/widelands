@@ -45,6 +45,7 @@
 #include "tribe.h"
 #include "worker.h"
 #include "world.h"
+#include "dismantlesite.h"
 
 #include "editor_game_base.h"
 
@@ -213,7 +214,10 @@ void Editor_Game_Base::set_map(Map * const new_map) {
 	delete m_map;
 
 	m_map = new_map;
-	if (g_gr)
+
+	// if this map is already completely loaded, we better inform g_gr about the change of the world
+	// to (re)load the correct road textures.
+	if (g_gr && strcmp(m_map->get_world_name(), ""))
 		g_gr->set_world(m_map->get_world_name());
 
 	NoteReceiver<NoteFieldTransformed>::connect(*m_map);
@@ -314,6 +318,27 @@ Building & Editor_Game_Base::warp_constructionsite
 	return
 		tribe.get_building_descr(idx)->create
 			(*this, plr, c, true, old_id ? tribe.get_building_descr(old_id) : 0, loading);
+}
+
+/**
+ * Create a dismantle site
+ */
+Building & Editor_Game_Base::warp_dismantlesite
+	(Coords const c, Player_Number const owner,
+	 Building_Index idx, bool loading)
+{
+	Player            & plr   = player(owner);
+	Tribe_Descr const & tribe = plr.tribe();
+
+	Building_Descr const * const descr =
+		tribe.get_building_descr
+			(tribe.safe_building_index("dismantlesite"));
+
+	upcast(const DismantleSite_Descr, ds_descr, descr);
+
+	return
+		*new DismantleSite
+			(*ds_descr, *this, c, *get_player(owner), *tribe.get_building_descr(idx), loading);
 }
 
 

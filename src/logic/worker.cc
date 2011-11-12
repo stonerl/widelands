@@ -1012,6 +1012,9 @@ bool Worker::run_construct(Game & game, State & state, Action const & action)
 		return true;
 	}
 
+	//update consumption statistic
+	owner().ware_consumed(wareindex, 1);
+
 	item = fetch_carried_item(game);
 	item->remove(game);
 
@@ -1572,7 +1575,7 @@ void Worker::cancel_task_transfer(Game & game)
 
 /**
  * Endless loop, in which the worker calls the owning building's
- * get_building_work() function to intiate subtasks.
+ * get_building_work() function to initiate subtasks.
  * The signal "update" is used to wake the worker up after a sleeping time
  * (initiated by a false return value from get_building_work()).
  *

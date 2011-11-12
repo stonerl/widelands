@@ -218,6 +218,29 @@ private:
 	Building_Index bi;
 };
 
+struct Cmd_DismantleBuilding:public PlayerCommand {
+	Cmd_DismantleBuilding() : PlayerCommand() {} // For savegame loading
+	Cmd_DismantleBuilding
+		(int32_t const t, int32_t const p,
+		 PlayerImmovable & pi)
+		: PlayerCommand(t, p), serial(pi.serial())
+	{}
+
+	// Write these commands to a file (for savegames)
+	void Write(FileWrite &, Editor_Game_Base &, Map_Map_Object_Saver  &);
+	void Read (FileRead  &, Editor_Game_Base &, Map_Map_Object_Loader &);
+
+	virtual uint8_t id() const {return QUEUE_CMD_DISMANTLEBUILDING;}
+
+	Cmd_DismantleBuilding (StreamRead &);
+
+	virtual void execute (Game &);
+	virtual void serialize (StreamWrite &);
+
+private:
+	Serial serial;
+};
+
 struct Cmd_SetWarePriority : public PlayerCommand {
 	Cmd_SetWarePriority() : PlayerCommand() {} // For savegame loading
 	Cmd_SetWarePriority
@@ -243,6 +266,29 @@ private:
 	int32_t m_priority;
 };
 
+struct Cmd_SetWareMaxFill : public PlayerCommand {
+	Cmd_SetWareMaxFill() : PlayerCommand() {} // For savegame loading
+	Cmd_SetWareMaxFill
+		(int32_t, Player_Number,
+		 PlayerImmovable &,
+		 Ware_Index, int32_t);
+
+	// Write these commands to a file (for savegames)
+	void Write(FileWrite &, Editor_Game_Base &, Map_Map_Object_Saver  &);
+	void Read (FileRead  &, Editor_Game_Base &, Map_Map_Object_Loader &);
+
+	virtual uint8_t id() const {return QUEUE_CMD_SETWAREMAXFILL;}
+
+	Cmd_SetWareMaxFill(StreamRead &);
+
+	virtual void execute (Game &);
+	virtual void serialize (StreamWrite &);
+
+private:
+	Serial m_serial;
+	Ware_Index m_index;
+	int32_t m_max_fill;
+};
 
 struct Cmd_ChangeTargetQuantity : public PlayerCommand {
 	Cmd_ChangeTargetQuantity() : PlayerCommand() {} //  For savegame loading.

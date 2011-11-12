@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2002-2003, 2006-2010 by the Widelands Development Team
+ * Copyright (C) 2002-2003, 2006-2011 by the Widelands Development Team
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -129,6 +129,15 @@ struct Player :
 	// For cheating
 	void set_see_all(bool const t) {m_see_all = t; m_view_changed = true;}
 	bool see_all() const throw () {return m_see_all;}
+
+	/// Per-player and per-field constructionsite information
+	struct Constructionsite_Information {
+		Constructionsite_Information() : becomes(0), was(0), totaltime(0), completedtime(0) {}
+		const Building_Descr * becomes;
+		const Building_Descr * was; // only valid if "becomes" is an enhanced building.
+		uint32_t               totaltime;
+		uint32_t               completedtime;
+	};
 
 	/// Per-player field information.
 	struct Field {
@@ -303,7 +312,10 @@ struct Player :
 		 * Only valid when the player has seen this node (or maybe a nearby node
 		 * if the immovable is big?). (Roads are not stored here.)
 		 */
-		const Map_Object_Descr * map_object_descr[3];
+		const Map_Object_Descr             * map_object_descr[3];
+		/// Information for constructionsite's animation.
+		/// only valid, if there is a constructionsite on this node
+		const Constructionsite_Information * constructionsite[3];
 
 		//  Summary of intended layout (not yet fully implemented)
 		//
@@ -439,6 +451,7 @@ struct Player :
 	void start_stop_building(PlayerImmovable &);
 	void enhance_building
 		(Building *, Building_Index index_of_new_building);
+	void dismantle_building (Building *);
 
 	// Economy stuff
 	void    add_economy(Economy &);
@@ -508,13 +521,19 @@ struct Player :
 	{
 		return m_building_stats[i];
 	}
+
 	std::vector<uint32_t> const * get_ware_production_statistics
+		(Ware_Index const) const;
+
+	std::vector<uint32_t> const * get_ware_consumption_statistics
 		(Ware_Index const) const;
 
 	void ReadStatistics(FileRead &, uint32_t version);
 	void WriteStatistics(FileWrite &) const;
 	void sample_statistics();
 	void ware_produced(Ware_Index);
+
+	void ware_consumed(Ware_Index, uint8_t);
 	void next_ware_production_period();
 
 	void receive(NoteImmovable const &);
@@ -534,6 +553,8 @@ private:
 	void update_building_statistics(Building &, losegain_t);
 	void update_team_players();
 	void play_message_sound(const std::string & sender);
+	void _enhance_or_dismantle
+		(Building *, Building_Index const index_of_new_building = Building_Index::Null());
 
 private:
 	MessageQueue           m_messages;
@@ -574,13 +595,25 @@ private:
 	/**
 	 * Wares produced (by ware id) since the last call to @ref sample_statistics
 	 */
-	std::vector<uint32_t> m_current_statistics;
+	std::vector<uint32_t> m_current_produced_statistics;
+
+	/**
+	 * Wares consumed (by ware id) since the last call to @ref sample_statistics
+	 */
+	std::vector<uint32_t> m_current_consumed_statistics;
 
 	/**
 	 * Statistics of wares produced over the life of the game, indexed as
 	 * m_ware_productions[ware id][time index]
 	 */
 	std::vector< std::vector<uint32_t> > m_ware_productions;
+
+	/**
+	 * Statistics of wares consumed over the life of the game, indexed as
+	 * m_ware_consumptions[ware_id][time_index]
+	 */
+	std::vector< std::vector<uint32_t> > m_ware_consumptions;
+
 	BuildingStats m_building_stats;
 };
 

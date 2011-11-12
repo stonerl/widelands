@@ -978,6 +978,7 @@ const MethodType<L_MapObject> L_MapObject::Methods[] = {
 	{0, 0},
 };
 const PropertyType<L_MapObject> L_MapObject::Properties[] = {
+	PROP_RO(L_MapObject, __hash),
 	PROP_RO(L_MapObject, serial),
 	PROP_RO(L_MapObject, type),
 	{0, 0, 0},
@@ -1011,6 +1012,12 @@ void L_MapObject::__unpersist(lua_State * L) {
  PROPERTIES
  ==========================================================
  */
+// Hash is used to identify a class in a Set
+int L_MapObject::get___hash(lua_State * L) {
+	lua_pushuint32(L, get(L, get_egbase(L))->serial());
+	return 1;
+}
+
 /* RST
 	.. attribute:: serial
 
@@ -1833,14 +1840,13 @@ int L_ProductionSite::set_wares(lua_State * L) {
 				  tribe.get_ware_descr(i->first)->name().c_str());
 
 		WaresQueue & wq = ps->waresqueue(i->first);
-		if (i->second > wq.get_size())
+		if (i->second > wq.get_max_size())
 			return
 				report_error
 					(L, "Not enough space for %u items, only for %i",
-					 i->second, wq.get_size());
+					 i->second, wq.get_max_size());
 
 		wq.set_filled(i->second);
-		wq.update();
 	}
 
 	return 0;

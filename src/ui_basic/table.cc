@@ -58,6 +58,7 @@ Table<void *>::Table
 	m_last_click_time (-10000),
 	m_last_selection  (no_selection_index()),
 	m_sort_column     (0),
+	m_total_width     (0),
 	m_sort_descending (descending)
 {
 	set_think(false);
@@ -87,6 +88,9 @@ void Table<void *>::add_column
 	uint32_t complete_width = 0;
 	container_iterate_const(Columns, m_columns, i)
 		complete_width += i.current->width;
+
+	m_total_width += width;
+	set_desired_size(m_total_width, get_h());
 
 	{
 		Column c;
@@ -349,6 +353,7 @@ bool Table<void *>::handle_mousepress
 					if (column.is_checkbox_column) {
 						play_click();
 						m_entry_records.at(row)->toggle(col);
+						update(0, 0, get_eff_w(), get_h());
 					}
 					break;
 				}
