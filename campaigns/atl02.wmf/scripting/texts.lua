@@ -46,6 +46,37 @@ end
 -- sawmill.]]
    -- ),
 -- }
+obj_basic_infrastructure = {
+   name = "obj_basic_infrastructure",
+   title = _ "Ensure the supply of build wares",
+   body = objective_text(_"Establish a basic production", _
+[[You will need at least a quarry, a few lumberjacks and a sawmill.
+A forester might or might not be needed depending on how fast the trees
+are growing around you. Find the balance.]]
+   ),
+}
+obj_tools = {
+   name = "obj_tools",
+   title = _ "Build tools quickly",
+   body = objective_text(_"Make new tools", _
+[[Most of your tools have been lost in the ship tragedy. Your people will
+not be able to fulfill their duties without proper tools. Luckily you still
+have some iron ore and plenty of coal. Build a production of tools, it is
+a prerequisite for success on island.]]
+   ),
+}
+
+obj_explore = {
+   name = "obj_explore",
+   title = _"Explore the surroundings",
+   body = objective_text(_"Explore your surroundings", _
+[[We are pretty sure that we are not alone on the island. We do not know
+if the others on this island are friends or foes so we need to treat carefully.
+Expand and explore the island by building at least one habitat for a scout
+and military buildings. Favor Towers over other military buildings for their
+bigger view range.]]
+   ),
+}
 
 -- =======================================================================
 --                                  Texts
@@ -54,70 +85,49 @@ end
 -- This is an array or message descriptions
 initial_messages = {
 {
-   title = _ "Proudest to the death",
-   body = rt(
-      h1(_"Favored by the god") ..
-      p(_
-[[On the hidden and lost island of Atlantis, a proud tribe settled since the
-world was very young. Ruled by the bloodline of King Ajanthul - the first human
-to be empowered by the sea god Lutas to breathe above the sea level - and the
-wise clerics, who provided the link to Lutas - they prospered and became
-civilized.]]
-      ) .. p(_
-[[This story happens during the regency of King Askandor, the 43rd successor of
-King Ajanthul. He has been a good king, ruling Atlantis with wisdom and
-foresight. But with age, he became afraid of dying and so he began looking for
-a cure to death even though most clerics warned him. Some said, endless life
-was only for the gods and to seek for it was forbidden.]]
-      )
-   ),
+   title = _ "The princess' memoir",
+   body = jundlina( _"Jundlina writes her diary", _
+[[Our escape from the cursed island was a close one: we managed to load three
+ships and make our escape, but the currents of the sinking island tested our
+new ships and their design. And one failed the test: the last days of loading was 
+done in chaos and without much planing and so one of ships ended up carrying
+most of the heavy wares in our possession. This plus the current was too much for
+the ship and it was pulled below the sea level by Lutas and his currents and we lost
+most men and all wares it carried.]]
+   .. "<br><br>" .. _
+[[The fear was great in us all. We expected the other ships to be drowned as well, but
+they persisted. We escaped the island and began our smooth sailing to other costs.
+Many weeks have passed and we did only see small islands not suitable for habitation and
+without any sign of being blessed by Satul, the fire god. Last night however, we made
+out a new island. We saw smoke hovering over it. The black comes from the fiery mountain
+in the north of the island, the grey however comes from settlers.]]
+   )
 },
 {
-   title = _ "The god's disgrace",
-   body = rt(
-      h1(_"The god's punishment") ..
-      p(_
-[[But all seemed well. Only the horses seemed to feel something was wrong.
-In the nights, they went crazy and were full of fear. It was not long before the
-horsebreeder Xydra figured out what was wrong with them: The sea level in front
-of their stable was rising in an ever accelerating speed.]]
-   ) .. p(_
-[[The clerics went into their meditation and the reason for the rising water
-was soon to be found: The god Lutas had lost faith in the Atlanteans because of
-the boldness of their king. He decided to withdraw the rights that were granted
-to King Ajanthul and his children. And so, he called them back below the sea
-again.]]
-   )
+   title = _ "Planing for the future",
+   body = jundlina(_"Jundlina continues", _
+[[At least the east side is inhabited, so much is clear. We do not know if the people
+there are friends or foes. We do not even know what tribe they might be from. The only
+thing that is sure that they can't be Atlantians for no ship of us has sailed as far
+as us in the last hundreds years. I can only hope they are friendly. We have not much water
+left, our food is running low, we lost all our tools and most of our building materials
+with the third ship. We can't afford waging war until we rooted ourselves here.]]
 )
 },
 {
-   title = _ "Uproar and confusion",
-   body = rt(
-      h1(_"Chaos emerges...") ..
-      p(_
-[[Guilt-ridden, the king committed suicide. Without a monarch, the people
-turned to the clerics, but those had no substantial help to offer. Most
-accepted their fate while others tried to change the god's mind by offering
-animals in his temple. But to no avail...]]
-   ) .. p(_
-[[Jundlina, the late king's daughter and the highest priestess of the god
-was the most determined cleric. As countless offerings didn't change the
-situation, she convinced herself that to soothe the god, an offer of great
-personal value was needed. So she offered him her most beloved:
-her husband, father of her only child.]]
-   ) .. p(_
-[[But not even this changed the mind of the god. The water kept on rising.
-Nearly driven crazy by guilt, pain and anger, Jundlina became a heretic:
-Secretly, she gathered people of the common folk who were not in line with the
-decision of the clerics to accept the god's will. Together with them, she set
-the temple on fire and stole a ship to flee from the god's influence of
-Atlantis. This small group started praying to Satul, the fire god and the worst
-enemy of Lutas.]]
-   ) .. p(_
-[[Leaving the dying Atlantis and their past behind, they started a quest to
-find a place sheltered by the fire and protected from the sea.]]
-   )
-)
+   title = _ "Jundlina gives orders",
+   body = jundlina(_ "Jundlina decides", _
+[[We still have plenty of coal and iron ore, so a metal workshop and a smelter will
+provide us with good tools in no time. Also, we need to solve our building material
+problem. The island is full of trees, we might not even need foresters. But we need
+stone, that is for sure]]
+   .. "<br><br>" .. _
+[[Let's also explore this island. But we need to be careful. We should prefer towers over
+other military buildings so that we can see potential enemies before they see us. We will
+be careful with the stones though. When we no longer need a building, we will dismantle it instead
+of burning it down. This will take more time, but we can reuse some of its materials. Also, 
+I want a scout out and exploring at all times.
+]]) .. new_objectives(obj_tools,obj_basic_infrastructure,obj_explore)
 },
 } -- end of initial messages.
 

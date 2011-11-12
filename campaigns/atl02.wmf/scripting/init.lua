@@ -60,6 +60,7 @@ function _initialize_player(args)
    p1:allow_buildings("all")
    p1:forbid_buildings{"shipyard"}
 
+   -- TODO: should not be a default headquarter
    -- A default headquarters
    use("tribe_atlanteans", "sc00_headquarters_medium")
    init.func(p1) -- defined in sc00_headquarters_medium
@@ -164,6 +165,11 @@ function intro()
 
    p1.see_all = true -- TODO: remove this
    initialize()
+
+   add_obj(obj_basic_infrastructure)
+   add_obj(obj_tools)
+   add_obj(obj_explore)
+   msg_boxes(initial_messages)
 end
 
 run(intro)
