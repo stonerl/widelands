@@ -58,15 +58,71 @@ end
 -- ===============
 function _initialize_player(args)
    p1:allow_buildings("all")
+   p1:allow_workers("all")
+
    p1:forbid_buildings{"shipyard"}
 
-   -- TODO: should not be a default headquarter
-   -- A default headquarters
-   use("tribe_atlanteans", "sc00_headquarters_medium")
-   init.func(p1) -- defined in sc00_headquarters_medium
-   set_textdomain("scenario_atl02.wmf")
-   local hq = wl.Game().map.player_slots[1].starting_field.immovable
-   hq:set_workers{shipwright=1}
+   local sf = map.player_slots[1].starting_field
+   prefilled_buildings(p1, { "headquarters", sf.x, sf.y,
+      wares = {
+         diamond = 2,
+         ironore = 50,
+         quartz = 3,
+         stone = 8,
+         spideryarn = 4,
+         trunk = 40,
+         coal = 150,
+         gold = 0,
+         goldyarn = 0,
+         iron = 0,
+         planks = 23,
+         spidercloth = 5,
+         blackroot = 0,
+         blackrootflour = 20,
+         bread = 10,
+         corn = 0,
+         cornflour = 20,
+         fish = 0,
+         meat = 0,
+         smoked_fish = 16,
+         smoked_meat = 17,
+         water = 4,
+         bakingtray = 0,
+         bucket = 0,
+         fire_tongs = 0,
+         fishing_net = 0,
+         hammer = 0,
+         hunting_bow = 0,
+         milking_tongs = 0,
+         hook_pole = 0,
+         pick = 0,
+         saw = 0,
+         scythe = 0,
+         shovel = 0,
+         tabard = 0,
+         light_trident = 0,
+      },
+      workers = {
+         armoursmith = 0,
+         blackroot_farmer = 0,
+         builder = 10,
+         burner = 0,
+         carrier = 40,
+         fish_breeder = 1,
+         geologist = 4,
+         miner = 2,
+         sawyer = 1,
+         smelter = 1,
+         stonecutter = 1,
+         toolsmith = 1,
+         weaponsmith = 0,
+         woodcutter = 3,
+         horse = 5,
+      },
+      soldiers = {
+         [{0,0,0,0}] = 10,
+      }
+   })
 end
 function _initialize_kalitath()
    kalitath:allow_buildings("all")
