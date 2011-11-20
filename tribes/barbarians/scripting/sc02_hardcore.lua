@@ -19,7 +19,7 @@ init = {
 
    hq = prefilled_buildings(player, { "headquarters", sf.x, sf.y,
       wares = {
-         trunk = 3,
+         trunk = 7,
       },
       workers = {
          blacksmith = 1,

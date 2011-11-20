@@ -20,8 +20,9 @@ return {
 
    prefilled_buildings(p, { "headquarters", sf.x, sf.y,
       wares = {
-         trunk = 2,
-         wood = 3,
+         trunk = 3,
+         wood = 4,
+         stone = 1
       },
       workers = {
          baker = 1,
@@ -42,7 +43,7 @@ return {
          smelter = 1,
          stonemason = 2,
          toolsmith = 1,
-         vinefarmer =1
+         vinefarmer = 1
       },
       soldiers = {
          [{0,0,0,0}] = 1,

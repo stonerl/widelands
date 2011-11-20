@@ -22,9 +22,10 @@ init = {
 
    prefilled_buildings(plr, { "headquarters", sf.x, sf.y,
       wares = {
-         trunk = 2,
-         planks = 2,
-         spidercloth = 1
+         trunk = 3,
+         planks = 3,
+         spidercloth = 1,
+         stone = 1
       },
       workers = {
          baker = 1,          
