@@ -13,7 +13,7 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  *
  */
 
@@ -114,8 +114,8 @@ void SurfaceSDL::set_pixel(uint32_t x, uint32_t y, const Uint32 clr) {
 	x += m_offsx;
 	y += m_offsy;
 
-	assert(x < get_w());
-	assert(y < get_h());
+	if (x >= get_w() || y >= get_h())
+		return;
 	assert(m_surface);
 
 	if (SDL_MUSTLOCK(m_surface))

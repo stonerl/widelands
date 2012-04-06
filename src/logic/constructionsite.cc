@@ -13,7 +13,7 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  *
  */
 
@@ -24,7 +24,6 @@
 #include "upcast.h"
 #include "wexception.h"
 
-#include "ui_basic/object.h" //only needed for i18n function _()
 #include "graphic/animation.h"
 #include "economy/wares_queue.h"
 #include "game.h"
@@ -398,7 +397,7 @@ void ConstructionSite::draw
 		g_gr->get_animation_size(a, tanim, wa, ha);
 		dst.drawanimrect
 			(pos, a, tanim - FRAME_LENGTH, get_owner(),
-			 Rect(Point(0, 0), w, std::min(ha, h - lines)));
+			 Rect(Point(0, 0), wa, std::min(ha, h - lines)));
 	}
 
 	assert(lines <= h);

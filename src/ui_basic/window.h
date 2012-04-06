@@ -13,7 +13,7 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  *
  */
 
@@ -85,18 +85,13 @@ struct Window : public NamedPanel {
 	bool handle_mouserelease(Uint8 btn, int32_t mx, int32_t my);
 	bool handle_mousemove
 		(Uint8 state, int32_t mx, int32_t my, int32_t xdiff, int32_t ydiff);
+	bool handle_alt_drag (int32_t mx, int32_t my);
 
 protected:
 	virtual void layout();
 	virtual void update_desired_size();
 
 private:
-	void dock_left();
-	void undock_left();
-	void dock_right();
-	void undock_right();
-	void dock_bottom();
-	void undock_bottom();
 	bool _is_minimal;
 	uint32_t _oldw, _oldh;  // if it is, these are the old formats
 	bool _dragging, _docked_left, _docked_right, _docked_bottom;

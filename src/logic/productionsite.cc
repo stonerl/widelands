@@ -13,7 +13,7 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  *
  */
 
@@ -494,7 +494,7 @@ Request & ProductionSite::request_worker(Ware_Index const wareid) {
 			(*this,
 			 wareid,
 			 ProductionSite::request_worker_callback,
-			 Request::WORKER);
+			 wwWORKER);
 }
 
 
@@ -539,18 +539,20 @@ void ProductionSite::request_worker_callback
 		}
 	}
 	while (!worker_placed) {
-		uint8_t nwp = psite.descr().nr_working_positions();
-		uint8_t pos = 0;
-		for (Working_Position * wp = psite.m_working_positions; pos < nwp; ++wp) {
-			// Find a fitting slot
-			if (!wp->worker && !worker_placed)
-				if (wp->worker_request->get_index() == idx) {
-					delete wp->worker_request;
-					*wp = Working_Position(0, w);
-					worker_placed = true;
-					break;
-				}
-			++pos;
+		{
+			uint8_t nwp = psite.descr().nr_working_positions();
+			uint8_t pos = 0;
+			Working_Position * wp = psite.m_working_positions;
+			for (; pos < nwp; ++wp, ++pos) {
+				// Find a fitting slot
+				if (!wp->worker && !worker_placed)
+					if (wp->worker_request->get_index() == idx) {
+						delete wp->worker_request;
+						*wp = Working_Position(0, w);
+						worker_placed = true;
+						break;
+					}
+			}
 		}
 		if (!worker_placed) {
 			// Find the next smaller version of this worker
@@ -569,7 +571,6 @@ void ProductionSite::request_worker_callback
 						("Something went wrong! No fitting place for worker %s in %s at (%u, %u) found!",
 						 w->descr().descname().c_str(), psite.descr().descname().c_str(),
 						 psite.get_position().x, psite.get_position().y);
-			pos = 0;
 		}
 	}
 
@@ -747,7 +748,6 @@ bool ProductionSite::get_building_work
 		std::pair<Ware_Index, uint8_t> & worker_type_with_count =
 			*m_recruited_workers.rbegin();
 		{
-			Ware_Index const worker_index = worker_type_with_count.first;
 			Worker_Descr const & worker_descr =
 				*tribe().get_worker_descr(worker_type_with_count.first);
 			{
@@ -852,13 +852,9 @@ void ProductionSite::program_end(Game & game, Program_Result const result)
 
 	std::string const & program_name = top_state().program->name();
 
-	uint32_t dt = m_post_timer;
-
 	m_stack.pop_back();
 	if (m_stack.size())
 		top_state().phase = result;
-	else // This was the last program. Relax for a bit before trying to work again
-		dt = std::max(dt, 10000U);
 
 	switch (result) {
 	case Failed:

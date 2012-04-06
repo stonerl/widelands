@@ -13,7 +13,7 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  *
  */
 
@@ -55,7 +55,11 @@ public:
 
 	int32_t get_nritems() const {return m_items.size();}
 
-	void add(Panel * panel, uint32_t align, bool fullsize = false);
+	void add
+		(Panel * panel,
+		uint32_t align,
+		bool fullsize = false,
+		bool fillspace = false);
 	void add_space(uint32_t space);
 	void add_inf_space();
 	bool is_snap_target() const {return true;}
@@ -82,7 +86,6 @@ private:
 		enum Type {
 			ItemPanel,
 			ItemSpace,
-			ItemInfSpace
 		};
 
 		Type type;
@@ -94,8 +97,10 @@ private:
 				bool fullsize;
 			} panel;
 			uint32_t space;
-			uint32_t assigned_space;
 		} u;
+
+		bool fillspace;
+		uint32_t assigned_var_depth;
 	};
 
 	bool m_scrolling;

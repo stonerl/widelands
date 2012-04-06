@@ -13,7 +13,7 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  *
  */
 
@@ -139,11 +139,12 @@ int32_t RenderTarget::get_h() const
  */
 void RenderTarget::draw_line
 	(int32_t const x1, int32_t const y1, int32_t const x2, int32_t const y2,
-	 RGBColor const color)
+	 RGBColor const color, uint8_t width)
 {
 	m_surface->draw_line
 		(x1 + m_offset.x + m_rect.x, y1 + m_offset.y + m_rect.y,
-		 x2 + m_offset.x + m_rect.x, y2 + m_offset.y + m_rect.y, color);
+		 x2 + m_offset.x + m_rect.x, y2 + m_offset.y + m_rect.y, color,
+		 width);
 }
 
 /**
@@ -222,6 +223,12 @@ void RenderTarget::tile(Rect r, PictureID const picture, Point ofs, Composite cm
 	int32_t srch = picture->get_h();
 
 	if (clip(r)) {
+		if (m_offset.x < 0)
+			ofs.x -= m_offset.x;
+
+		if (m_offset.y < 0)
+			ofs.y -= m_offset.y;
+
 		// Make sure the offset is within bounds
 		ofs.x = ofs.x % srcw;
 
@@ -452,11 +459,8 @@ void RenderTarget::doblit
 	if (dst.x < 0) {
 		if (srcrc.w <= static_cast<uint32_t>(-dst.x))
 			return;
-
 		srcrc.x -= dst.x;
-
 		srcrc.w += dst.x;
-
 		dst.x = 0;
 	}
 

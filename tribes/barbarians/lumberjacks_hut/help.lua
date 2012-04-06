@@ -1,76 +1,49 @@
-use("aux", "formatting")  
+use("aux", "formatting")
+use("aux", "format_help")
 
-return {  
-  text =   
-     rt(  
-h1("The Barbarian Quarry") ..  
+set_textdomain("tribe_barbarians")
 
-h2("General:") ..  
-p(_  
-[[The stone mason working at the quarry makes stones for your buildings out of rocks found lying in the landscape.<br>  
-Once they are gone, you need to find another stone field, or open up a granite mine. They do not regenerate.<br>  
-Only if a spot is totally cleared from these stones, it is ready for building new houses there.<br>  
-The stonemason starts working outward, starting with the stones closest to his house up to the maximum range of 6.  
-Note that he will change the heap he is working on and not continue at one until this is finished.<br>  
-Also keep in mind that stones of a different kind exist, that are not cut by the stonemason and will be blocking.]]) ..   
-
-h2("Building:") ..  
-p(_  
-[[needs only a small plot, and cannot be upgraded into a more effective building. <br>  
-It offers room for one stonemason only.The barbarian stonemason is needed at the quarries only.<br>  
-To build a quarry, you will need: 4 trunks, <br>  
-dismantling will yield 2 trunks]]) ..   
-
-h2("Output:") ..  
-h3(_"Build costs:") ..
-
-rt("image=tribes/barbarians/trunk/menu.png", p( 2 .. _"trunks")) ..
-
-rt(p( _
-[[Depending on the walking distance to the stones, the stonemason will fetch one tree every 40 to 60 seconds.<br>  
-A granite mine will work more effective than a quarry, but it needs rations to work.]]) ..   
-
-h2("Worker:") ..  
-p(_  
-[[The Barbarian stonemason needs a pick. Without one a new stonemason cannot be created.<br>  
-Although miners also use picks, they are a different profession and one cannot replace the other.<br>  
-Stonemasons are doing a perfect job from the very beginning and will not gain further experience.<br>  
-Clearing a large amount of stones is a slow and tedious work. Build more than one quarry if possible and don't let  
-the walking distances get too long.]]))  
-}  
-
-
-
-
--- use("aux", "formatting")   
-
--- return {   
-  -- text =    
-     -- rt(   
--- h1("The Barbarian Lumberjack") ..   
-
--- h2("General:") ..   
--- p(_   
--- [[The lumberjack clears the landscape from trees enabling you to build new houses.<br>   
--- In doing so he also provides you with trunks, which are the Barbarians' basic building material.<br>   
--- The lumberjack works outward starting with the tree closest to his house up to the maximum range of 10.   
--- Only fully grown specimen of all tree species are being felled.]]) ..    
--- h2("Building:") ..   
--- p(_   
--- [[The lumberjack's hut needs only a small plot, and cannot be upgraded into a more effective building. <br>   
--- It offers room for one lumberjack only.<br>   
--- To build one, you will need: 3 trunks, <br>   
--- dismantling will yield 2 trunks]]) ..    
--- h2("Output:") ..   
--- p(_   
--- [[The Barbarian lumberjack is more effective than tree fellers os other tribes.<br>   
--- Depending on the walking distance to the tree, he will fell one tree every 52 to 90 seconds.<br>   
--- One lumberjack will fell fewer trees than a ranger can plant.]]) ..    
--- h2("Worker:") ..   
--- p(_   
--- [[The Barbarian lumberjack needs a felling axe. Without one a new Lumberjack cannot be created.<br>   
--- The felling axe is a tool, not a weapon and can only be produced at the metalworks, not at an axefactory or war mill.<br>   
--- Lumberjacks are fully trained from the very beginning and will not gain further experience.<br>   
--- Trees are auto seeding. Unless you have eradicated all trees in a larger area, keep one lumberjack to deal with the offspring.]]))   
--- }   
-
+return {
+	text =
+		--rt(h1(_"The Barbarian Lumberjack's Hut")) ..
+	--Lore Section
+		rt(h2(_"Lore")) ..
+		rt("image=tribes/barbarians/lumberjacks_hut/lumberjacks_hut_i_00.png", p(
+			_[["Take 200 hits to fell a tree and you're a baby. Take 100 and you're a soldier. Take 50 and you're a hero. Take 20 and soon you will be a honorable lumberjack."]])) ..
+		rt("text-align=right",p("font-size=10 font-style=italic", _[[Krumta, carpenter of Chat'Karuth]])) ..
+	--General Section
+		rt(h2(_"General")) ..
+		rt(h3(_"Purpose:")) ..
+		image_line("tribes/barbarians/trunk/menu.png",1,p(_"Fell trees in the surrounding area and process them into trunks.")) ..
+		text_line(_"Working radius:", "10") ..
+		text_line(_"Conquer range:", "n/a") ..
+		text_line(_"Vision range:", "4") ..
+	--Dependencies
+		rt(h2(_"Dependencies")) ..
+		rt(p(_"The Lumberjack's Hut needs trees in the immediate vicinity to fell.")) ..
+		text_line(_"Incoming:", "n/a") ..
+		rt(h3(_"Outgoing:")) ..
+		dependencies({"tribes/barbarians/lumberjacks_hut/menu.png","tribes/barbarians/trunk/menu.png"},p(_"Trunk")) ..
+		dependencies({"tribes/barbarians/trunk/menu.png","tribes/barbarians/constructionsite/menu.png"},p(_"Construction Site")) ..
+		dependencies({"tribes/barbarians/trunk/menu.png","tribes/barbarians/burners_house/menu.png"},p(_"Charcoal Burner's House")) ..
+		dependencies({"tribes/barbarians/trunk/menu.png","tribes/barbarians/metalworks/menu.png"},p(_"Metalwork Shop")) ..
+		dependencies({"tribes/barbarians/trunk/menu.png","tribes/barbarians/hardener/menu.png"},p(_"Wood Hardener")) ..
+	--Building Section
+		rt(h2(_"Building")) ..
+		text_line(_"Space required:",_"Small plot","pics/small.png") ..
+		text_line(_"Upgraded from:", "n/a") ..
+		rt(h3(_"Build Cost:")) ..
+		image_line("tribes/barbarians/trunk/menu.png", 3, p("3 " .. _"Trunk")) ..
+		rt(h3(_"Dismantle yields:")) ..
+		image_line("tribes/barbarians/trunk/menu.png", 2, p("2 " .. _"Trunk")) ..
+		text_line(_"Upgradeable to:","n/a") ..
+	--Workers Section
+		rt(h2(_"Workers")) ..
+		rt(h3(_"Crew required:")) ..
+		image_line("tribes/barbarians/lumberjack/menu.png", 1, p(_"Lumberjack")) ..
+		text_line(_"Worker uses:",_"Felling Axe","tribes/barbarians/felling_axe/menu.png") ..
+		text_line(_"Experience levels:","n/a") ..
+	--Production Section
+		rt(h2(_"Production")) ..
+		text_line(_"Performance:", _"The Lumberjack needs %s to fell a tree, not counting the time he needs to reach the destination and go home again.":format("12s"))
+}

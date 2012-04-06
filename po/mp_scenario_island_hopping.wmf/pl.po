@@ -7,37 +7,38 @@ msgid ""
 msgstr ""
 "Project-Id-Version: widelands\n"
 "Report-Msgid-Bugs-To: FULL NAME <EMAIL@ADDRESS>\n"
-"POT-Creation-Date: 2011-10-03 11:44+0000\n"
-"PO-Revision-Date: 2011-10-01 13:37+0000\n"
+"POT-Creation-Date: 2012-03-26 08:30+0000\n"
+"PO-Revision-Date: 2012-02-17 19:45+0000\n"
 "Last-Translator: Wesmania <ikk_pl@yahoo.co.uk>\n"
 "Language-Team: Polish <pl@li.org>\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"X-Launchpad-Export-Date: 2011-10-04 04:49+0000\n"
-"X-Generator: Launchpad (build 14071)\n"
+"X-Launchpad-Export-Date: 2012-03-27 04:41+0000\n"
+"X-Generator: Launchpad (build 15011)\n"
 
+#: ../../maps/MP Scenarios/Island Hopping.wmf/scripting/init.lua:101
 #: ../../maps/MP Scenarios/Island Hopping.wmf/scripting/multiplayer_init.lua:101
 msgid "%i %s<br>"
 msgstr "%i %s<br>"
 
-#: ../../maps/MP Scenarios/Island Hopping.wmf/scripting/texts.lua:52
+#: ../../maps/MP Scenarios/Island Hopping.wmf/scripting/texts.lua:51
 msgid "%s has been King of the Hill since %s!"
 msgstr "%s jest Królem Wzgórza od %s!"
 
-#: ../../maps/MP Scenarios/Island Hopping.wmf/scripting/texts.lua:53
+#: ../../maps/MP Scenarios/Island Hopping.wmf/scripting/texts.lua:52
 msgid "%s has won the game. Congratulations!"
 msgstr "%s wygrał grę. Gratulacje!"
 
 #: ../../maps/MP Scenarios/Island Hopping.wmf/scripting/texts.lua:46
 msgid ""
-"%s is now King of the Hill! He needs to keep his castle there for 20\n"
-"minutes to win the game."
+"%s is now King of the Hill and will win the game in 20 minutes, if nobody "
+"takes over the hill until than."
 msgstr ""
-"%s jest teraz Królem Wzgórza! Musi on utrzymać zamek na wzgórzu przez 20 "
-"minut, by wygrać grę."
+"%s jest teraz Królem Wzgórza i wygra grę, jeśli w ciągu 20 minut nikt nie "
+"przejmie wzgórza."
 
-#: ../../maps/MP Scenarios/Island Hopping.wmf/scripting/texts.lua:50
+#: ../../maps/MP Scenarios/Island Hopping.wmf/scripting/texts.lua:49
 msgid "%s lost control of the hill."
 msgstr "%s stracił panowanie na wzgórzu."
 
@@ -89,10 +90,6 @@ msgstr "Ukończył jako czwarty"
 msgid "5 minutes"
 msgstr "5 minut"
 
-#: ../../maps/MP Scenarios/Island Hopping.wmf/scripting/texts.lua:43
-msgid "As a reward, he receives:<br><br>%s"
-msgstr "W nagrodę otrzymuje:<br><br>%s"
-
 #: ../../maps/MP Scenarios/Island Hopping.wmf/scripting/texts.lua:23
 msgid "Finish rewards"
 msgstr "Nagrody za ukończenie"
@@ -101,6 +98,7 @@ msgstr "Nagrody za ukończenie"
 msgid "First Island"
 msgstr "Pierwsza Wyspa"
 
+#: ../../maps/MP Scenarios/Island Hopping.wmf/scripting/init.lua:94
 #: ../../maps/MP Scenarios/Island Hopping.wmf/scripting/multiplayer_init.lua:94
 msgid "Game Status"
 msgstr "Stan Gry"
@@ -150,6 +148,10 @@ msgstr ""
 "posiada surowce i łąki. Pozostawione na wyspach ośrodki wciąż będą "
 "dostarczać\n"
 "ci surowców niezbędnych do rozwoju na kolejnych wyspach."
+
+#: ../../maps/MP Scenarios/Island Hopping.wmf/scripting/texts.lua:43
+msgid "The reward for this feat amounts to<br><br>%s"
+msgstr "Zagroda za to osiągnięcie wynosi<br><br>%s"
 
 #: ../../maps/MP Scenarios/Island Hopping.wmf/scripting/texts.lua:5
 msgid "Welcome to Island Hopping"

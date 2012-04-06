@@ -6,15 +6,15 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Widelands svn4866\n"
 "Report-Msgid-Bugs-To: widelands-public@lists.sourceforge.net\n"
-"POT-Creation-Date: 2011-10-03 11:44+0000\n"
-"PO-Revision-Date: 2011-08-15 11:31+0000\n"
-"Last-Translator: Emmanuel Andry <Unknown>\n"
+"POT-Creation-Date: 2012-03-26 08:30+0000\n"
+"PO-Revision-Date: 2012-03-11 16:43+0000\n"
+"Last-Translator: Thomas Jungers <mpjungers@hotmail.com>\n"
 "Language-Team: French <widelands-public@lists.sourceforge.net>\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"X-Launchpad-Export-Date: 2011-10-04 04:40+0000\n"
-"X-Generator: Launchpad (build 14071)\n"
+"X-Launchpad-Export-Date: 2012-03-27 04:33+0000\n"
+"X-Generator: Launchpad (build 15011)\n"
 
 #: ../../campaigns/cconfig:64
 msgid "01 - Eyes in the Dark"
@@ -86,6 +86,10 @@ msgid ""
 "as possible, to be the first building up a castle on the top of the center "
 "mountain."
 msgstr ""
+"Un tournoi spécial dans la culture Atlantéenne nommé «Sautillement d'île », "
+"où deux ou plusieurs groupes tentent de rejoindre l'île du centre le plus "
+"vite possible, pour être le premier à construire un château sur le sommet de "
+"la montagne centrale."
 
 #: ../../maps/Impact.wmf/elemental:9
 msgid ""
@@ -162,12 +166,11 @@ msgid ""
 "along the river. Hint II: Snowmen mark additional water sources. Hint 3: "
 "Each mountain contains only one resource."
 msgstr ""
-"Chaque tribu est entourée par quatre gigantesques montagnes. Qui saura être "
-"le premier à les conquérir et à en réclamer les ressources pour sa propre "
-"tribu ? Astuce n°1: De l'eau douce pourra facilement être trouvée non loin "
-"de la rivière. Astuce n° 2: Les bonshommes de neige marquent également "
-"l'emplacement de sources d'eau. Astuce n°3: Chaque montagne ne permet "
-"d'obtenir qu'une seule ressource."
+"Chaque tribu est encerclée par quatre vastes montagnes.  Qui les conquerra "
+"le premier et revendiquera les ressources pour sa propre tribu ? Indice I : "
+"on peut trouver de l'eau le long de la rivière.  Indice II : les bonhommes "
+"de neige trouvent plus de sources d'eau.  Indice III : chaque montagne ne "
+"contient qu'une seule ressource."
 
 #: ../../campaigns/cconfig:30
 msgid "Easy. Introduces the Barbarians"
@@ -209,10 +212,10 @@ msgid ""
 "barefaced enough to settle on the coast of that island, a lot others "
 "followed afterwards."
 msgstr ""
-"Depuis des siècles cette île était considérée comme un sanctuaire divin. "
-"Aucun humain n'osait y poser le pied. Mais à présent, une tribu éhontée s' "
-"est installée sur ma côte de l'île, et de nombreuses autres suivirent "
-"bientôt."
+"Pendant des centaines d'années, cette île a été préservée comme sanctuaire "
+"des Dieux.  Aucun humain ne s'est jamais aventuré à poser son pied dessus.  "
+"Mais maintenant qu'une tribu était finalement assez effrontée pour s'établir "
+"sur la côte de cette île, beaucoup d'autres suivraient."
 
 #: ../../maps/Four Castles.wmf/elemental:7
 msgid "Four Castles"
@@ -225,13 +228,12 @@ msgstr "Quatre Montagnes"
 #: ../../maps/Desert Tournament.wmf/elemental:9
 msgid ""
 "Four tribes struggle with their nearest neighbour to be the first to reach "
-"the mountain of gold that primises riches beyond belief. But can the two "
+"the mountain of gold that promises riches beyond belief. But can the two "
 "remaining ones share the resources wisely?"
 msgstr ""
-"Quatre tribus luttent avec leurs plus proches voisins pour être les premiers "
-"à atteindre la montagne d'or qui promet des richesses au-delà de toute "
-"croyance. Mais les deux qui resterons, partagerons t' ils les ressources "
-"sagement ?"
+"Quatre tribus luttent avec leur voisin le plus proche pour être le premier à "
+"atteindre la montagne d'or qui promet des richesses incroyables.  Mais les "
+"deux restants peuvent-ils partager les ressources avec sagesse ?"
 
 #: ../../maps/Glacier Lake.wmf/elemental:7
 msgid "Glacier Lake"
@@ -268,7 +270,7 @@ msgstr ""
 
 #: ../../maps/MP Scenarios/Island Hopping.wmf/elemental:7
 msgid "Island Hopping"
-msgstr ""
+msgstr "Sautillement d'île"
 
 #: ../../maps/Islands at war.wmf/elemental:9
 msgid "Islands at war"
@@ -289,8 +291,8 @@ msgid ""
 "It is said, that the old war monks, living in the even older swamps are the "
 "key to the control of the whole island."
 msgstr ""
-"Il se dit, que les vieux moines guerriers, qui vivent dans l'ancien marais "
-"sont la clé du contrôle total de l'île."
+"On dit que les vieux moines guerriers, vivant dans des marais encore plus "
+"vieux, sont la clé pour le contrôle de l'île toute entière."
 
 #: ../../maps/Wisent Valley.wmf/elemental:11
 msgid ""
@@ -376,11 +378,11 @@ msgid ""
 "stronghold. Water can be found everywhere, so there is no need to send out "
 "geologists."
 msgstr ""
-"Seule une petite colline au centre de la carte relie ces quatre tribus "
-"rivales. Menez votre armée droit vers cette colline et construisez une "
-"gigantesque forteresse comme démonstration de votre supériorité ! Astuce: Au "
-"centre il n'y a de place que pour une seule forteresse. De l'eau peut être "
-"trouvée partout, il n'y a donc pas besoin d'envoyer des géologues."
+"Seule une petite colline au centre de la carte relie ces quatre tribus en "
+"compétition.  Menez votre armée droit sur cette colline et bâtissez une "
+"énorme place forte comme signe de votre supériorité ! Indice : au centre, il "
+"n'y a de la place que pour une seule place forte.  Il y a de l'eau partout, "
+"donc il n'y a pas besoin d'envoyer de géologues."
 
 #: ../../maps/Rendez-Vous.wmf/elemental:7
 msgid "Rendez-Vous"
@@ -416,7 +418,7 @@ msgstr ""
 
 #: ../../maps/MP Scenarios/Smugglers.wmf/elemental:9
 msgid "Smugglers"
-msgstr ""
+msgstr "Contrebande"
 
 #: ../../maps/The Far North.wmf/elemental:11
 msgid ""
@@ -444,6 +446,42 @@ msgstr ""
 "ont disparu. Personne ne sait. Les gens disent que plus rien n'entrave "
 "désormais la route vers la fortune. Mais beaucoup mourront dévorés par les "
 "loups, engloutis par les marais... encerclés par des tribus hostiles."
+
+#: ../../maps/Sun of fire.wmf/elemental:12
+msgid "Start positions are clockwise"
+msgstr ""
+"Les positions de départs sont attribuées dans le sens des aiguilles d'une "
+"montre"
+
+#: ../../maps/Desert Tournament.wmf/elemental:10
+#: ../../maps/Four Castles.wmf/elemental:10
+#: ../../maps/Swamp Monks.wmf/elemental:10
+msgid "Suggested Teams: (blue, red) vs (yellow, green)"
+msgstr "Equipes Suggérées: (Bleu, rouge) contre (jaune, vert)"
+
+#: ../../maps/Four Mountains.wmf/elemental:10
+msgid ""
+"Suggested Teams: (blue, red) vs (yellow, green) or (blue, green) vs (red, "
+"yellow)"
+msgstr ""
+"Équipes suggérées: (bleu, rouge) contre (jaune, vert) ou (bleu, vert) contre "
+"(rouge, jaune)"
+
+#: ../../maps/Elven Forests.wmf/elemental:10
+msgid ""
+"Suggested Teams: (blue, red) vs (yellow, green) or (blue, yellow) vs (red, "
+"green)"
+msgstr ""
+"Équipes suggérées: (bleu, rouge) contre (jaune, vert) ou (bleu, jaune) "
+"contre (rouge, vert)"
+
+#: ../../maps/Atoll.wmf/elemental:10
+msgid "Suggested Teams: (blue, yellow) vs (red, green)"
+msgstr "Équipes suggérées: (bleu, jaune) contre (rouge, vert)"
+
+#: ../../maps/Rendez-Vous.wmf/elemental:10
+msgid "Suggested Teams: all ok."
+msgstr "Equipes Suggérées: tout est ok."
 
 #: ../../maps/Swamp Island.wmf/elemental:9
 msgid "Swamp Island"
@@ -483,7 +521,20 @@ msgid ""
 "an attempt of taking them for themselves."
 msgstr ""
 "La beauté à couper le souffle de ces terres d'émeraude a attiré de "
-"nombreuses tribus qui souhaitent se les approprier."
+"nombreuses tribus souhaitant s'en emparer."
+
+#: ../../maps/MP Scenarios/Together we're strong.wmf/elemental:11
+msgid ""
+"The four mighty harbours of the Craw Islands were trading their goods among "
+"each others for ages. All of them needed resources, they could not produce "
+"on their own territory and provided resources that the other could not "
+"produce in exchange. Based on these trades a very friendly commerce was "
+"common between the four harbours and the people living on the Craw Islands - "
+"just until lately two of the harbours united to an exclusive trade alliance, "
+"forcing the other two to do the same. Suddenly it seems it is only a matter "
+"of time, until the first fights between the harbours will shake the peaceful "
+"life that lasted so long..."
+msgstr ""
 
 #: ../../maps/The long way.wmf/elemental:7
 msgid "The long way"
@@ -551,6 +602,10 @@ msgstr ""
 msgid "Three Warriors"
 msgstr "Trois Guerriers"
 
+#: ../../maps/MP Scenarios/Together we're strong.wmf/elemental:9
+msgid "Together we're strong"
+msgstr "Ensemble nous sommes forts"
+
 #: ../../maps/Twinkling Waves.wmf/elemental:9
 msgid "Twinkling Waves"
 msgstr "Vagues Scintillantes"
@@ -573,8 +628,8 @@ msgid ""
 "Well protected in their mighty fortresses, four power-hungry warlords are "
 "completing their schemes to dominate these lands..."
 msgstr ""
-"Bien protégé dans leur puissantes forteresses, quatre seigneurs de guerre "
-"affamés de pouvoir achèvent leurs plans de domination de ces terres..."
+"Bien protégés dans leurs puissantes forteresses, quatre chefs de guerre "
+"assoiffés de pouvoir achèvent leurs plans pour dominer ces terres..."
 
 #: ../../campaigns/cconfig:31
 msgid ""
@@ -658,7 +713,7 @@ msgstr ""
 
 #: ../../maps/Atoll.wmf/elemental:9
 msgid "Who will be the real King of the big atoll?"
-msgstr "Qui sera réellement le Roi du grand atoll ?"
+msgstr "Qui sera le vrai Roi du grand atoll ?"
 
 #: ../../maps/Wisent Valley.wmf/elemental:9
 msgid "Wisent Valley"
@@ -680,5 +735,10 @@ msgstr ""
 msgid ""
 "Your well established smuggling routes suddenly got busy: Two other tribes "
 "appeared and now a rivalry under smugglers has been started: Which team will "
-"be the first to smuggle a certain number of wares?"
+"be the first to smuggle a certain number of wares? Teams are: Blue + Yellow "
+"vs Red + Green."
 msgstr ""
+"Vos chemins de contrebande bien établis se sont soudainement animées: Deux "
+"autres tribus sont apparues et des rivalités entre contrebandiers ont "
+"débuté: Quelle équipe sera la première à passer en contrebande un certain "
+"nombre de marchandises? Les équipes sont: Bleu + Jaune contre Rouge + Vert."

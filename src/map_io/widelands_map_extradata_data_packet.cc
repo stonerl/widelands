@@ -13,7 +13,7 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  *
  */
 
@@ -88,6 +88,8 @@ throw (_wexception)
 					info.type     = Map::Extradata_Info::PIC;
 					info.filename = *pname;
 					info.data     = picture;
+					// replace \ with / in path or pics won't be saved on Windows
+					std::replace(info.filename.begin(), info.filename.end(), '\\', '/');
 					map.m_extradatainfos.push_back(info);
 				}
 			}

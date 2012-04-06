@@ -101,9 +101,16 @@ endif (CMAKE_BUILD_TYPE STREQUAL Debug)
 
 #the subdirectories are only used for test definition
 #temporarily disabled the 'old' tests due to incompatibility
-#add_subdirectory(economy)
-#add_subdirectory(io)
-add_subdirectory(scripting)
+if (WL_UNIT_TESTS)
+  # Tests need to link with SDL library without main
+  set(TEST_EXTRA_SOURCES ${CMAKE_CURRENT_BINARY_DIR}/build_info.cc)
+  set(TEST_EXTRA_LIBS ${SDL_LIBRARY} )
+  list(REMOVE_ITEM TEST_EXTRA_LIBS  ${SDLMAIN_LIBRARY}) 
+
+  add_subdirectory(economy)
+  add_subdirectory(io)
+  add_subdirectory(scripting)
+endif (WL_UNIT_TESTS)
 
 target_link_libraries(widelands_all ${SDLIMAGE_LIBRARY})
 target_link_libraries(widelands_all ${SDLMIXER_LIBRARY})
@@ -113,10 +120,10 @@ target_link_libraries(widelands_all ${SDLGFX_LIBRARY})
 target_link_libraries(widelands_all ${LUA_LIBRARY})
 target_link_libraries(widelands_all ${PNG_LIBRARY})
 target_link_libraries(widelands_all ${ZLIB_LIBRARY})
-target_link_libraries(widelands_all ${GGZ_CORE_LIBRARY})
 target_link_libraries(widelands_all ${OPENGL_gl_LIBRARY})
 target_link_libraries(widelands_all ${GLEW_LIBRARY})
-if (CMAKE_SYSTEM_NAME MATCHES "FreeBSD") 
+target_link_libraries(widelands_all ${Boost_LIBRARIES})
+if (CMAKE_SYSTEM_NAME MATCHES "FreeBSD")
   target_link_libraries(widelands_all ${EXECINFO_LIBRARY})
 endif (CMAKE_SYSTEM_NAME MATCHES "FreeBSD")
 
@@ -135,9 +142,7 @@ if (WIN32)
   if (DEFINED MSVC)
     target_link_libraries(widelands_all ws2_32)
 
-    #GGZ on MSVC using 3rdparty bundle needs expat and iconv library
-    find_package(EXPAT REQUIRED)
-    target_link_libraries(widelands_all ${EXPAT_LIBRARY})
+    #gettext on MSVC using 3rdparty bundle needs iconv library
     find_library(ICONV_LIBRARY iconv libiconv REQUIRED)
     target_link_libraries(widelands_all ${ICONV_LIBRARY})
 

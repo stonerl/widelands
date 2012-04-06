@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2002-2004, 2006-2010 by the Widelands Development Team
+ * Copyright (C) 2002-2004, 2006-2011 by the Widelands Development Team
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -13,7 +13,7 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  *
  */
 
@@ -26,10 +26,13 @@
 
 #include "economy/economy.h"
 #include "economy/flag.h"
+#include "economy/portdock.h"
 #include "economy/request.h"
 #include "economy/ware_instance.h"
 #include "economy/warehousesupply.h"
 #include "editor_game_base.h"
+#include "findbob.h"
+#include "findnode.h"
 #include "game.h"
 #include "log.h"
 #include "player.h"
@@ -175,7 +178,7 @@ bool WarehouseSupply::has_storage() const throw ()
 	return true;
 }
 
-void WarehouseSupply::get_ware_type(bool & isworker, Ware_Index & ware) const
+void WarehouseSupply::get_ware_type(WareWorker & type, Ware_Index & ware) const
 {
 	throw wexception
 		("WarehouseSupply::get_ware_type: calling this is nonsensical");
@@ -189,7 +192,7 @@ void WarehouseSupply::send_to_storage(Game &, Warehouse * wh)
 uint32_t WarehouseSupply::nr_supplies
 	(Game const & game, Request const & req) const
 {
-	if (req.get_type() == Request::WORKER)
+	if (req.get_type() == wwWORKER)
 		return
 			m_warehouse->count_workers
 				(game, req.get_index(), req.get_requirements());
@@ -204,7 +207,7 @@ uint32_t WarehouseSupply::nr_supplies
 	// highered and would have the same value as the original request)
 	int32_t const y =
 		x + (req.get_priority(0) / 100)
-		- (m_warehouse->get_priority(Request::WARE, req.get_index()) / 100) - 1;
+		- (m_warehouse->get_priority(wwWARE, req.get_index()) / 100) - 1;
 	// But the number should never be higher than the number of wares available
 	if (y > x)
 		return x;
@@ -214,7 +217,7 @@ uint32_t WarehouseSupply::nr_supplies
 
 /// Launch a ware as item.
 WareInstance & WarehouseSupply::launch_item(Game & game, Request const & req) {
-	if (req.get_type() != Request::WARE)
+	if (req.get_type() != wwWARE)
 		throw wexception
 			("WarehouseSupply::launch_item: called for non-ware request");
 	if (!m_wares.stock(req.get_index()))
@@ -247,8 +250,10 @@ Warehouse_Descr::Warehouse_Descr
 	 Tribe_Descr const & _tribe)
 :
 	Building_Descr(_name, _descname, directory, prof, global_s, _tribe),
-m_conquers    (0)
+m_conquers    (0),
+m_heal_per_second(0)
 {
+	m_heal_per_second     = global_s.get_safe_int("heal_per_second");
 	if
 		((m_conquers =
 		  	prof.get_safe_section("global").get_positive("conquers", 0)))
@@ -275,7 +280,8 @@ IMPLEMENTATION
 
 Warehouse::Warehouse(const Warehouse_Descr & warehouse_descr) :
 	Building(warehouse_descr),
-	m_supply(new WarehouseSupply(this))
+	m_supply(new WarehouseSupply(this)),
+	m_portdock(0)
 {
 	uint8_t nr_worker_types_without_cost =
 		warehouse_descr.tribe().worker_types_without_cost().size();
@@ -313,13 +319,13 @@ bool Warehouse::_load_finish_planned_worker(PlannedWorkers & pw)
 		(Worker_Descr::Buildcost::const_iterator cost_it = cost.begin();
 		 cost_it != cost.end(); ++cost_it, ++idx)
 	{
-		Request::Type type;
+		WareWorker type;
 		Ware_Index ware;
 
 		if ((ware = tribe().ware_index(cost_it->first)))
-			type = Request::WARE;
+			type = wwWARE;
 		else if ((ware = tribe().worker_index(cost_it->first)))
-			type = Request::WORKER;
+			type = wwWORKER;
 		else
 			return false;
 
@@ -473,13 +479,108 @@ void Warehouse::init(Editor_Game_Base & egbase)
 			 	 Area<FCoords>
 			 	 	(egbase.map().get_fcoords(get_position()), conquer_radius)));
 
+	if (descr().get_isport())
+		init_portdock(egbase);
 }
 
+/**
+ * Find a contiguous set of water fields close to the port for docking
+ * and initialize the @ref PortDock instance.
+ */
+void Warehouse::init_portdock(Editor_Game_Base & egbase)
+{
+	molog("Setting up port dock fields\n");
 
+	Map & map = egbase.map();
+	std::vector<Coords> shore;
+
+	shore.resize(3);
+	map.get_neighbour(get_position(), WALK_W, &shore[0]);
+	map.get_neighbour(get_position(), WALK_NW, &shore[1]);
+	map.get_neighbour(get_position(), WALK_NE, &shore[2]);
+
+	map.find_fields
+		(Area<FCoords>(map.get_fcoords(get_position()), 2),
+		 &shore, FindNodeShore());
+
+	std::vector<Coords> water;
+	container_iterate_const(std::vector<Coords>, shore, shoreit) {
+		FCoords cur = map.get_fcoords(*shoreit.current);
+		for (int dir = FIRST_DIRECTION; dir <= LAST_DIRECTION; ++dir) {
+			FCoords neighb = map.get_neighbour(cur, dir);
+			if ((neighb.field->nodecaps() & (MOVECAPS_WALK|MOVECAPS_SWIM)) != MOVECAPS_SWIM)
+				continue;
+
+			if (std::find(water.begin(), water.end(), neighb) == water.end())
+				water.push_back(neighb);
+		}
+	}
+	if (water.empty()) {
+		log("Attempting to setup port without neighboring water.\n");
+		return;
+	}
+
+	std::vector<FCoords> dock;
+	std::vector<Coords>::size_type nrscanned = 0;
+	dock.push_back(map.get_fcoords(water[0]));
+
+	while (nrscanned < dock.size()) {
+		for (int dir = FIRST_DIRECTION; dir <= LAST_DIRECTION; ++dir) {
+			FCoords neighb = map.get_neighbour(dock[nrscanned], dir);
+
+			if (std::find(dock.begin(), dock.end(), neighb) != dock.end())
+				continue;
+			if (std::find(water.begin(), water.end(), neighb) == water.end())
+				continue;
+
+			dock.push_back(neighb);
+		}
+		nrscanned++;
+	}
+
+	molog("Found %zu fields for the dock\n", dock.size());
+
+	m_portdock = new PortDock;
+	m_portdock->set_owner(get_owner());
+	m_portdock->set_warehouse(this);
+	m_portdock->set_economy(get_economy());
+	container_iterate_const(std::vector<FCoords>, dock, it) {
+		m_portdock->add_position(*it.current);
+	}
+	m_portdock->init(egbase);
+
+	if (get_economy() != 0)
+		m_portdock->set_economy(get_economy());
+}
+
+void Warehouse::destroy(Editor_Game_Base & egbase)
+{
+	Game & game = ref_cast<Game, Editor_Game_Base>(egbase);
+
+	const WareList & workers = get_workers();
+
+	for (Ware_Index id = Ware_Index::First(); id < workers.get_nrwareids(); ++id) {
+		const uint32_t stock = workers.stock(id);
+
+		if (stock > 0) {
+			for (uint32_t i = 0; i < stock; ++i) {
+				launch_worker(game, id, Requirements()).start_task_leavebuilding
+					(game, true);
+			}
+		}
+	}
+
+	Building::destroy(egbase);
+}
 
 /// Destroy the warehouse.
 void Warehouse::cleanup(Editor_Game_Base & egbase)
 {
+	if (m_portdock) {
+		m_portdock->remove(egbase);
+		m_portdock = 0;
+	}
+
 	while (m_planned_workers.size()) {
 		m_planned_workers.back().cleanup();
 		m_planned_workers.pop_back();
@@ -560,6 +661,7 @@ void Warehouse::act(Game & game, uint32_t const data)
 		if (m_incorporated_workers.count(ware)) {
 			WorkerList & soldiers = m_incorporated_workers[ware];
 
+			uint32_t total_heal = descr().get_heal_per_second();
 			// Do not use container_iterate, as we plan to erase some
 			// of those guys
 			for
@@ -577,7 +679,12 @@ void Warehouse::act(Game & game, uint32_t const data)
 					m_supply->remove_workers(ware, 1);
 					continue;
 				}
-				//  If warehouse can heal, this is the place to put it.
+
+				if (soldier->get_current_hitpoints() < soldier->get_max_hitpoints()) {
+					soldier->heal(total_heal);
+					continue;
+				}
+
 			}
 		}
 		m_next_military_act = schedule_act(game, 1000);
@@ -610,6 +717,8 @@ void Warehouse::set_economy(Economy * const e)
 	if (old)
 		old->remove_warehouse(*this);
 
+	if (m_portdock)
+		m_portdock->set_economy(e);
 	m_supply->set_economy(e);
 	Building::set_economy(e);
 
@@ -812,7 +921,11 @@ WareInstance & Warehouse::launch_item(Game & game, Ware_Index const ware) {
 
 	m_supply->remove_wares(ware, 1);
 
-	do_launch_item(game, item);
+	// Schedule a call of WareInstance::update, which will either carry the
+	// item out of the warehouse via do_launch_item, or move it into the attached
+	// dock.
+	item.set_location(game, this);
+	item.schedule_act(game, 1);
 
 	return item;
 }
@@ -926,9 +1039,11 @@ void Warehouse::create_worker(Game & game, Ware_Index const worker) {
 	Worker_Descr::Buildcost const & buildcost = w_desc.buildcost();
 	container_iterate_const(Worker_Descr::Buildcost, buildcost, i) {
 		std::string const & input = i.current->first;
-		if (Ware_Index const id_ware = tribe().ware_index(input))
+		if (Ware_Index const id_ware = tribe().ware_index(input)) {
 			remove_wares  (id_ware,                        i.current->second);
-		else
+			//update statistic accordingly
+			owner().ware_consumed(id_ware, i.current->second);
+		} else
 			remove_workers(tribe().safe_worker_index(input), i.current->second);
 	}
 
@@ -1028,11 +1143,11 @@ void Warehouse::plan_workers(Game & game, Ware_Index index, uint32_t amount)
 			if (Ware_Index id_w = tribe().ware_index(input_name)) {
 				pw->requests.push_back
 					(new Request
-					 (*this, id_w, &Warehouse::request_cb, Request::WARE));
+					 (*this, id_w, &Warehouse::request_cb, wwWARE));
 			} else if ((id_w = tribe().worker_index(input_name))) {
 				pw->requests.push_back
 					(new Request
-					 (*this, id_w, &Warehouse::request_cb, Request::WORKER));
+					 (*this, id_w, &Warehouse::request_cb, wwWORKER));
 			} else
 				throw wexception
 					("plan_workers: bad buildcost '%s'", input_name.c_str());
@@ -1202,12 +1317,12 @@ Warehouse::StockPolicy Warehouse::get_worker_policy(Ware_Index ware) const
 }
 
 Warehouse::StockPolicy Warehouse::get_stock_policy
-	(bool isworker, Ware_Index ware) const
+	(WareWorker waretype, Ware_Index wareindex) const
 {
-	if (isworker)
-		return get_worker_policy(ware);
+	if (waretype == wwWORKER)
+		return get_worker_policy(wareindex);
 	else
-		return get_ware_policy(ware);
+		return get_ware_policy(wareindex);
 }
 
 
@@ -1299,5 +1414,14 @@ int Warehouse::outcorporateSoldier(Editor_Game_Base & egbase, Soldier & soldier)
 
 	return 0;
 }
+
+void Warehouse::log_general_info(const Editor_Game_Base & egbase)
+{
+	Building::log_general_info(egbase);
+
+	if (descr().get_isport())
+		molog("Port dock: %u\n", m_portdock ? m_portdock->serial() : 0);
+}
+
 
 }

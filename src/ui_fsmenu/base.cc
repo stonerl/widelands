@@ -13,7 +13,7 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  *
  */
 
@@ -57,7 +57,7 @@ Fullscreen_Menu_Base::Fullscreen_Menu_Base(char const * const bgpic)
 	Section & s = g_options.pull_section("global");
 
 #if USE_OPENGL
-#define GET_BOOL_USE_OPENGL s.get_bool("opengl", false)
+#define GET_BOOL_USE_OPENGL s.get_bool("opengl", true)
 #else
 #define GET_BOOL_USE_OPENGL false
 #endif

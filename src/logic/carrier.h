@@ -13,7 +13,7 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  *
  */
 
@@ -49,7 +49,7 @@ struct Carrier : public Worker {
 
 
 	Carrier(const Descr & carrier_descr)
-		: Worker(carrier_descr), m_acked_ware(-1)
+		: Worker(carrier_descr), m_promised_pickup_to(-1)
 	{}
 	virtual ~Carrier() {};
 
@@ -70,6 +70,7 @@ private:
 
 	// internal task stuff
 	void road_update        (Game &, State &);
+	void road_pop           (Game &, State &);
 	void transport_update   (Game &, State &);
 
 	static Task const taskRoad;
@@ -82,11 +83,15 @@ private:
 	bool swap_or_wait       (Game &, State &);
 
 	/// -1: no ware acked; 0/1: acked ware for start/end flag of road
-	int32_t m_acked_ware;
+	// This should be an enum, but this clutters the code with too many casts
+	static const int32_t NOONE = -1;
+	static const int32_t START_FLAG = 0;
+	static const int32_t END_FLAG = 1;
+	int32_t m_promised_pickup_to;
 
 	// saving and loading
 protected:
-	class Loader : public Worker::Loader {
+	struct Loader : public Worker::Loader {
 	public:
 		Loader();
 

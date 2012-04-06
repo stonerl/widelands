@@ -13,7 +13,7 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  *
  */
 
@@ -65,7 +65,7 @@ DismantleSite_Window::DismantleSite_Window
 	for (uint32_t i = 0; i < cs.get_nrwaresqueues(); ++i)
 		Building_Window::create_ware_queue_panel(&box, cs, cs.get_waresqueue(i), true);
 
-	get_tabs()->add("wares", g_gr->get_picture(PicMod_UI, pic_tab_wares), &box);
+	get_tabs()->add("wares", g_gr->get_picture(PicMod_UI, pic_tab_wares), &box, _("Building materials"));
 }
 
 

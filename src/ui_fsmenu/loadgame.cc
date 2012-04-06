@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2002, 2006-2011 by the Widelands Development Team
+ * Copyright (C) 2002, 2006-2012 by the Widelands Development Team
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -13,7 +13,7 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  *
  */
 
@@ -50,20 +50,16 @@ Fullscreen_Menu_LoadGame::Fullscreen_Menu_LoadGame
 		(this, "back",
 		 get_w() * 71 / 100, get_h() * 9 / 10, m_butw, m_buth,
 		 g_gr->get_picture(PicMod_UI, "pics/but0.png"),
-		 boost::bind(&Fullscreen_Menu_LoadGame::end_modal, boost::ref(*this), 0),
 		 _("Back"), std::string(), true, false),
 	m_ok
 		(this, "ok",
 		 get_w() * 71 / 100, get_h() * 15 / 20, m_butw, m_buth,
 		 g_gr->get_picture(PicMod_UI, "pics/but2.png"),
-		 boost::bind(&Fullscreen_Menu_LoadGame::clicked_ok, boost::ref(*this)),
 		 _("OK"), std::string(), false, false),
 	m_delete
 		(this, "delete",
 		 get_w() * 71 / 100, get_h() * 17 / 20, m_butw, m_buth,
 		 g_gr->get_picture(PicMod_UI, "pics/but0.png"),
-		 boost::bind
-			 (&Fullscreen_Menu_LoadGame::clicked_delete, boost::ref(*this)),
 		 _("Delete"), std::string(), false, false),
 
 // Savegame list
@@ -90,6 +86,12 @@ Fullscreen_Menu_LoadGame::Fullscreen_Menu_LoadGame
 	m_settings(gsp),
 	m_ctrl(gc)
 {
+	m_back.sigclicked.connect(boost::bind(&Fullscreen_Menu_LoadGame::end_modal, boost::ref(*this), 0));
+	m_ok.sigclicked.connect(boost::bind(&Fullscreen_Menu_LoadGame::clicked_ok, boost::ref(*this)));
+	m_delete.sigclicked.connect
+		(boost::bind
+			 (&Fullscreen_Menu_LoadGame::clicked_delete, boost::ref(*this)));
+
 	m_back.set_font(font_small());
 	m_ok.set_font(font_small());
 	m_delete.set_font(font_small());
@@ -100,8 +102,8 @@ Fullscreen_Menu_LoadGame::Fullscreen_Menu_LoadGame
 	m_label_gametime.set_font(m_fn, m_fs, UI_FONT_CLR_FG);
 	m_tagametime    .set_font(m_fn, m_fs, UI_FONT_CLR_FG);
 	m_list          .set_font(m_fn, m_fs);
-	m_list.selected.set(this, &Fullscreen_Menu_LoadGame::map_selected);
-	m_list.double_clicked.set(this, &Fullscreen_Menu_LoadGame::double_clicked);
+	m_list.selected.connect(boost::bind(&Fullscreen_Menu_LoadGame::map_selected, this, _1));
+	m_list.double_clicked.connect(boost::bind(&Fullscreen_Menu_LoadGame::double_clicked, this, _1));
 	fill_list();
 }
 
@@ -179,7 +181,16 @@ void Fullscreen_Menu_LoadGame::map_selected(uint32_t selected)
 
 		m_ok.set_enabled(true);
 		m_delete.set_enabled(true);
-		m_tamapname.set_text(gpdp.get_mapname());
+
+		//Try to translate the map name.
+		//This will work on every official map as expected
+		//and 'fail silently' (not find a translation) for already translated campaign map names.
+		//It will also translate 'false-positively' on any user-made map which shares a name with
+		//the official maps, but this should not be a problem to worry about.
+		{
+			i18n::Textdomain td("maps");
+			m_tamapname.set_text(_(gpdp.get_mapname()));
+		}
 
 		char buf[200];
 		uint32_t gametime = gpdp.get_gametime();

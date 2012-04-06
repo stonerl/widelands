@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2002-2004, 2006-2008 by the Widelands Development Team
+ * Copyright (C) 2002-2004, 2006-2008, 2012 by the Widelands Development Team
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -13,7 +13,7 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  *
  */
 
@@ -28,18 +28,39 @@
  * Deletes the bob at the given location
 */
 int32_t Editor_Delete_Bob_Tool::handle_click_impl
-	(Widelands::Map               &       map,
-	 Widelands::Node_and_Triangle<> const center,
-	 Editor_Interactive           &       parent)
+	(Widelands::Map & map, Widelands::Node_and_Triangle< Widelands::Coords > center,
+	Editor_Interactive & parent, Editor_Action_Args & args)
 {
 	Widelands::Editor_Game_Base & egbase = parent.egbase();
-	const int32_t radius = parent.get_sel_radius();
+	const int32_t radius = args.sel_radius;
 	Widelands::MapRegion<Widelands::Area<Widelands::FCoords> > mr
-		(map,
-		 Widelands::Area<Widelands::FCoords>
-		 	(map.get_fcoords(center.node), radius));
-	do if (Widelands::Bob * const bob = mr.location().field->get_first_bob())
-		bob->remove(egbase);
+	(map,
+	 Widelands::Area<Widelands::FCoords>
+	 (map.get_fcoords(center.node), radius));
+
+	do if (Widelands::Bob * const bob = mr.location().field->get_first_bob()) {
+			args.obob_type.push_back(&bob->descr());
+			bob->remove(egbase);
+		} else {
+			args.obob_type.push_back(NULL);
+		}
 	while (mr.advance(map));
 	return radius + 2;
 }
+
+int32_t Editor_Delete_Bob_Tool::handle_undo_impl
+	(Widelands::Map & map, Widelands::Node_and_Triangle< Widelands::Coords > center,
+	Editor_Interactive & parent, Editor_Action_Args & args)
+{
+
+	uint32_t ret = parent.tools.place_bob.handle_undo_impl(map, center, parent, args);
+	args.obob_type.clear();
+	return ret;
+}
+
+Editor_Action_Args Editor_Delete_Bob_Tool::format_args_impl(Editor_Interactive & parent)
+{
+	return Editor_Tool::format_args_impl(parent);
+}
+
+

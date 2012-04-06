@@ -13,7 +13,7 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  *
  */
 
@@ -47,8 +47,9 @@ struct UniqueWindow : public Window {
 		void toggle();
 
 		int32_t x, y;
+		bool valid_pos;
 
-		Registry() : window(0), x(-1), y(-1) {}
+		Registry() : window(0), x(0), y(0), valid_pos(false) {}
 		~Registry();
 	};
 

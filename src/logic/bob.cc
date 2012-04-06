@@ -13,7 +13,7 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  *
  */
 
@@ -24,6 +24,7 @@
 #include "checkstep.h"
 #include "economy/route.h"
 #include "economy/transfer.h"
+#include "findbob.h"
 #include "game.h"
 #include "game_data_error.h"
 #include "map_io/widelands_map_map_object_loader.h"
@@ -37,6 +38,7 @@
 #include "tribe.h"
 #include "upcast.h"
 #include "wexception.h"
+#include <cstdlib>
 
 #include "backtrace.h"
 
@@ -131,7 +133,7 @@ Bob::~Bob()
 		molog
 			("Map_Object::~Map_Object: m_pos.field != 0, cleanup() not "
 			 "called!\n");
-		*static_cast<int32_t *>(0) = 0;
+		abort();
 	}
 }
 
@@ -830,12 +832,12 @@ Point Bob::calc_drawpos(const Editor_Game_Base & game, const Point pos) const
 		spos.y += end.field->get_height() * HEIGHT_FACTOR;
 		spos.y -= start.field->get_height() * HEIGHT_FACTOR;
 
+		assert(m_walkstart <= game.get_gametime());
+		assert(m_walkstart < m_walkend);
 		float f =
 			static_cast<float>(game.get_gametime() - m_walkstart)
 			/
 			(m_walkend - m_walkstart);
-		assert(m_walkstart <= game.get_gametime());
-		assert(m_walkstart < m_walkend);
 
 		if (f < 0)
 			f = 0;

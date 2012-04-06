@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2002-2004, 2006-2009 by the Widelands Development Team
+ * Copyright (C) 2002-2004, 2006-2012 by the Widelands Development Team
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -13,7 +13,7 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  *
  */
 
@@ -87,13 +87,11 @@ Fullscreen_Menu_Editor_MapSelect::Fullscreen_Menu_Editor_MapSelect() :
 		(this, "back",
 		 get_w() * 71 / 100, get_h() * 17 / 20, m_butw, m_buth,
 		 g_gr->get_picture(PicMod_UI, "pics/but0.png"),
-		 boost::bind(&Fullscreen_Menu_Editor_MapSelect::end_modal, boost::ref(*this), 0),
 		 _("Back"), std::string(), true, false),
 	m_ok
 		(this, "ok",
 		 get_w() * 71 / 100, get_h() * 9 / 10, m_butw, m_buth,
 		 g_gr->get_picture(PicMod_UI, "pics/but2.png"),
-		 boost::bind(&Fullscreen_Menu_Editor_MapSelect::ok, boost::ref(*this)),
 		 _("OK"), std::string(), false, false),
 
 // Map list
@@ -105,6 +103,9 @@ Fullscreen_Menu_Editor_MapSelect::Fullscreen_Menu_Editor_MapSelect() :
 // Runtime variables
 	m_curdir("maps"), m_basedir("maps")
 {
+	m_back.sigclicked.connect(boost::bind(&Fullscreen_Menu_Editor_MapSelect::end_modal, boost::ref(*this), 0));
+	m_ok.sigclicked.connect(boost::bind(&Fullscreen_Menu_Editor_MapSelect::ok, boost::ref(*this)));
+
 	m_back.set_font(font_small());
 	m_ok.set_font(font_small());
 
@@ -123,9 +124,9 @@ Fullscreen_Menu_Editor_MapSelect::Fullscreen_Menu_Editor_MapSelect() :
 	m_descr           .set_font(m_fn, m_fs, UI_FONT_CLR_FG);
 	m_list            .set_font(m_fn, m_fs);
 
-	m_list.selected.set(this, &Fullscreen_Menu_Editor_MapSelect::map_selected);
-	m_list.double_clicked.set
-		(this, &Fullscreen_Menu_Editor_MapSelect::double_clicked);
+	m_list.selected.connect(boost::bind(&Fullscreen_Menu_Editor_MapSelect::map_selected, this, _1));
+	m_list.double_clicked.connect
+		(boost::bind(&Fullscreen_Menu_Editor_MapSelect::double_clicked, this, _1));
 
 	fill_list();
 }
@@ -168,20 +169,29 @@ void Fullscreen_Menu_Editor_MapSelect::map_selected(uint32_t)
 	if (!g_fs->IsDirectory(name) || WL_Map_Loader::is_widelands_map(name)) {
 		Widelands::Map map;
 		{
-			Widelands::Map_Loader * const m_ml =
-				map.get_correct_loader(name.c_str());
+			Widelands::Map_Loader * const m_ml = map.get_correct_loader(name.c_str());
 			m_ml->preload_map(true); //  This has worked before, no problem.
 			delete m_ml;
 		}
 
-		m_name  .set_text(map.get_name       ());
-		m_author.set_text(map.get_author     ());
-		m_descr .set_text(map.get_description());
-		m_world .set_text(map.get_world_name ());
+		// get translated worldsname
+		std::string world(map.get_world_name());
+		std::string worldpath("worlds/" + world);
+		Profile prof((worldpath + "/conf").c_str(), 0, "world_" + world);
+		Section & global = prof.get_safe_section("world");
+		world = global.get_safe_string("name");
+
+		// Translate the map data
+		i18n::Textdomain td("maps");
+		m_name  .set_text(_(map.get_name()));
+		m_author.set_text(map.get_author());
+		m_descr .set_text
+			(_(map.get_description()) + (map.get_hint().empty() ? "" : (std::string("\n") + _(map.get_hint()))));
+		m_world .set_text(world);
 
 		char buf[200];
 		sprintf(buf, "%i", map.get_nrplayers());
-		m_nr_players .set_text(buf);
+		m_nr_players.set_text(buf);
 
 		sprintf(buf, "%ix%i", map.get_width(), map.get_height());
 		m_size      .set_text(buf);

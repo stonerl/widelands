@@ -13,7 +13,7 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  *
  */
 
@@ -84,7 +84,7 @@ UniqueWindow::UniqueWindow
 		delete m_registry->window;
 
 		m_registry->window = this;
-		if (m_registry->x >= 0) {
+		if (m_registry->valid_pos) {
 			set_pos(Point(m_registry->x, m_registry->y));
 			m_usedefaultpos = false;
 		}
@@ -106,6 +106,7 @@ UniqueWindow::~UniqueWindow()
 		m_registry->window = 0;
 		m_registry->x = get_x();
 		m_registry->y = get_y();
+		m_registry->valid_pos = true;
 
 		if (m_registry->onDelete) {
 			m_registry->onDelete();

@@ -135,7 +135,7 @@ var_updater=0 # 0 = false
     fi
 
     echo " "
-    cmake -DWL_PORTABLE=true .. -DCMAKE_EXE_CXX_FLAGS="${CFLAGS}" -DCMAKE_BUILD_TYPE="${var_build_type}"
+    cmake -DWL_PORTABLE=true .. -DCMAKE_BUILD_TYPE="${var_build_type}"
     make ${MAKEOPTS}
     return 0
   }
@@ -181,6 +181,7 @@ var_updater=0 # 0 = false
             echo "fi"
             echo " "
             echo "bzr pull"
+            echo "touch CMakeLists.txt"
             echo "cd build"
             echo "make"
             if [ $var_build_lang -eq 1 ] ; then

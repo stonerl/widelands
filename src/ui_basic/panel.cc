@@ -13,7 +13,7 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  *
  */
 
@@ -533,7 +533,7 @@ void Panel::update_inner(int32_t x, int32_t y, int32_t w, int32_t h)
  * Enable/Disable the drawing cache.
  * When the drawing cache is enabled, draw() is only called after an update()
  * has been called explicitly. Otherwise, the contents of the panel are copied
- * from an \ref OffscreenSurface containing the cached image, provided that
+ * from an \ref IOffscreenSurface containing the cached image, provided that
  * the graphics system supports it.
  *
  * \note Caching only works properly for solid panels that have no transparency.
@@ -658,6 +658,17 @@ bool Panel::handle_mousemove(const Uint8, int32_t, int32_t, int32_t, int32_t)
  * \return true if the event was processed, false otherwise
 */
 bool Panel::handle_key(bool, SDL_keysym)
+{
+	return false;
+}
+
+/**
+ * Called whenever the user presses a mouse button in the panel while pressing the alt-key.
+ * This function is called first on the parent panels.
+ * It should be only overwritten by the UI::Window class.
+ * \return true if the click was processed, false otherwise
+ */
+bool Panel::handle_alt_drag(int32_t x, int32_t y)
 {
 	return false;
 }
@@ -903,7 +914,7 @@ void Panel::do_mousein(bool const inside)
 
 	if (!inside && _mousein) {
 		_mousein->do_mousein(false);
-		_mousein = false;
+		_mousein = NULL;
 	}
 	handle_mousein(inside);
 }
@@ -921,6 +932,18 @@ bool Panel::do_mousepress(const Uint8 btn, int32_t x, int32_t y) {
 	y -= _tborder;
 	if (_flags & pf_top_on_click)
 		move_to_top();
+
+	//  FIXME This code is erroneous. It checks the current key state. What it
+	//  FIXME needs is the key state at the time the mouse was clicked. See the
+	//  FIXME usage comment for get_key_state.
+	//  Some window managers use alt-drag, so we can't only use the alt keys
+	if
+		((not _g_mousegrab) && (btn == SDL_BUTTON_LEFT) &&
+		 ((get_key_state(SDLK_LALT) | get_key_state(SDLK_RALT) |
+		   get_key_state(SDLK_MODE) | get_key_state(SDLK_LSHIFT))))
+		if (handle_alt_drag(x, y))
+			return true;
+
 	if (_g_mousegrab != this)
 		for
 			(Panel * child = _fchild;

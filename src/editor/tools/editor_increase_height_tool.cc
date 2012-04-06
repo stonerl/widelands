@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2002-2004, 2006-2008 by the Widelands Development Team
+ * Copyright (C) 2002-2004, 2006-2008, 2012 by the Widelands Development Team
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -13,7 +13,7 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  *
  */
 
@@ -21,18 +21,45 @@
 
 #include "logic/map.h"
 #include "logic/field.h"
+#include "logic/mapregion.h"
 #include "editor/editorinteractive.h"
-
 
 /// Increases the heights by a value. Chages surrounding nodes if necessary.
 int32_t Editor_Increase_Height_Tool::handle_click_impl
-	(Widelands::Map               &       map,
-	 Widelands::Node_and_Triangle<> const center,
-	 Editor_Interactive           &       parent)
+	(Widelands::Map & map,
+	Widelands::Node_and_Triangle<> center,
+	Editor_Interactive & parent,
+	Editor_Action_Args & args)
 {
+	if (args.origHights.empty()) {
+		Widelands::MapRegion<Widelands::Area<Widelands::FCoords> > mr
+		(map,
+		 Widelands::Area<Widelands::FCoords>
+		 (map.get_fcoords(center.node), args.sel_radius + MAX_FIELD_HEIGHT / MAX_FIELD_HEIGHT_DIFF + 1));
+		do {
+			args.origHights.push_back(mr.location().field->get_height());
+		} while (mr.advance(map));
+	}
+
 	return
-		map.change_height
-			(Widelands::Area<Widelands::FCoords>
-			 	(map.get_fcoords(center.node), parent.get_sel_radius()),
-			 m_change_by);
+	    map.change_height
+	    (Widelands::Area<Widelands::FCoords>
+	     (map.get_fcoords(center.node), args.sel_radius),
+	     args.change_by);
+}
+
+int32_t Editor_Increase_Height_Tool::handle_undo_impl
+	(Widelands::Map & map,
+	Widelands::Node_and_Triangle<> center,
+	Editor_Interactive & parent,
+	Editor_Action_Args & args)
+{
+	return m_decrease_tool.handle_undo_impl(map, center, parent, args);
+}
+
+Editor_Action_Args Editor_Increase_Height_Tool::format_args_impl(Editor_Interactive & parent)
+{
+	Editor_Action_Args a(parent);
+	a.change_by = m_change_by;
+	return a;
 }

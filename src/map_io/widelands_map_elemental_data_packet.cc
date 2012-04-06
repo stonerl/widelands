@@ -13,7 +13,7 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  *
  */
 
@@ -50,6 +50,7 @@ throw (_wexception)
 			map->set_name       (s.get_string("name"));
 			map->set_author     (s.get_string("author"));
 			map->set_description(s.get_string("descr"));
+			map->set_hint       (s.get_string("hint", ""));
 			map->set_background (s.get_string("background"));
 
 			std::string t = s.get_string("tags", "");
@@ -97,6 +98,7 @@ throw (_wexception)
 	s.set_string("name",           map.get_name       ());
 	s.set_string("author",         map.get_author     ());
 	s.set_string("descr",          map.get_description());
+	s.set_string("hint",           map.get_hint       ());
 	s.set_string("tags", boost::algorithm::join(map.get_tags(), ","));
 
 	prof.write("elemental", false, fs);

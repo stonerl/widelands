@@ -13,7 +13,7 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  *
  */
 
@@ -87,11 +87,13 @@ Interactive_Base::Interactive_Base
 	m_avg_usframetime             (0),
 	m_jobid                       (Overlay_Manager::Job_Id::Null()),
 	m_road_buildhelp_overlay_jobid(Overlay_Manager::Job_Id::Null()),
-	m_buildroad                   (false),
+	m_buildroad                   (0),
 	m_road_build_player           (0),
 	m_toolbar                     (this, 0, 0, UI::Box::Horizontal),
+	m_label_speed_shadow
+		(this, get_w() - 1, 0, std::string(), UI::Align_TopRight),
 	m_label_speed
-		(this, get_w(), 0, std::string(), UI::Align_TopRight)
+		(this, get_w(), 1, std::string(), UI::Align_TopRight)
 {
 	m_toolbar.set_layout_toplevel(true);
 	m->quicknavigation->set_setview
@@ -100,7 +102,7 @@ Interactive_Base::Interactive_Base
 		(boost::bind(&QuickNavigation::view_changed,
 		 m->quicknavigation.get(), _1, _2));
 
-	changeview.set(this, &Interactive_Base::mainview_move);
+	changeview.connect(boost::bind(&Interactive_Base::mainview_move, this, _1, _2));
 
 	set_border_snap_distance(global_s.get_int("border_snap_distance", 0));
 	set_panel_snap_distance (global_s.get_int("panel_snap_distance", 10));
@@ -115,7 +117,7 @@ Interactive_Base::Interactive_Base
 		 global_s.get_int("depth", 16),
 		 global_s.get_bool("fullscreen", false),
 #if USE_OPENGL
-		 global_s.get_bool("opengl", false));
+		 global_s.get_bool("opengl", true));
 #else
 		 false);
 #endif
@@ -125,6 +127,11 @@ Interactive_Base::Interactive_Base
 	m_sel.pic = g_gr->get_picture(PicMod_Game, "pics/fsel.png");
 
 	m_label_speed.set_visible(false);
+	m_label_speed_shadow.set_visible(false);
+
+	UI::TextStyle style_shadow = m_label_speed.get_textstyle();
+	style_shadow.fg = RGBColor(0, 0, 0);
+	m_label_speed_shadow.set_textstyle(style_shadow);
 
 	setDefaultCommand (boost::bind(&Interactive_Base::cmdLua, this, _1));
 	addCommand
@@ -299,6 +306,10 @@ void Interactive_Base::update_speedlabel()
 		m_label_speed.set_visible(true);
 	} else
 		m_label_speed.set_visible(false);
+
+	m_label_speed_shadow.set_text(m_label_speed.get_text());
+	m_label_speed_shadow.set_visible(m_label_speed.is_visible());
+
 }
 
 
@@ -363,7 +374,7 @@ void Interactive_Base::draw_overlay(RenderTarget & dst) {
 		char buf[100];
 
 		snprintf(buf, sizeof(buf), "%3i %3i", m_sel.pos.node.x, m_sel.pos.node.y);
-		UI::g_fh->draw_text
+		UI::g_fh->draw_text_shadow
 			(dst, UI::TextStyle::ui_big(), Point(5, 5), buf, UI::Align_Left);
 		assert(m_sel.pos.triangle.t < 2);
 		const char * const triangle_string[] = {"down", "right"};
@@ -372,7 +383,7 @@ void Interactive_Base::draw_overlay(RenderTarget & dst) {
 			 "%3i %3i %s",
 			 m_sel.pos.triangle.x, m_sel.pos.triangle.y,
 			 triangle_string[m_sel.pos.triangle.t]);
-		UI::g_fh->draw_text
+		UI::g_fh->draw_text_shadow
 			(dst, UI::TextStyle::ui_big(),
 			 Point(5, 25),
 			 buf, UI::Align_Left);
@@ -385,7 +396,7 @@ void Interactive_Base::draw_overlay(RenderTarget & dst) {
 			(buffer, sizeof(buffer),
 			 "%5.1f fps (avg: %5.1f fps)",
 			 1000.0 / m_frametime, 1000.0 / (m_avg_usframetime / 1000));
-		UI::g_fh->draw_text
+		UI::g_fh->draw_text_shadow
 			(dst, UI::TextStyle::ui_big(),
 			 Point(85, 5),
 			 buffer, UI::Align_Left);
@@ -449,7 +460,9 @@ void Interactive_Base::move_view_to(const Coords c)
 	assert(0 <= c.y);
 	assert     (c.y < egbase().map().get_height());
 
-	uint32_t const x = c.x * TRIANGLE_WIDTH, y = c.y * TRIANGLE_HEIGHT;
+	const Map & map = egbase().map();
+	uint32_t const x = (c.x + (c.y & 1) * 0.5) * TRIANGLE_WIDTH;
+	uint32_t const y = c.y * TRIANGLE_HEIGHT - map[c].get_height() * HEIGHT_FACTOR;
 	if (m->minimap.window)
 		m->mm->set_view_pos(x, y);
 	minimap_warp(x, y);
@@ -483,7 +496,7 @@ void Interactive_Base::toggle_minimap() {
 	}
 	else {
 		m->mm = new MiniMap(*this, &m->minimap);
-		m->mm->warpview.set(this, &Interactive_Base::minimap_warp);
+		m->mm->warpview.connect(boost::bind(&Interactive_Base::minimap_warp, this, _1, _2));
 
 		// make sure the viewpos marker is at the right pos to start with
 		const Point p = get_viewpoint();

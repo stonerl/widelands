@@ -13,7 +13,7 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  *
  */
 
@@ -43,21 +43,17 @@ struct Tribe_Descr;
 struct Road;
 struct AttackController;
 
-/** class Player
+/**
+ * Manage in-game aspects of players, such as tribe, team, fog-of-war, statistics,
+ * messages (notification when a resource has been found etc.) and so on.
  *
- * What we really need is a Player class that stores e.g. score
- * and diplomacy of a player.
- *
- * These Player classes should be controlled via the cmd queue.
- * Commands are inserted by:
- *  - local player
- *  - network packets
- *  - AI code
- * Player commands should be controlled by the \ref GameController
- * in the long run.
- *                      -- Nicolai
+ * Also provides functions for directly building player immovables; however,
+ * from the UI and AI codes, those should only ever be issued indirectly via
+ * \ref GameController and friends, so that replays and network games function
+ * properly.
  */
 struct Player :
+	boost::noncopyable,
 	public NoteReceiver<NoteImmovable>, public NoteReceiver<NoteFieldPossession>,
 	public NoteSender  <NoteImmovable>, public NoteSender  <NoteFieldPossession>
 {
@@ -72,8 +68,8 @@ struct Player :
 	typedef std::vector<Building_Stats_vector> BuildingStats;
 
 	friend struct Editor_Game_Base;
-	friend class Game_Player_Info_Data_Packet;
-	friend class Game_Player_Economies_Data_Packet;
+	friend struct Game_Player_Info_Data_Packet;
+	friend struct Game_Player_Economies_Data_Packet;
 	friend struct Map_Buildingdata_Data_Packet;
 	friend struct Map_Players_View_Data_Packet;
 	friend struct Map_Exploration_Data_Packet;
@@ -140,7 +136,7 @@ struct Player :
 	};
 
 	/// Per-player field information.
-	struct Field {
+	struct Field : boost::noncopyable {
 		Field() :
 			military_influence(0),
 			vision            (0)
@@ -313,9 +309,16 @@ struct Player :
 		 * if the immovable is big?). (Roads are not stored here.)
 		 */
 		const Map_Object_Descr             * map_object_descr[3];
+
 		/// Information for constructionsite's animation.
 		/// only valid, if there is a constructionsite on this node
 		const Constructionsite_Information * constructionsite[3];
+
+		/// Save whether the player saw a border the last time (s)he saw the node.
+		bool border;
+		bool border_r;
+		bool border_br;
+		bool border_bl;
 
 		//  Summary of intended layout (not yet fully implemented)
 		//
@@ -336,11 +339,14 @@ struct Player :
 		//  map_object_descr[0]             0x0a0  0x20   0x0a0  0x40
 		//  map_object_descr[1]             0x0c0  0x20   0x0e0  0x40
 		//  map_object_descr[2]             0x0e0  0x20   0x120  0x40
+		//  Constructionsite_Information[0]
+		//  Constructionsite_Information[1]
+		//  Constructionsite_Information[2]
+		//  border
+		//  border_r
+		//  border_br
+		//  border_bl
 		//  <end>                           0x100         0x160
-
-	private:
-		Field & operator= (Field const &);
-		explicit Field    (Field const &);
 	};
 
 	const Field * fields() const throw () {return m_fields;}

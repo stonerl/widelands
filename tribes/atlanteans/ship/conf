@@ -1,8 +1,10 @@
 #help=_A sea-worthy ship
 
+capacity=20
+
 [idle]
 pics=ship_i_??.png
-hotspot=118 94
+hotspot=77 64
 playercolor=true
 fps=10
 

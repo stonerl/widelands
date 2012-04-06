@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010-2011 by the Widelands Development Team
+ * Copyright (C) 2010-2012 by the Widelands Development Team
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -13,7 +13,7 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  *
  */
 
@@ -39,7 +39,6 @@
 #include "wui/overlay_manager.h"
 
 #include "terrain_sdl.h"
-#include "terrain_opengl.h"
 
 using Widelands::BaseImmovable;
 using Widelands::Coords;
@@ -75,7 +74,7 @@ inline static Sint8 node_brightness
 }
 
 
-#define RENDERMAP_INITIALIZANTONS                                             \
+#define RENDERMAP_INITIALIZATIONS                                             \
    viewofs -= m_offset;                                                       \
                                                                               \
    Map                   const & map             = egbase.map();              \
@@ -115,7 +114,7 @@ void GameView::rendermap
 	if (player.see_all())
 		return rendermap(egbase, viewofs);
 
-	RENDERMAP_INITIALIZANTONS;
+	RENDERMAP_INITIALIZATIONS;
 
 	const Player::Field * const first_player_field = player.fields();
 	Widelands::Time const gametime = egbase.get_gametime();
@@ -158,7 +157,7 @@ void GameView::rendermap
 		uint32_t count = dx;
 
 		while (count--) {
-			const FCoords l = f, bl = br;
+			const FCoords bl = br;
 			const Player::Field &  f_player_field =  *r_player_field;
 			const Player::Field & bl_player_field = *br_player_field;
 			f = r;
@@ -173,14 +172,11 @@ void GameView::rendermap
 			br_posx += TRIANGLE_WIDTH;
 			const Texture & tr_d_texture =
 				*g_gr->get_maptexture_data
-					(world.terrain_descr(first_player_field[tr_index].terrains.d)
-					 .get_texture());
+					(world.terrain_descr(first_player_field[tr_index].terrains.d).get_texture());
 			const Texture & f_d_texture =
-				*g_gr->get_maptexture_data
-					(world.terrain_descr(f_player_field.terrains.d).get_texture());
+				*g_gr->get_maptexture_data(world.terrain_descr(f_player_field.terrains.d).get_texture());
 			f_r_texture =
-				g_gr->get_maptexture_data
-					(world.terrain_descr(f_player_field.terrains.r).get_texture());
+				g_gr->get_maptexture_data(world.terrain_descr(f_player_field.terrains.r).get_texture());
 
 			uint8_t const roads =
 				f_player_field.roads | overlay_manager.get_road_overlay(f);
@@ -214,8 +210,10 @@ void GameView::rendermap
 				f_vert.tx += TRIANGLE_WIDTH / 2;
 				r_vert.tx += TRIANGLE_WIDTH / 2;
 			} else {
-				bl_vert.tx -= TRIANGLE_WIDTH / 2;
-				br_vert.tx -= TRIANGLE_WIDTH / 2;
+				f_vert.tx += TRIANGLE_WIDTH;
+				r_vert.tx += TRIANGLE_WIDTH;
+				bl_vert.tx += TRIANGLE_WIDTH / 2;
+				br_vert.tx += TRIANGLE_WIDTH / 2;
 			}
 
 			draw_field //  Render ground
@@ -233,8 +231,8 @@ void GameView::rendermap
 		const int32_t dx2        = maxfx - minfx + 1;
 		int32_t dy2              = maxfy - minfy + 1;
 		int32_t linear_fy2       = minfy;
-		bool row_is_forward2 = linear_fy2 & 1;
-		int32_t b_posy2          = linear_fy2 * TRIANGLE_HEIGHT - viewofs.y;
+		bool row_is_forward2     = linear_fy2 & 1;
+		int32_t b_posy2          = linear_fy2 * TRIANGLE_HEIGHT - viewofs.y - m_offset.y;
 
 		while (dy2--) {
 			const int32_t posy = b_posy2;
@@ -242,12 +240,10 @@ void GameView::rendermap
 
 			{ //  Draw things on the node.
 				const int32_t linear_fx = minfx;
-				FCoords r(Coords(linear_fx, linear_fy2));
-				FCoords br
-					(Coords(linear_fx - not row_is_forward2, linear_fy2 + 1));
+				FCoords r (Coords(linear_fx, linear_fy2));
+				FCoords br(Coords(linear_fx - not row_is_forward2, linear_fy2 + 1));
 
-				//  Calculate safe (bounded) field coordinates and get field
-				//  pointers.
+				//  Calculate safe (bounded) field coordinates and get field pointers.
 				map.normalize_coords(r);
 				map.normalize_coords(br);
 				Widelands::Map_Index  r_index = Map::get_index (r, mapwidth);
@@ -258,11 +254,11 @@ void GameView::rendermap
 				map.get_tln(r, &tr);
 				map.get_ln(r, &f);
 				bool r_is_border;
-				uint8_t f_owner_number = f.field->get_owned_by(); //  FIXME PPoV
+				uint8_t f_owner_number = f.field->get_owned_by();   //  do not use if f_vision < 1 -> PPOV
 				uint8_t r_owner_number;
-				r_is_border = r.field->is_border(); //  FIXME PPoV
-				r_owner_number = r.field->get_owned_by(); //  FIXME PPoV
-				uint8_t br_owner_number = br.field->get_owned_by(); //  FIXME PPoV
+				r_is_border = r.field->is_border();                 //  do not use if f_vision < 1 -> PPOV
+				r_owner_number = r.field->get_owned_by();           //  do not use if f_vision < 1 -> PPOV
+				uint8_t br_owner_number = br.field->get_owned_by(); //  do not use if f_vision < 1 -> PPOV
 				Player::Field const * r_player_field = first_player_field + r_index;
 				const Player::Field * br_player_field = first_player_field + br_index;
 				Widelands::Vision  r_vision =  r_player_field->vision;
@@ -272,7 +268,7 @@ void GameView::rendermap
 					 +
 					 row_is_forward2 * (TRIANGLE_WIDTH / 2)
 					 -
-					 viewofs.x,
+					 viewofs.x - m_offset.x,
 					 posy - r.field->get_height() * HEIGHT_FACTOR);
 				Point br_pos
 					(r_pos.x - TRIANGLE_WIDTH / 2,
@@ -281,7 +277,6 @@ void GameView::rendermap
 				int32_t count = dx2;
 
 				while (count--) {
-					const FCoords l = f, bl = br;
 					f = r;
 					const Player::Field & f_player_field = *r_player_field;
 					move_r(mapwidth, tr);
@@ -290,64 +285,59 @@ void GameView::rendermap
 					r_player_field  = first_player_field +  r_index;
 					br_player_field = first_player_field + br_index;
 
-					//  FIXME PPoV
+					//  do not use if f_vision < 1 -> PPOV
 					const uint8_t tr_owner_number = tr.field->get_owned_by();
 
 					const bool f_is_border = r_is_border;
 					const uint8_t l_owner_number = f_owner_number;
 					const uint8_t bl_owner_number = br_owner_number;
 					f_owner_number = r_owner_number;
-					r_is_border = r.field->is_border();         //  FIXME PPoV
-					r_owner_number = r.field->get_owned_by();   //  FIXME PPoV
-					br_owner_number = br.field->get_owned_by(); //  FIXME PPoV
+					r_is_border = r.field->is_border();         //  do not use if f_vision < 1 -> PPOV
+					r_owner_number = r.field->get_owned_by();   //  do not use if f_vision < 1 -> PPOV
+					br_owner_number = br.field->get_owned_by(); //  do not use if f_vision < 1 -> PPOV
 					Widelands::Vision const  f_vision =  r_vision;
 					Widelands::Vision const bl_vision = br_vision;
 					r_vision  = player.vision (r_index);
 					br_vision = player.vision(br_index);
 					const Point f_pos = r_pos, bl_pos = br_pos;
-					r_pos = Point
-						(r_pos.x + TRIANGLE_WIDTH,
-						 posy - r.field->get_height() * HEIGHT_FACTOR);
-					br_pos = Point
-						(br_pos.x + TRIANGLE_WIDTH,
-						 b_posy2 - br.field->get_height() * HEIGHT_FACTOR);
-
-					//  Render border markes on and halfway between border nodes.
-					if (f_is_border) {
-						const Player & owner = egbase.player(f_owner_number);
-						uint32_t const anim = owner.frontier_anim();
-						if (1 < f_vision)
-							drawanim(f_pos, anim, 0, &owner);
-						if
-							((f_vision | r_vision)
-							 and
-							 r_owner_number == f_owner_number
-							 and
-							 ((tr_owner_number == f_owner_number)
-							  xor
-							  (br_owner_number == f_owner_number)))
-							drawanim(middle(f_pos, r_pos), anim, 0, &owner);
-						if
-							((f_vision | bl_vision)
-							 and
-							 bl_owner_number == f_owner_number
-							 and
-							 ((l_owner_number == f_owner_number)
-							  xor
-							  (br_owner_number == f_owner_number)))
-							drawanim(middle(f_pos, bl_pos), anim, 0, &owner);
-						if
-							((f_vision | br_vision)
-							 and
-							 br_owner_number == f_owner_number
-							 and
-							 ((r_owner_number == f_owner_number)
-							  xor
-							  (bl_owner_number == f_owner_number)))
-							drawanim(middle(f_pos, br_pos), anim, 0, &owner);
-					}
+					r_pos = Point(r_pos.x + TRIANGLE_WIDTH, posy - r.field->get_height() * HEIGHT_FACTOR);
+					br_pos = Point(br_pos.x + TRIANGLE_WIDTH, b_posy2 - br.field->get_height() * HEIGHT_FACTOR);
 
 					if (1 < f_vision) { // Render stuff that belongs to the node.
+						//  Render border markes on and halfway between border nodes.
+						if (f_is_border) {
+							const Player & owner = egbase.player(f_owner_number);
+							uint32_t const anim = owner.frontier_anim();
+							drawanim(f_pos, anim, 0, &owner);
+							if
+								((f_vision | r_vision)
+								 and
+								 r_owner_number == f_owner_number
+								 and
+								 ((tr_owner_number == f_owner_number)
+								 xor
+								 (br_owner_number == f_owner_number)))
+								drawanim(middle(f_pos, r_pos), anim, 0, &owner);
+							if
+								((f_vision | bl_vision)
+								 and
+								 bl_owner_number == f_owner_number
+								 and
+								 ((l_owner_number == f_owner_number)
+								 xor
+								 (br_owner_number == f_owner_number)))
+								drawanim(middle(f_pos, bl_pos), anim, 0, &owner);
+							if
+								((f_vision | br_vision)
+								 and
+								 br_owner_number == f_owner_number
+								 and
+								 ((r_owner_number == f_owner_number)
+								 xor
+								 (bl_owner_number == f_owner_number)))
+								drawanim(middle(f_pos, br_pos), anim, 0, &owner);
+						}
+
 
 						// Render bobs
 						// TODO - rendering order?
@@ -380,12 +370,24 @@ void GameView::rendermap
 							 it < end;
 							 ++it)
 							blit(f_pos - it->hotspot, it->picid);
-					} else if (f_vision == 1)
+					} else if (f_vision == 1) {
+						const Player * owner = f_player_field.owner ? egbase.get_player(f_player_field.owner) : 0;
+						if (owner) {
+							// Draw borders as they stood the last time we saw them
+							uint32_t const anim = owner->frontier_anim();
+							if (f_player_field.border)
+								drawanim(f_pos, anim, 0, owner);
+							if (f_player_field.border_r)
+								drawanim(middle(f_pos,  r_pos), anim, 0, owner);
+							if (f_player_field.border_br)
+								drawanim(middle(f_pos, bl_pos), anim, 0, owner);
+							if (f_player_field.border_bl)
+								drawanim(middle(f_pos, br_pos), anim, 0, owner);
+						}
 						if
 							(const Map_Object_Descr * const map_object_descr =
 							 f_player_field.map_object_descr[TCoords<>::None])
 						{
-							Player const * const owner = f_owner_number ? egbase.get_player(f_owner_number) : 0;
 							if
 								(const Player::Constructionsite_Information * const csinf =
 								 f_player_field.constructionsite[TCoords<>::None])
@@ -446,6 +448,7 @@ void GameView::rendermap
 								drawanim(f_pos, owner->flag_anim(), 0, owner);
 							}
 						}
+					}
 				}
 			}
 
@@ -597,7 +600,7 @@ void GameView::rendermap
 	(Widelands::Editor_Game_Base const &       egbase,
 	 Point                                     viewofs)
 {
-	RENDERMAP_INITIALIZANTONS;
+	RENDERMAP_INITIALIZATIONS;
 
 	rendermap_init();
 
@@ -632,7 +635,7 @@ void GameView::rendermap
 		uint32_t count = dx;
 
 		while (count--) {
-			const FCoords l = f, bl = br;
+			const FCoords bl = br;
 			f = r;
 			const int32_t f_posx = r_posx, bl_posx = br_posx;
 			const Texture & l_r_texture = *f_r_texture;
@@ -738,7 +741,6 @@ void GameView::rendermap
 				int32_t count = dx2;
 
 				while (count--) {
-					const FCoords l = f, bl = br;
 					f = r;
 					move_r(mapwidth, tr);
 					move_r(mapwidth,  r,  r_index);
@@ -978,7 +980,10 @@ void GameView::renderminimap
 	 Point                               const viewpoint,
 	 uint32_t                            const flags)
 {
-	draw_minimap(egbase, player, m_rect, viewpoint - m_offset, flags);
+	draw_minimap
+		(egbase, player, m_rect, viewpoint -
+			((flags & MiniMap::Zoom2) ? Point(m_offset.x / 2, m_offset.y / 2) : m_offset),
+				viewpoint, flags);
 }
 
 
@@ -988,16 +993,16 @@ void GameView::renderminimap
  * into the bitmap.
  *
  * Vertices:
- *   - f_vert vertice of the field
- *   - r_vert vertice right of the field
- *   - bl_vert vertice bottom left of the field
- *   - br_vert vertice bottom right of the field
+ *   - f_vert vertex of the field
+ *   - r_vert vertex right of the field
+ *   - bl_vert vertex bottom left of the field
+ *   - br_vert vertex bottom right of the field
  *
  * Textures:
  *   - f_r_texture Terrain of the triangle right of the field
  *   - f_d_texture Terrain of the triangle under of the field
- *   - tr_d_texture Terrain of the triangle to of the right triangle ??
- *   - l_r_texture Terrain of the triangle left if the down triangle ??
+ *   - tr_d_texture Terrain of the triangle top of the right triangle ??
+ *   - l_r_texture Terrain of the triangle left of the down triangle ??
  *
  *             (tr_d)
  *
@@ -1020,43 +1025,7 @@ void GameView::draw_field
 	 Texture const &  f_d_texture,
 	 Texture const &  f_r_texture)
 {
-	upcast(SurfaceSDL, sdlsurf, m_surface.get());
-	if (sdlsurf)
-	{
-		sdlsurf->set_subwin(subwin);
-		switch (sdlsurf->format().BytesPerPixel) {
-		case 2:
-			draw_field_int<Uint16>
-				(*sdlsurf,
-				 f_vert, r_vert, bl_vert, br_vert,
-				 roads,
-				 tr_d_texture, l_r_texture, f_d_texture, f_r_texture);
-			break;
-		case 4:
-			draw_field_int<Uint32>
-				(*sdlsurf,
-				 f_vert, r_vert, bl_vert, br_vert,
-				 roads,
-				 tr_d_texture, l_r_texture, f_d_texture, f_r_texture);
-			break;
-		default:
-			assert(false);
-		}
-		sdlsurf->unset_subwin();
-	}
-#ifdef USE_OPENGL
-	else
-	{
-		// Draw triangle right (bottom) of the field
-		draw_field_opengl
-			(subwin, f_vert, br_vert, r_vert, f_r_texture);
-		// Draw triangle bottom of the field
-		draw_field_opengl
-			(subwin, f_vert, bl_vert, br_vert, f_d_texture);
-		// Draw the roads
-		draw_roads_opengl(subwin, roads, f_vert, r_vert, bl_vert, br_vert);
-	}
-#endif
+
 }
 
 /*
@@ -1114,18 +1083,36 @@ inline static uint32_t calc_minimap_color
 	}
 
 	if (see_details)
+		// if ownership layer is displayed, it creates enoungh contrast
+		// to visualize objects using white color.
+		// Otherwise, a more contrasting color may be needed:
+		// * winterland -> orange
+
 		if (upcast(PlayerImmovable const, immovable, f.field->get_immovable())) {
 			if (flags & MiniMap::Roads and dynamic_cast<Road const *>(immovable))
-				pixelcolor = blend_color(format, pixelcolor, 255, 255, 255);
+			{
+				if (!(flags & MiniMap::Owner) && !strcmp(egbase.map().get_world_name(), "winterland"))
+						pixelcolor = blend_color(format, pixelcolor, 255, 127, 0);
+				else //ownership layer displayed or greenland
+						pixelcolor = blend_color(format, pixelcolor, 255, 255, 255);
+			}
+
 			if
 				((flags & MiniMap::Flags and dynamic_cast<Flag const *>(immovable))
 				 or
 				 (flags & MiniMap::Bldns
 				  and
 				  dynamic_cast<Widelands::Building const *>(immovable)))
-				pixelcolor =
-					SDL_MapRGB
-						(&const_cast<SDL_PixelFormat &>(format), 255, 255, 255);
+			{
+				if (!(flags & MiniMap::Owner) && !strcmp(egbase.map().get_world_name(), "winterland"))
+					pixelcolor =
+						SDL_MapRGB
+							(&const_cast<SDL_PixelFormat &>(format), 255, 127, 0);
+				else //ownership layer displayed or greenland
+					pixelcolor =
+						SDL_MapRGB
+							(&const_cast<SDL_PixelFormat &>(format), 255, 255, 255);
+			}
 		}
 
 	return pixelcolor;
@@ -1203,26 +1190,27 @@ static void draw_minimap_int
 	 Widelands::Player           const * const player,
 	 Rect                                const rc,
 	 Point                               const viewpoint,
+	 Point                               const framepoint,
 	 uint32_t                            const flags)
 {
 	Widelands::Map const & map = egbase.map();
 
-	int32_t mapheight = (flags & MiniMap::Zoom2 ? rc.h / 2 : rc.h);
+	int32_t mapheight = map.get_height();
 
 	// size of the display frame
 	int32_t xsize = g_gr->get_xres() / TRIANGLE_WIDTH / 2;
 	int32_t ysize = g_gr->get_yres() / TRIANGLE_HEIGHT / 2;
 
 	Point ptopleft; // top left point of the current display frame
-	ptopleft.x = viewpoint.x + mapwidth / 2 - xsize;
+	ptopleft.x = framepoint.x + mapwidth / 2 - xsize;
 	if (ptopleft.x < 0) ptopleft.x += mapwidth;
-	ptopleft.y = viewpoint.y + mapheight / 2 - ysize;
+	ptopleft.y = framepoint.y + mapheight / 2 - ysize;
 	if (ptopleft.y < 0) ptopleft.y += mapheight;
 
 	Point pbottomright; // bottom right point of the current display frame
-	pbottomright.x = viewpoint.x + mapwidth / 2 + xsize;
+	pbottomright.x = framepoint.x + mapwidth / 2 + xsize;
 	if (pbottomright.x >= mapwidth) pbottomright.x -= mapwidth;
-	pbottomright.y = viewpoint.y + mapheight / 2 + ysize;
+	pbottomright.y = framepoint.y + mapheight / 2 + ysize;
 	if (pbottomright.y >= mapheight) pbottomright.y -= mapheight;
 
 	uint32_t modx = pbottomright.x % 2;
@@ -1308,6 +1296,7 @@ void GameView::draw_minimap
 	 Widelands::Player           const * const player,
 	 Rect                                const rc,
 	 Point                               const viewpt,
+	 Point                               const framept,
 	 uint32_t                            const flags)
 {
 	// First create a temporary SDL Surface to draw the minimap. This Surface is
@@ -1343,12 +1332,12 @@ void GameView::draw_minimap
 	case sizeof(Uint16):
 		draw_minimap_int<Uint16>
 			(pixels, surface->pitch, *surface->format,
-			 w, egbase, player, rc2, viewpt, flags);
+			 w, egbase, player, rc2, viewpt, framept, flags);
 		break;
 	case sizeof(Uint32):
 		draw_minimap_int<Uint32>
 			(pixels, surface->pitch, *surface->format,
-			 w, egbase, player, rc2, viewpt, flags);
+			 w, egbase, player, rc2, viewpt, framept, flags);
 		break;
 	default:
 		assert (false);
@@ -1359,36 +1348,4 @@ void GameView::draw_minimap
 	PictureID picture = g_gr->convert_sdl_surface_to_picture(surface);
 
 	m_surface->blit(Point(rc.x, rc.y), picture, rc2);
-}
-
-void GameView::rendermap_init()
-{
-#ifdef USE_OPENGL
-	if (g_opengl) {
-		glMatrixMode(GL_TEXTURE);
-		glLoadIdentity();
-		glScalef
-			(1.0f / static_cast<GLfloat>(TEXTURE_WIDTH),
-			 1.0f / static_cast<GLfloat>(TEXTURE_HEIGHT), 1);
-		glDisable(GL_BLEND);
-
-		// Use scissor test to clip the window. This takes coordinates in screen
-		// coordinates (y goes from bottom to top)
-		glScissor
-			(m_rect.x, g_gr->get_yres() - m_rect.y - m_rect.h,
-			 m_rect.w, m_rect.h);
-		glEnable(GL_SCISSOR_TEST);
-	}
-#endif
-}
-
-void GameView::rendermap_deint()
-{
-#ifdef USE_OPENGL
-	if (g_opengl) {
-		glDisable(GL_SCISSOR_TEST);
-		glMatrixMode(GL_TEXTURE);
-		glLoadIdentity();
-	}
-#endif
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2006-2010 by the Widelands Development Team
+ * Copyright (C) 2006-2011 by the Widelands Development Team
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -13,12 +13,13 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  *
  */
 
 #include <lua.hpp>
 
+#include "gamecontroller.h"
 #include "logic/player.h"
 #include "upcast.h"
 #include "wui/interactive_player.h"
@@ -134,7 +135,7 @@ int L_Panel::get_buttons(lua_State * L) {
 /* RST
 	.. attribute:: tabs
 
-		(RO) An :class:`array` of all visible buttons inside this Panel.
+		(RO) An :class:`array` of all visible tabs inside this Panel.
 */
 static void _put_all_tabs_into_table
 	(lua_State * L, UI::Panel * g)
@@ -542,6 +543,12 @@ int L_MapView::get_viewpoint_x(lua_State * L) {
 	return 1;
 }
 int L_MapView::set_viewpoint_x(lua_State * L) {
+	Widelands::Game & game = get_game(L);
+	// don't move view in replays
+	if (game.gameController()->getGameDescription() == "replay") {
+		return 0;
+	}
+
 	Map_View * mv = get();
 	Point p = mv->get_viewpoint();
 	p.x = luaL_checkuint32(L, -1);
@@ -553,6 +560,12 @@ int L_MapView::get_viewpoint_y(lua_State * L) {
 	return 1;
 }
 int L_MapView::set_viewpoint_y(lua_State * L) {
+	Widelands::Game & game = get_game(L);
+	// don't move view in replays
+	if (game.gameController()->getGameDescription() == "replay") {
+		return 0;
+	}
+
 	Map_View * mv = get();
 	Point p = mv->get_viewpoint();
 	p.y = luaL_checkuint32(L, -1);
@@ -632,7 +645,7 @@ int L_MapView::get_is_building_road(lua_State * L) {
 int L_MapView::click(lua_State * L) {
 	get()->warp_mouse_to_node
 		((*get_user_class<LuaMap::L_Field>(L, 2))->coords());
-	get()->fieldclicked.call();
+	get()->fieldclicked();
 	return 0;
 }
 

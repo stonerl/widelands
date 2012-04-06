@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2002-2004, 2006-2008 by the Widelands Development Team
+ * Copyright (C) 2002-2004, 2006-2011 by the Widelands Development Team
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -13,7 +13,7 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  *
  */
 
@@ -144,27 +144,24 @@ m_selected_information(0)
 	iterate_players_existing_const(p, nr_players, game, player) {
 		char buffer[36];
 		snprintf(buffer, sizeof(buffer), "pics/genstats_enable_plr_%02u.png", p);
-		UI::Callback_Button & cb =
-			*new UI::Callback_Button
+		UI::Button & cb =
+			*new UI::Button
 				(hbox1, "playerbutton",
 				 0, 0, 25, 25,
 				 g_gr->get_picture(PicMod_UI, "pics/but4.png"),
 				 g_gr->get_picture(PicMod_Game, buffer),
-				 boost::bind
-				 	(&General_Statistics_Menu::cb_changed_to,
-					 boost::ref(*this),
-					p),
 				 player->get_name().c_str());
-
+		cb.sigclicked.connect
+			(boost::bind(&General_Statistics_Menu::cb_changed_to, this, p));
 		cb.set_perm_pressed(m_my_registry->selected_players[p - 1]);
 
 		m_cbs[p - 1] = &cb;
 
-		hbox1->add(&cb, UI::Box::AlignLeft);
+		hbox1->add(&cb, UI::Box::AlignLeft, false, true);
 	} else //  player nr p does not exist
 		m_cbs[p - 1] = 0;
 
-	m_box.add(hbox1, UI::Box::AlignTop);
+	m_box.add(hbox1, UI::Box::AlignTop, true);
 
 	UI::Box * hbox2 = new UI::Box(&m_box, 0, 0, UI::Box::Horizontal, 0, 0, 1);
 
@@ -176,7 +173,7 @@ m_selected_information(0)
 		 g_gr->get_picture(PicMod_Game, "pics/genstats_landsize.png"),
 		 _("Land"),
 		 &btn);
-	hbox2->add(btn, UI::Box::AlignLeft);
+	hbox2->add(btn, UI::Box::AlignLeft, false, true);
 
 	m_radiogroup.add_button
 		(hbox2,
@@ -184,7 +181,7 @@ m_selected_information(0)
 		 g_gr->get_picture(PicMod_Game, "pics/genstats_nrworkers.png"),
 		 _("Workers"),
 		 &btn);
-	hbox2->add(btn, UI::Box::AlignLeft);
+	hbox2->add(btn, UI::Box::AlignLeft, false, true);
 
 	m_radiogroup.add_button
 		(hbox2,
@@ -192,7 +189,7 @@ m_selected_information(0)
 		 g_gr->get_picture(PicMod_Game, "pics/genstats_nrbuildings.png"),
 		 _("Buildings"),
 		 &btn);
-	hbox2->add(btn, UI::Box::AlignLeft);
+	hbox2->add(btn, UI::Box::AlignLeft, false, true);
 
 	m_radiogroup.add_button
 		(hbox2,
@@ -200,7 +197,7 @@ m_selected_information(0)
 		 g_gr->get_picture(PicMod_Game, "pics/genstats_nrwares.png"),
 		 _("Wares"),
 		 &btn);
-	hbox2->add(btn, UI::Box::AlignLeft);
+	hbox2->add(btn, UI::Box::AlignLeft, false, true);
 
 	m_radiogroup.add_button
 		(hbox2,
@@ -208,7 +205,7 @@ m_selected_information(0)
 		 g_gr->get_picture(PicMod_Game, "pics/genstats_productivity.png"),
 		 _("Productivity"),
 		 &btn);
-	hbox2->add(btn, UI::Box::AlignLeft);
+	hbox2->add(btn, UI::Box::AlignLeft, false, true);
 
 	m_radiogroup.add_button
 		(hbox2,
@@ -216,7 +213,7 @@ m_selected_information(0)
 		 g_gr->get_picture(PicMod_Game, "pics/genstats_casualties.png"),
 		 _("Casualties"),
 		 &btn);
-	hbox2->add(btn, UI::Box::AlignLeft);
+	hbox2->add(btn, UI::Box::AlignLeft, false, true);
 
 	m_radiogroup.add_button
 		(hbox2,
@@ -224,7 +221,7 @@ m_selected_information(0)
 		 g_gr->get_picture(PicMod_Game, "pics/genstats_kills.png"),
 		 _("Kills"),
 		 &btn);
-	hbox2->add(btn, UI::Box::AlignLeft);
+	hbox2->add(btn, UI::Box::AlignLeft, false, true);
 
 	m_radiogroup.add_button
 		(hbox2,
@@ -232,7 +229,7 @@ m_selected_information(0)
 		 g_gr->get_picture(PicMod_Game, "pics/genstats_msites_lost.png"),
 		 _("Military buildings lost"),
 		 &btn);
-	hbox2->add(btn, UI::Box::AlignLeft);
+	hbox2->add(btn, UI::Box::AlignLeft, false, true);
 
 	m_radiogroup.add_button
 		(hbox2,
@@ -240,7 +237,7 @@ m_selected_information(0)
 		 g_gr->get_picture(PicMod_Game, "pics/genstats_msites_defeated.png"),
 		 _("Military buildings defeated"),
 		 &btn);
-	hbox2->add(btn, UI::Box::AlignLeft);
+	hbox2->add(btn, UI::Box::AlignLeft, false, true);
 
 	m_radiogroup.add_button
 		(hbox2,
@@ -248,7 +245,7 @@ m_selected_information(0)
 		 g_gr->get_picture(PicMod_Game, "pics/genstats_civil_blds_lost.png"),
 		 _("Civilian buildings lost"),
 		 &btn);
-	hbox2->add(btn, UI::Box::AlignLeft);
+	hbox2->add(btn, UI::Box::AlignLeft, false, true);
 
 	m_radiogroup.add_button
 		(hbox2,
@@ -256,7 +253,7 @@ m_selected_information(0)
 		 g_gr->get_picture(PicMod_Game, "pics/genstats_militarystrength.png"),
 		 _("Military"),
 		 &btn);
-	hbox2->add(btn, UI::Box::AlignLeft);
+	hbox2->add(btn, UI::Box::AlignLeft, false, true);
 
 	if (hook) {
 		m_radiogroup.add_button
@@ -265,14 +262,14 @@ m_selected_information(0)
 			 g_gr->get_picture(PicMod_Game, cs_pic),
 			 cs_name.c_str(),
 			 &btn);
-		hbox2->add(btn, UI::Box::AlignLeft);
+		hbox2->add(btn, UI::Box::AlignLeft, false, true);
 	}
 
 	m_radiogroup.set_state(m_selected_information);
-	m_radiogroup.changedto.set
-		(this, &General_Statistics_Menu::radiogroup_changed);
+	m_radiogroup.changedto.connect
+		(boost::bind(&General_Statistics_Menu::radiogroup_changed, this, _1));
 
-	m_box.add(hbox2, UI::Box::AlignTop);
+	m_box.add(hbox2, UI::Box::AlignTop, true);
 
 	m_box.add
 		(new WUIPlot_Area_Slider
@@ -284,13 +281,15 @@ m_selected_information(0)
 }
 
 General_Statistics_Menu::~General_Statistics_Menu() {
-	m_my_registry->selected_information = m_selected_information;
-	m_my_registry->time = m_plot.get_time();
 	Game & game = ref_cast<Interactive_GameBase, UI::Panel>(*get_parent()).game();
-	Player_Number const nr_players = game.map().get_nrplayers();
-	iterate_players_existing_const(p, nr_players, game, player) {
-		m_my_registry->selected_players[p - 1] =
-			m_cbs[p - 1]->get_perm_pressed();
+	if (game.is_loaded()) {
+		// Save informations for recreation, if window is reopened
+		m_my_registry->selected_information = m_selected_information;
+		m_my_registry->time = m_plot.get_time();
+		Player_Number const nr_players = game.map().get_nrplayers();
+		iterate_players_existing_const(p, nr_players, game, player) {
+			m_my_registry->selected_players[p - 1] = m_cbs[p - 1]->get_perm_pressed();
+		}
 	}
 }
 

@@ -13,7 +13,7 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  *
  */
 
@@ -47,12 +47,21 @@ struct TestingMap : public Map {
 /*************************************************************************/
 /*                                 TESTS                                 */
 /*************************************************************************/
-struct SimpleRoadTestsFixture {
-	SimpleRoadTestsFixture() :
+struct WlTestFixture {
+	WlTestFixture() {
+	g_fs = new LayeredFileSystem();
+	}
+	~WlTestFixture() { delete g_fs; g_fs=0;}
+
+};
+
+struct SimpleRoadTestsFixture : public WlTestFixture {
+	SimpleRoadTestsFixture() : 
+		g(0),
 		path(Coords(5, 5))
 	{
 		map = new TestingMap(32, 32);
-		g.set_map(map, false);
+		g.set_map(map);
 
 		path.append(*map, WALK_E);
 		path.append(*map, WALK_E);

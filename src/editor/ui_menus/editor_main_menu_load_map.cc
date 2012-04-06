@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2002-2004, 2006-2009 by the Widelands Development Team
+ * Copyright (C) 2002-2004, 2006-2012 by the Widelands Development Team
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -13,7 +13,7 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  *
  */
 
@@ -31,6 +31,7 @@
 #include "wui/overlay_manager.h"
 #include "logic/world.h"
 #include "map_io/map_loader.h"
+#include "profile/profile.h"
 
 #include "ui_basic/button.h"
 #include "ui_basic/editbox.h"
@@ -59,8 +60,8 @@ Main_Menu_Load_Map::Main_Menu_Load_Map(Editor_Interactive & parent)
 		(this,
 		 posx, posy,
 		 get_inner_w() / 2 - spacing, get_inner_h() - spacing - offsy - 40);
-	m_ls->selected.set(this, &Main_Menu_Load_Map::selected);
-	m_ls->double_clicked.set(this, &Main_Menu_Load_Map::double_clicked);
+	m_ls->selected.connect(boost::bind(&Main_Menu_Load_Map::selected, this, _1));
+	m_ls->double_clicked.connect(boost::bind(&Main_Menu_Load_Map::double_clicked, this, _1));
 
 	posx = get_inner_w() / 2 + spacing;
 	posy += 20;
@@ -110,24 +111,23 @@ Main_Menu_Load_Map::Main_Menu_Load_Map(Editor_Interactive & parent)
 			 get_inner_h() - posy - spacing - 40,
 			 "---", UI::Align_CenterLeft);
 
-	posx = 5;
 	posy = get_inner_h() - 30;
 
-	m_ok_btn = new UI::Callback_Button
+	m_ok_btn = new UI::Button
 		(this, "ok",
 		 get_inner_w() / 2 - spacing - 80, posy, 80, 20,
 		 g_gr->get_picture(PicMod_UI, "pics/but0.png"),
-		 boost::bind(&Main_Menu_Load_Map::clicked_ok, boost::ref(*this)),
 		 _("OK"),
 		 std::string(),
 		 false);
+	m_ok_btn->sigclicked.connect(boost::bind(&Main_Menu_Load_Map::clicked_ok, this));
 
-	new UI::Callback_Button
+	UI::Button * cancelbtn = new UI::Button
 		(this, "cancel",
-		 get_inner_w() / 2 + spacing, posy, 80, 20,
+		 posx, posy, 80, 20,
 		 g_gr->get_picture(PicMod_UI, "pics/but1.png"),
-		 boost::bind(&Main_Menu_Load_Map::die, boost::ref(*this)),
 		 _("Cancel"));
+	cancelbtn->sigclicked.connect(boost::bind(&Main_Menu_Load_Map::die, this));
 
 	m_basedir = "maps";
 	m_curdir  = "maps";
@@ -173,10 +173,20 @@ void Main_Menu_Load_Map::selected(uint32_t) {
 			delete m_ml;
 		}
 
-		m_name  ->set_text(map.get_name       ());
-		m_author->set_text(map.get_author     ());
-		m_descr ->set_text(map.get_description());
-		m_world ->set_text(map.get_world_name ());
+		// get translated worldsname
+		std::string world(map.get_world_name());
+		std::string worldpath("worlds/" + world);
+		Profile prof((worldpath + "/conf").c_str(), 0, "world_" + world);
+		Section & global = prof.get_safe_section("world");
+		world = global.get_safe_string("name");
+
+		// Translate the map data
+		i18n::Textdomain td("maps");
+		m_name  ->set_text(_(map.get_name()));
+		m_author->set_text(map.get_author());
+		m_descr ->set_text
+			(_(map.get_description()) + (map.get_hint().empty() ? "" : (std::string("\n") + _(map.get_hint()))));
+		m_world ->set_text(world);
 
 		char buf[200];
 		sprintf(buf, "%i", map.get_nrplayers());

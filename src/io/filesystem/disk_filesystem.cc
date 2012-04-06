@@ -13,7 +13,7 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  *
  */
 
@@ -73,27 +73,31 @@ RealFSImpl::RealFSImpl(std::string const & Directory)
 : m_directory(Directory)
 {
 	// TODO: check OS permissions on whether the directory is writable!
-#ifdef WIN32
-	m_root = Directory;
-	// Replace all slashes with backslashes for FileSystem::pathIsAbsolute
-	// and FileSystem::FS_CanonicalizeName to work properly.
-	for (uint32_t j = 0; j < m_root.size(); ++j) {
-		if (m_root[j] == '/')
-			m_root[j] = '\\';
-	}
-#else
 	m_root = FS_CanonicalizeName(Directory);
-#endif
 }
 
 
 /**
- * Return true if this directory is writable.
+ * SHOULD return true if this directory is writable.
  */
 bool RealFSImpl::IsWritable() const {
 	// Should be checked here (ondisk state can change)
 	return true;
 }
+
+/// returns true, if the file is writeable
+bool RealFSImpl::FileIsWriteable(std::string const & path) {
+	std::string fullname;
+	fullname = FS_CanonicalizeName(path);
+
+	// we call fopen with "a" == append to be sure nothing gets overwritten
+	FILE * const f = fopen(fullname.c_str(), "a");
+	if (!f)
+		return false;
+	fclose(f);
+	return true;
+}
+
 
 /**
  * Returns the number of files found, and stores the filenames (without the
@@ -129,7 +133,7 @@ int32_t RealFSImpl::FindFiles
 	if (not pattern.compare(0, 3, "../")) {
 		// Workaround: If pattern is a relative we need to fix the path
 		std::string m_root_save(m_root); // save orginal m_root
-		m_root = path;
+		m_root = FS_CanonicalizeName(path);
 		realpath = FS_CanonicalizeName(pattern);
 		realpath = realpath.substr(0, realpath.rfind('\\'));
 		m_root = m_root_save; // reset m_root
@@ -468,20 +472,20 @@ void * RealFSImpl::fastLoad
 
 /**
  * Write the given block of memory to the repository.
+ * if \arg append is true and a file of name \arg fname is already existing the data will be appended to
+ * that file.
  * Throws an exception if it fails.
  */
-void RealFSImpl::Write
-	(std::string const & fname, void const * const data, int32_t const length)
+void RealFSImpl::Write(std::string const & fname, void const * const data, int32_t const length, bool append)
 {
 	std::string fullname;
 
 	fullname = FS_CanonicalizeName(fname);
 
-	FILE * const f = fopen(fullname.c_str(), "wb");
+	FILE * const f = fopen(fullname.c_str(), append ? "a" : "wb");
 	if (!f)
 		throw wexception
-			("could not open %s (%s) for writing",
-			 fname.c_str(), fullname.c_str());
+			("could not open %s (%s) for writing", fname.c_str(), fullname.c_str());
 
 	size_t const c = fwrite(data, length, 1, f);
 	fclose(f);

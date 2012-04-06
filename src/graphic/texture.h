@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2002-2004, 2006, 2008-2010 by the Widelands Development Team
+ * Copyright (C) 2002-2004, 2006, 2008-2010, 2012 by the Widelands Development Team
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -13,7 +13,7 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  *
  */
 
@@ -37,7 +37,7 @@ struct Road_Textures {
 	PictureID pic_road_busy;
 };
 
-/** class Texture
+/** struct Texture
 *
 * Texture represents are terrain texture, which is strictly
 * TEXTURE_WIDTH by TEXTURE_HEIGHT pixels in size. It uses 8 bit color, and
@@ -71,7 +71,7 @@ struct Texture {
 private:
 	Colormap * m_colormap;
 	uint8_t  * m_pixels;
-	uint32_t   m_mmap_color;
+	uint32_t   m_mmap_color[256];
 	uint8_t  * m_curframe;
 	int32_t    m_frame_num;
 	char     * m_texture_picture;

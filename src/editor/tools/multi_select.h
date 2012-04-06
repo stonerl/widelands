@@ -13,7 +13,7 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  *
  */
 
@@ -58,10 +58,10 @@ struct MultiSelect {
 	int32_t get_nr_enabled() const {return m_nr_enabled;}
 	int32_t get_random_enabled() const {
 		const int32_t rand_value =
-			static_cast<int32_t>
-				(static_cast<double>(get_nr_enabled())
-				 *
-				 rand() / (RAND_MAX + 1.0));
+		    static_cast<int32_t>
+		    (static_cast<double>(get_nr_enabled())
+		     *
+		     rand() / (RAND_MAX + 1.0));
 		int32_t i = 0;
 		int32_t j = rand_value + 1;
 		while (j) {if (is_enabled(i)) --j; ++i;}

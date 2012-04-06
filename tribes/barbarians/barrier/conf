@@ -1,12 +1,12 @@
 size=medium
 max_soldiers=5
-heal_per_second=1
+heal_per_second=130
 conquers=8
 enhanced_building=yes
 
 [buildcost]
 blackwood=5
-grout=3
+grout=2
 
 [idle]
 pics=barrier_i_??.png

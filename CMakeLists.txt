@@ -9,7 +9,7 @@ if (WL_VERSION_STANDARD)
 	# "Build${WL_VERSION_MINOR}" + ".${WL_VERSION_PATCH}" if WL_VERSION_PATCH is
 	# defined.
 	set (WL_VERSION_MAJOR 0)
-	set (WL_VERSION_MINOR 15)
+	set (WL_VERSION_MINOR 17)
 
 	# Just define in case that we release patches for official builds
 	#set (WL_VERSION_PATCH 90)
@@ -107,15 +107,18 @@ endif (CMAKE_BUILD_TYPE STREQUAL "Debug")
 # unit_test_framework is for testing only
 if (WL_UNIT_TESTS)
   message(STATUS "Enabled unit tests")
-
+if (DEFINED MSVC)
   set (BUILD_SHARED_LIBS OFF)
-  set (Boost_FIND_COMPONENTS unit_test_framework)
-  set (Boost_USE_STATIC_LIBS   ON)
+else (DEFINED MSVC)
+  set (Boost_USE_STATIC_LIBS  OFF)
+endif (DEFINED MSVC)
+  set (Boost_FIND_COMPONENTS unit_test_framework signals)
   set (Boost_USE_MULTITHREADED ON)
   set (Boost_DETAILED_FAILURE_MSG ON)
-  find_package(Boost 1.35.0 COMPONENTS unit_test_framework REQUIRED)
+  find_package(Boost 1.35.0 COMPONENTS unit_test_framework signals REQUIRED)
 
   if (NOT DEFINED MSVC)
+  # If boost unit test library is linked dynamically, BOOST_TEST_DYN_LINK must be defined
     string( REGEX MATCH ".a$" BOOST_STATIC_UNIT_TEST_LIB ${Boost_UNIT_TEST_FRAMEWORK_LIBRARY})
     if (NOT BOOST_STATIC_UNIT_TEST_LIB)
       add_definitions(-DBOOST_TEST_DYN_LINK)
@@ -132,11 +135,15 @@ if (WL_UNIT_TESTS)
   add_custom_target(autotest ALL
     COMMAND ${CMAKE_CTEST_COMMAND} --output-on-failure
     WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
-    DEPENDS widelands;test_widelands_scripting
+    DEPENDS widelands;test_widelands_scripting;test_economy;test_io_filesystem
   )
 else (WL_UNIT_TESTS)
   message(STATUS "Disabled Unit Tests")
-  find_package(Boost 1.35.0 REQUIRED)
+  set (Boost_FIND_COMPONENTS signals)
+  set (Boost_USE_STATIC_LIBS   ON)
+  set (Boost_USE_MULTITHREADED ON)
+  set (Boost_DETAILED_FAILURE_MSG ON)
+  find_package(Boost 1.35.0 COMPONENTS signals REQUIRED)
 endif (WL_UNIT_TESTS)
 
 option (WL_STRICT "If strict compilation mode is requested (almost every warning is an error)" OFF)
@@ -215,10 +222,10 @@ EXEC_PROGRAM (
         message("Detected gcc ${WLBUILD_COMPILERVERSION_REP}")
         message("Suffering from gcc bug, disabling -O3")
         set (CMAKE_CXX_FLAGS_RELEASE "-O2 -DNDEBUG" CACHE STRING "Set by widelands CMakeLists.txt" FORCE)
+    ELSE (WLBUILD_COMPILERVERSION_REP STREQUAL "4.5.1" OR WLBUILD_COMPILERVERSION_REP STREQUAL "4.5.2")
+        #This line is the default and should be preserved.
+        set (CMAKE_CXX_FLAGS_RELEASE "-O3 -DNDEBUG" CACHE STRING "Set by widelands CMakeLists.txt" FORCE)
     ENDIF (WLBUILD_COMPILERVERSION_REP STREQUAL "4.5.1" OR WLBUILD_COMPILERVERSION_REP STREQUAL "4.5.2")
-ELSE (${CMAKE_COMPILER_IS_GNUCXX})
-    #This line is the default and should be preserved.
-    set (CMAKE_CXX_FLAGS_RELEASE "-O3 -DNDEBUG" CACHE STRING "Set by widelands CMakeLists.txt" FORCE)
 ENDIF (${CMAKE_COMPILER_IS_GNUCXX})
 
 #If building with MSVC, then check for 3rdparty libs
@@ -269,10 +276,6 @@ if (DEFINED WL_3RDPARTY_DIR)
   set (CMAKE_INCLUDE_PATH "${WL_3RDPARTY_DIR}/include;${WL_3RDPARTY_DIR}/include/sdl")
   set (CMAKE_LIBRARY_PATH "${WL_3RDPARTY_DIR}/lib")
 endif (DEFINED WL_3RDPARTY_DIR)
-
-find_package(GGZ_Core REQUIRED)
-include_directories(${GGZ_CORE_INCLUDE_DIR})
-add_definitions("-DUSE_GGZ")
 
 #on freeBSD this must be explicitely linked
 if (CMAKE_SYSTEM_NAME MATCHES "FreeBSD")
@@ -342,11 +345,26 @@ if (DEFINED WL_VERSION_MAJOR)
 	file (WRITE WL_RELEASE "${WL_VERSION}")
 endif (DEFINED WL_VERSION_MAJOR)
 
+# we need python to determine the current version
+find_package (PythonInterp REQUIRED)
+
 if (NOT DEFINED WL_VERSION)
   add_custom_target (
     BzrRevision ALL
     COMMAND ${CMAKE_COMMAND} -DWL_INSTALL_PREFIX=${WL_INSTALL_PREFIX} -DWL_INSTALL_BINDIR=${WL_INSTALL_BINDIR} -DWL_INSTALL_DATADIR=${WL_INSTALL_DATADIR} -DWL_INSTALL_LOCALEDIR=${WL_INSTALL_LOCALEDIR} -DPYTHON_EXECUTABLE=${PYTHON_EXECUTABLE} -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE} -DSOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR} -DBINARY_DIR=${CMAKE_CURRENT_BINARY_DIR} -P ${CMAKE_CURRENT_SOURCE_DIR}/BzrRevision.cmake
   )
+  
+  # Detect version now
+  execute_process (
+    COMMAND ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/utils/detect_revision.py
+    OUTPUT_VARIABLE WL_VERSION
+    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+    OUTPUT_STRIP_TRAILING_WHITESPACE
+  )
+  file (WRITE ${CMAKE_CURRENT_BINARY_DIR}/VERSION "${WL_VERSION}")
+  configure_file (${CMAKE_CURRENT_SOURCE_DIR}/src/build_info.cc.cmake ${CMAKE_CURRENT_BINARY_DIR}/src/build_info.cc)
+  message (STATUS "Version of Widelands Build is ${WL_VERSION}(${CMAKE_BUILD_TYPE})")
+
 else (NOT DEFINED WL_VERSION)
   add_custom_target (
     InputRevision ALL
@@ -360,6 +378,8 @@ install (
   CONFIGURATIONS Debug;Release
   COMPONENT CoreVersionFile
 )
+set(CPACK_COMPONENT_COREVERSIONFILE_HIDDEN TRUE)
+set(CPACK_COMPONENT_COREVERSIONFILE_REQUIRED TRUE)
 
 include_directories(src ${CMAKE_CURRENT_BINARY_DIR}/src)
 
@@ -414,9 +434,6 @@ install(
     campaigns
     fonts
     global
-    maps
-    music
-    sound
     tribes
     txts
     worlds
@@ -426,6 +443,28 @@ install(
   CONFIGURATIONS Debug;Release
   COMPONENT CoreDataFiles
 )
+set(CPACK_COMPONENT_COREDATAFILES_DISPLAY_NAME "Widelands Core")
+set(CPACK_COMPONENT_COREDATAFILES_HIDDEN FALSE)
+set(CPACK_COMPONENT_COREDATAFILES_REQUIRED TRUE)
+
+install(
+  DIRECTORY
+    maps
+  DESTINATION ${WL_INSTALL_DATADIR}
+  CONFIGURATIONS Debug;Release
+  COMPONENT MapFiles
+)
+set(CPACK_COMPONENT_MAPFILES_DISPLAY_NAME "Maps Files")
+
+install(
+  DIRECTORY
+    music
+	sound
+  DESTINATION ${WL_INSTALL_DATADIR}
+  CONFIGURATIONS Debug;Release
+  COMPONENT MusicFiles
+)
+set(CPACK_COMPONENT_MUSICFILES_DISPLAY_NAME "Music and Sound Files")
 
 install(
   FILES
@@ -436,6 +475,8 @@ install(
   CONFIGURATIONS Debug;Release
   COMPONENT CoreLicenseFiles
 )
+set(CPACK_COMPONENT_CORELICENSEFILES_HIDDEN TRUE)
+set(CPACK_COMPONENT_CORELICENSEFILES_REQUIRED TRUE)
 
 install(
   DIRECTORY
@@ -445,8 +486,9 @@ install(
   COMPONENT DocFiles
   PATTERN "CMakeLists.txt" EXCLUDE
 )
-
-find_package (PythonInterp REQUIRED)
+set(CPACK_COMPONENT_DOCFILES_DISPLAY_NAME "Documentation")
+set(CPACK_COMPONENT_DOCFILES_HIDDEN TRUE)
+set(CPACK_COMPONENT_DOCFILES_REQUIRED FALSE)
 
 set_directory_properties(PROPERTIES ADDITIONAL_MAKE_CLEAN_FILES locale)
 
@@ -457,9 +499,129 @@ install(
   CONFIGURATIONS Debug;Release
   COMPONENT CoreLanguageFiles
 )
+set(CPACK_COMPONENT_CORELANGUAGEFILES_DISPLAY_NAME "Language Files")
 
-set (CPACK_PACKAGE_FILE_NAME widelands-${WL_VERSION})
-set (CPACK_COMPONENTS_ALL ExecutableFiles CoreDataFiles DocFiles CoreLanguageFiles CoreVersionFile CoreLicenseFiles)
-set (CPACK_GENERATOR "TGZ")
-set (CPACK_SOURCE_GENERATOR "TGZ")
+set(CPACK_COMPONENT_EXECUTABLEFILES_HIDDEN TRUE)
+set(CPACK_COMPONENT_EXECUTABLEFILES_REQUIRED TRUE)
+
+# Components to install
+set(CPACK_COMPONENTS_ALL ExecutableFiles CoreDataFiles MapFiles CoreLanguageFiles CoreVersionFile CoreLicenseFiles)
+if (NOT WL_NOMUSIC)
+  set(CPACK_COMPONENTS_ALL ${CPACK_COMPONENTS_ALL} MusicFiles)
+endif (NOT WL_NOMUSIC)
+
+if (WIN32)
+  # Install files only needed for Windows
+  FILE(GLOB dlls "${CMAKE_CURRENT_BINARY_DIR}/*.dll")
+  install(
+    FILES
+      ${dlls}
+      utils/win32/WL-Editor.ico
+    DESTINATION ${WL_INSTALL_DATADIR}
+    CONFIGURATIONS Debug;Release
+    COMPONENT Win32Specific
+  )
+  set(CPACK_COMPONENT_WIN32SPECIFIC_HIDDEN TRUE)
+  set(CPACK_COMPONENT_WIN32SPECIFIC_REQUIRED TRUE)
+  set(CPACK_COMPONENTS_ALL ${CPACK_COMPONENTS_ALL} Win32Specific)
+
+  # Only NSIS supports install types
+  set(CPACK_ALL_INSTALL_TYPES Full Minimal)
+  set(CPACK_COMPONENT_EXECUTABLEFILES_INSTALL_TYPES Full Minimal)
+  set(CPACK_COMPONENT_COREDATAFILES_INSTALL_TYPES Full Minimal)
+  set(CPACK_COMPONENT_COREVERSIONFILE_INSTALL_TYPES Full Minimal)
+  set(CPACK_COMPONENT_CORELICENSEFILES_INSTALL_TYPES Full Minimal)
+  set(CPACK_COMPONENT_MAPFILES_INSTALL_TYPES Full)
+  set(CPACK_COMPONENT_MUSICFILES_INSTALL_TYPES Full)
+  set(CPACK_COMPONENT_CORELANGUAGEFILES_INSTALL_TYPES Full)
+  set(CPACK_COMPONENT_WIN32SPECIFIC_INSTALL_TYPES Full Minimal)
+
+  # Set generator
+  set(CPACK_GENERATOR NSIS)
+
+  # Graphics for the installer (all slashes are necessary!)
+  set(CPACK_NSIS_MUI_ICON "${CMAKE_CURRENT_LIST_DIR}\\\\utils\\\\win32\\\\wl-ico-128.ico")
+  set(CPACK_NSIS_MUI_UNIICON "${CMAKE_CURRENT_LIST_DIR}\\\\utils\\\\win32\\\\wl-ico-128.ico")
+  set(CPACK_PACKAGE_ICON "${CMAKE_CURRENT_LIST_DIR}\\\\utils\\\\win32\\\\nsis\\\\install_header.bmp")
+  set(CPACK_NSIS_MUI_WELCOMEFINISHPAGE_BITMAP "${CMAKE_CURRENT_LIST_DIR}\\\\utils\\\\win32\\\\nsis\\\\WL.bmp")
+
+  # Name for installer and Windows Add/Remove
+  set(CPACK_NSIS_PACKAGE_NAME "Widelands")
+  set(CPACK_NSIS_DISPLAY_NAME "Widelands ${WL_VERSION}")
+  set(CPACK_NSIS_DISPLAY_NAME_SET "TRUE")
+  
+  # Optional dialogs
+  if (NOT DEFINED CPACK_NSIS_LANGUAGE_DIALOG)
+    set(CPACK_NSIS_LANGUAGE_DIALOG "ON")
+  endif (NOT DEFINED CPACK_NSIS_LANGUAGE_DIALOG)
+  if (NOT DEFINED CPACK_NSIS_CHANGELOG)
+    set(CPACK_NSIS_CHANGELOG "ON")
+  endif (NOT DEFINED CPACK_NSIS_CHANGELOG)
+
+  # Setup (and remove) shortcuts to Widelands (all slashes are necessary!)
+  set(CPACK_PACKAGE_EXECUTABLES "..\\\\widelands;Widelands")
+  set(CPACK_NSIS_MENU_LINKS "http://wl.widelands.org/;Widelands Homepage")
+  set(CPACK_NSIS_CREATE_ICONS_EXTRA "
+    CreateShortCut \\\"$SMPROGRAMS\\\\$STARTMENU_FOLDER\\\\Widelands - Mapeditor.lnk\\\" \\\"$INSTDIR\\\\widelands.exe\\\" \\\"--editor\\\" \\\"$INSTDIR\\\\WL-Editor.ico\\\"
+  ")
+  set(CPACK_NSIS_DELETE_ICONS_EXTRA "
+    Delete \\\"$DESKTOP\\\\Widelands.lnk\\\"
+    Delete \\\"$DESKTOP\\\\Widelands - Mapeditor.lnk\\\"
+    Delete \\\"$SMPROGRAMS\\\\$MUI_TEMP\\\\Widelands - Mapeditor.lnk\\\"
+  ")
+
+  # Additional information (all slashes are necessary!)
+  set(CPACK_NSIS_URL_INFO_ABOUT "http://wl.widelands.org/")
+  set(CPACK_NSIS_HELP_LINK "http://wl.widelands.org/")
+  set(CPACK_NSIS_INSTALLED_ICON_NAME "widelands.exe")
+  set(CPACK_NSIS_MUI_FINISHPAGE_RUN "..\\\\widelands.exe")
+  set(CPACK_NSIS_MUI_FINISHPAGE_README "$INSTDIR\\\\ChangeLog")
+  set(CPACK_PACKAGE_VENDOR "Widelands Development Team")
+  # replace [ and ], they will cause problems in filename!
+  string(REPLACE "[" "-" PACKAGE_VERSION ${WL_VERSION})
+  string(REPLACE "]" "" PACKAGE_VERSION ${PACKAGE_VERSION})
+  set(CPACK_PACKAGE_VERSION "${PACKAGE_VERSION}(${CMAKE_BUILD_TYPE})")
+  set(CPACK_PACKAGE_VERSION_MAJOR ${WL_VERSION_MAJOR})
+  set(CPACK_PACKAGE_VERSION_MINOR ${WL_VERSION_MINOR})
+  set(CPACK_PACKAGE_VERSION_PATCH ${WL_VERSION_PATCH})
+  set(CPACK_RESOURCE_FILE_LICENSE "${CMAKE_CURRENT_LIST_DIR}\\\\COPYING")
+  set(CPACK_RESOURCE_FILE_README "${CMAKE_CURRENT_LIST_DIR}\\\\ChangeLog")
+
+  # Setup (and remove) Registry entries for Widelands (all slashes are necessary!)
+  set(CPACK_NSIS_EXTRA_INSTALL_COMMANDS "
+    WriteRegStr HKCR \\\".wgf\\\" \\\"\\\" \\\"WidelandsSavegame\\\"
+    WriteRegStr HKCR \\\"WidelandsSavegame\\\" \\\"\\\" \\\"Widelands Savegame\\\"
+    WriteRegStr HKCR \\\"WidelandsSavegame\\\\DefaultIcon\\\" \\\"\\\" \\\"$INSTDIR\\\\widelands.exe,0\\\"
+    WriteRegStr HKCR \\\"WidelandsSavegame\\\\shell\\\\open\\\\command\\\" \\\"\\\" \\\"$INSTDIR\\\\widelands.exe --loadgame=%1\\\"
+
+    WriteRegStr HKCR \\\".wmf\\\" \\\"\\\" \\\"WidelandsMapFile\\\"
+    WriteRegStr HKCR \\\"WidelandsMapFile\\\" \\\"\\\" \\\"Widelands Mapfile\\\"
+    WriteRegStr HKCR \\\"WidelandsMapFile\\\\DefaultIcon\\\" \\\"\\\" \\\"$INSTDIR\\\\WL-Editor.ico\\\"
+    WriteRegStr HKCR \\\"WidelandsMapFile\\\\shell\\\\open\\\\command\\\" \\\"\\\" \\\"$INSTDIR\\\\widelands.exe --editor=%1\\\"
+  ")
+  set(CPACK_NSIS_EXTRA_UNINSTALL_COMMANDS "
+    DeleteRegValue HKCR \\\".wgf\\\" \\\"WidelandsSavegame\\\"
+    DeleteRegKey /ifempty HKCR \\\".wgf\\\"
+    DeleteRegKey HKCR \\\"WidelandsSavegame\\\"
+
+    DeleteRegValue HKCR \\\".wmf\\\" \\\"WidelandsMapFile\\\"
+    DeleteRegKey /ifempty HKCR \\\".wmf\\\"
+    DeleteRegKey HKCR \\\"WidelandsMapFile\\\"
+    
+    Delete \\\"$INSTDIR\\\\stdout.txt\\\"
+    Delete \\\"$INSTDIR\\\\stderr.txt\\\"
+    Delete \\\"$INSTDIR\\\"
+  ")
+
+elseif (WIN32)
+  set (CPACK_PACKAGE_FILE_NAME widelands-${WL_VERSION})
+  set (CPACK_GENERATOR "TGZ")
+  set (CPACK_SOURCE_GENERATOR "TGZ")
+endif (WIN32)
+
 include(CPack)
+
+# Temporary warning about clang as long as widelands does not run stable
+IF (${CMAKE_CXX_COMPILER_ID} STREQUAL "Clang")
+  message( WARNING "WARNING!!! You seem to compile widelands using the clang/llvm compiler infrastructure. Please note that we do not yet support compiling with clang. You are very likely to run into problems. We are working on it, though. In the mean time, please use GCC infrastructure to compile widelands. You can use the CMake parameter -DCMAKE_CXX_COMPILER=g++ to force GCC if you have it installed. Thank you for your understanding.")
+ENDIF (${CMAKE_CXX_COMPILER_ID} STREQUAL "Clang")
