@@ -16,13 +16,16 @@ function productionsite_tests:setup()
    self.f1 = map:get_field(10,10)
    self.f2 = map:get_field(12,10)
    self.f3 = map:get_field(14,10)
+   self.f4 = map:get_field(16,10)
    player1:conquer(self.f1, 4)
    player1:conquer(self.f2, 4)
    player1:conquer(self.f3, 4)
+   player1:conquer(self.f4, 4)
 
    self.inn = player1:place_building("big_inn", self.f1, false, true)
    self.warmill = player1:place_building("warmill", self.f2, false, true)
    self.lumberjack = player1:place_building("lumberjacks_hut", self.f3, false, true)
+   self.brewery = player1:place_building("brewery", self.f4, false, true)
 end
 function productionsite_tests:teardown()
    pcall(function()
@@ -33,6 +36,9 @@ function productionsite_tests:teardown()
    end)
    pcall(function()
       self.f3.brn.immovable:remove()
+   end)
+   pcall(function()
+      self.f4.brn.immovable:remove()
    end)
 end
 function productionsite_tests:test_name()
@@ -67,6 +73,11 @@ function productionsite_tests:test_set_workers()
    assert_equal(2, rv.innkeeper)
    assert_equal(0, rv.carrier)
    assert_equal(nil, rv.blacksmith)
+end
+function productionsite_tests:test_set_overqualified_workers()
+   -- TODO: this fails but should work
+   -- Master brewers can work as brewers
+   self.brewery:set_workers("master-brewer", 2)
 end
 function productionsite_tests:test_set_workers_warmill()
    self.warmill:set_workers("master-blacksmith",1)

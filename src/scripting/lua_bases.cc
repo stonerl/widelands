@@ -268,15 +268,15 @@ int L_PlayerBase::place_flag(lua_State * L) {
 /* RST
 	.. method:: place_road(f1, dir1, dir2, ...[, force=false])
 
-		Start a road at the given field, then walk the directions
+		Start a road at the given flag, then walk the directions
 		given. Places a flag at the last field.
 
 		If the last argument to this function is :const:`true` the road will
 		be created by force: all immovables in the way are removed and land
 		is conquered.
 
-		:arg f1: fields to connect with this road
-		:type f1: :class:`wl.map.Field`
+		:arg f1: flag where the road will start.
+		:type f1: :class:`wl.map.Flag`
 		:arg dirs: direction, can be either ("r", "l", "br", "bl", "tr", "tl") or
 			("e", "w", "ne", "nw", "se", "sw").
 		:type dirs: :class:`string`
