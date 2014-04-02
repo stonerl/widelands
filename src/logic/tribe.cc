@@ -17,44 +17,46 @@
  *
  */
 
-#include "tribe.h"
-
-#include "carrier.h"
-#include "constructionsite.h"
-#include "critter_bob.h"
-#include "dismantlesite.h"
-#include "editor_game_base.h"
-#include "game.h"
-#include "game_data_error.h"
-#include "helper.h"
-#include "i18n.h"
-#include "immovable.h"
-#include "io/filesystem/layered_filesystem.h"
-#include "militarysite.h"
-#include "parse_map_object_types.h"
-#include "profile/profile.h"
-#include "scripting/scripting.h"
-#include "ship.h"
-#include "soldier.h"
-#include "trainingsite.h"
-#include "warehouse.h"
-#include "widelands_fileread.h"
-#include "worker.h"
-#include "world.h"
-
-#include "io/filesystem/disk_filesystem.h"
-
-#include "upcast.h"
+#include "logic/tribe.h"
 
 #include <iostream>
+
 #include <boost/algorithm/string.hpp>
+
+#include "graphic/graphic.h"
+#include "helper.h"
+#include "i18n.h"
+#include "io/filesystem/disk_filesystem.h"
+#include "io/filesystem/layered_filesystem.h"
+#include "logic/carrier.h"
+#include "logic/constructionsite.h"
+#include "logic/critter_bob.h"
+#include "logic/dismantlesite.h"
+#include "logic/editor_game_base.h"
+#include "logic/game.h"
+#include "logic/game_data_error.h"
+#include "logic/immovable.h"
+#include "logic/militarysite.h"
+#include "logic/ship.h"
+#include "logic/soldier.h"
+#include "logic/trainingsite.h"
+#include "logic/warehouse.h"
+#include "logic/widelands_fileread.h"
+#include "logic/worker.h"
+#include "logic/world.h"
+#include "parse_map_object_types.h"
+#include "profile/profile.h"
+#include "scripting/lua_table.h"
+#include "scripting/scripting.h"
+#include "upcast.h"
+
 
 using namespace std;
 
 namespace Widelands {
 
 Tribe_Descr::Tribe_Descr
-	(std::string const & tribename, Editor_Game_Base & egbase)
+	(const std::string & tribename, Editor_Game_Base & egbase)
 	: m_name(tribename), m_world(egbase.map().world())
 {
 	assert(&m_world);
@@ -90,17 +92,9 @@ Tribe_Descr::Tribe_Descr
 
 			PARSE_MAP_OBJECT_TYPES_BEGIN("ware")
 				m_wares.add
-					(new Item_Ware_Descr
+					(new WareDescr
 					 	(*this, _name, _descname, path, prof, global_s));
 			PARSE_MAP_OBJECT_TYPES_END;
-
-			// Read compatibility wares (removed wares existing in saved games from older builds
-			if (Section * const section = root_conf.get_section("compatibility_wares")) {
-				while (Section::Value const * const v = section->get_next_val()) {
-					log("Compatibility ware \"%s\"=\"%s\" loaded.\n", v->get_name(), v->get_string());
-					m_compatibility_wares[* new std::string(v->get_name())] = * new std::string(v->get_string());
-				}
-			}
 
 			PARSE_MAP_OBJECT_TYPES_BEGIN("immovable")
 				m_immovables.add
@@ -131,7 +125,7 @@ Tribe_Descr::Tribe_Descr
 			PARSE_MAP_OBJECT_TYPES_END;
 			if (not safe_building_index("constructionsite"))
 				throw game_data_error
-					(_("constructionsite type \"constructionsite\" is missing"));
+					("constructionsite type \"constructionsite\" is missing");
 
 			PARSE_MAP_OBJECT_TYPES_BEGIN("dismantlesite")
 				m_buildings.add
@@ -140,7 +134,7 @@ Tribe_Descr::Tribe_Descr
 			PARSE_MAP_OBJECT_TYPES_END;
 			if (not safe_building_index("dismantlesite"))
 				throw game_data_error
-					(_("dismantlesite type \"distmantlesite\" is missing"));
+					("dismantlesite type \"distmantlesite\" is missing");
 
 			PARSE_MAP_OBJECT_TYPES_BEGIN("warehouse")
 				m_buildings.add
@@ -221,16 +215,16 @@ Tribe_Descr::Tribe_Descr
 					(column_s, boost::token_finder(boost::is_any_of(","))); \
 				It2 != boost::split_iterator<string::iterator>(); \
 				++It2) { \
-				std::string name = boost::copy_range<std::string>(*It2); \
-				boost::trim(name); \
-				Ware_Index id = safe_##w##_index(name); \
+				std::string instance_name = boost::copy_range<std::string>(*It2); \
+				boost::trim(instance_name); \
+				Ware_Index id = safe_##w##_index(instance_name); \
 				column.push_back(id); \
 				/* it has been added to the column, but the column not */ \
 				/* yet to the array */ \
 				m_ ## w ## s_order_coords[id] = std::pair<uint32_t, uint32_t> \
 					(m_ ## w ## s_order.size(), column.size() - 1); \
 			} \
-			if (column.size()) m_##w##s_order.push_back(column); \
+			if (!column.empty()) m_##w##s_order.push_back(column); \
 		} \
 \
 		/* Check that every ##w## has been added */ \
@@ -257,18 +251,17 @@ Tribe_Descr::Tribe_Descr
 						if (m_anim_frontier.empty())
 							throw Nonexistent();
 						frontier_style_index(style_name);
-						throw game_data_error(_("\"%s\" is duplicated"), style_name);
+						throw game_data_error("\"%s\" is duplicated", style_name);
 					} catch (Nonexistent) {
 						m_anim_frontier.push_back
 							(std::pair<std::string, uint32_t>
-							 	(style_name,
-							 	 g_anim.get(path, *s, 0)));
+							 	(style_name, g_gr->animations().load(path, *s)));
 					}
 				}
 				if (m_anim_frontier.empty())
-					throw game_data_error(_("none found"));
-			} catch (_wexception const & e) {
-				throw game_data_error(_("frontier styles: %s"), e.what());
+					throw game_data_error("none found");
+			} catch (const _wexception & e) {
+				throw game_data_error("frontier styles: %s", e.what());
 			}
 			try {
 				while (Section * const s = root_conf.get_next_section("flag"))
@@ -278,74 +271,39 @@ Tribe_Descr::Tribe_Descr
 						if (m_anim_flag.empty())
 							throw Nonexistent();
 						flag_style_index(style_name);
-						throw game_data_error(_("\"%s\" is duplicated"), style_name);
+						throw game_data_error("\"%s\" is duplicated", style_name);
 					} catch (Nonexistent) {
 						m_anim_flag.push_back
 							(std::pair<std::string, uint32_t>
 							 	(style_name,
-							 	 g_anim.get(path, *s, 0)));
+							 	 g_gr->animations().load(path, *s)));
 					}
 				}
 				if (m_anim_flag.empty())
-					throw game_data_error(_("none found"));
-			} catch (_wexception const & e) {
-				throw game_data_error(_("flag styles: %s"), e.what());
+					throw game_data_error("none found");
+			} catch (const _wexception & e) {
+				throw game_data_error("flag styles: %s", e.what());
 			}
 
-			// Register Lua scripts
-			if (g_fs->IsDirectory(path + "scripting"))
-				egbase.lua().register_scripts
-					(g_fs->MakeSubFileSystem(path), "tribe_" + tribename);
+			{
+				// Read initializations -- all scripts are initializations currently
+				for (const std::string& script :
+				     filter(g_fs->ListDirectory(path + "scripting"),
+				            [](const string& fn) {return boost::ends_with(fn, ".lua");})) {
+					std::unique_ptr<LuaTable> t = egbase.lua().run_script(script);
 
-			// Read initializations -- all scripts are initializations currently
-			ScriptContainer & scripts =
-				egbase.lua().get_scripts_for("tribe_" + tribename);
-			container_iterate_const(ScriptContainer, scripts, s) {
-				boost::shared_ptr<LuaTable> t =
-					egbase.lua().run_script("tribe_" + tribename, s->first);
-
-				m_initializations.resize(m_initializations.size() + 1);
-				Initialization & init = m_initializations.back();
-				init.    name = s->first;
-				init.descname = t->get_string("name");
-
-				try {
-					for
-						(Initialization const * i = &m_initializations.front();
-						 i < &init;
-						 ++i)
-							if (i->name == init.name)
-								throw game_data_error("duplicated");
-				} catch (_wexception const & e) {
-					throw game_data_error
-						("Initializations: \"%s\": %s",
-						 init.name.c_str(), e.what());
+					m_initializations.resize(m_initializations.size() + 1);
+					Initialization& init = m_initializations.back();
+					init.script = script;
+					init.descname = t->get_string("name");
 				}
 			}
-		} catch (std::exception const & e) {
+		} catch (const std::exception & e) {
 			throw game_data_error("root conf: %s", e.what());
 		}
-
-		if (Section * compatibility_s = root_conf.get_section("compatibility_immovable")) {
-			while (const Section::Value * v = compatibility_s->get_next_val())
-				m_compatibility_immovable[v->get_name()] = split_string(v->get_string(), " ");
-		}
-	} catch (_wexception const & e) {
-		throw game_data_error(_("tribe %s: %s"), tribename.c_str(), e.what());
+	} catch (const _wexception & e) {
+		throw game_data_error("tribe %s: %s", tribename.c_str(), e.what());
 	}
-#ifdef WRITE_GAME_DATA_AS_HTML
-	if (g_options.pull_section("global").get_bool("write_HTML", false)) {
-		m_ware_references     = new HTMLReferences[get_nrwares    ().value()];
-		m_worker_references   = new HTMLReferences[get_nrworkers  ().value()];
-		m_building_references = new HTMLReferences[get_nrbuildings().value()];
-		writeHTMLBuildings(path);
-		writeHTMLWorkers  (path);
-		writeHTMLWares    (path);
-		delete[] m_building_references;
-		delete[] m_worker_references;
-		delete[] m_ware_references;
-	}
-#endif
 }
 
 
@@ -383,13 +341,13 @@ void Tribe_Descr::load_graphics()
  * does this tribe exist?
  */
 bool Tribe_Descr::exists_tribe
-	(std::string const & name, TribeBasicInfo * const info)
+	(const std::string & name, TribeBasicInfo * const info)
 {
 	std::string buf = "tribes/";
 	buf            += name;
 	buf            += "/conf";
 
-	LuaInterface * lua = create_LuaInterface();
+	LuaInterface lua;
 	FileRead f;
 	if (f.TryOpen(*g_fs, buf.c_str())) {
 		if (info)
@@ -400,36 +358,25 @@ bool Tribe_Descr::exists_tribe
 					prof.get_safe_section("tribe").get_int("uiposition", 0);
 
 				std::string path = "tribes/" + name + "/scripting";
-				if (g_fs->IsDirectory(path))
-					lua->register_scripts
-						(g_fs->MakeSubFileSystem(path), "tribe_" + name, "");
-
-				ScriptContainer & scripts = lua->get_scripts_for("tribe_" + name);
-				container_iterate_const(ScriptContainer, scripts, s) {
-					boost::shared_ptr<LuaTable> t =
-						lua->run_script("tribe_" + name, s->first);
-
-					info->initializations.push_back
-						(TribeBasicInfo::Initialization
-						 	(s->first, t->get_string("name")));
+				for (const std::string& script :
+				     filter(g_fs->ListDirectory(path),
+				            [](const string& fn) {return boost::ends_with(fn, ".lua");})) {
+					std::unique_ptr<LuaTable> t = lua.run_script(script);
+					info->initializations.push_back(
+					   TribeBasicInfo::Initialization(script, t->get_string("name")));
 				}
-			} catch (_wexception const & e) {
-				delete lua;
+			} catch (const _wexception & e) {
 				throw game_data_error
 					("reading basic info for tribe \"%s\": %s",
 					 name.c_str(), e.what());
 			}
-
-		delete lua;
 		return true;
 	}
-
-	delete lua;
 	return false;
 }
 
 struct TribeBasicComparator {
-	bool operator()(TribeBasicInfo const & t1, TribeBasicInfo const & t2) {
+	bool operator()(const TribeBasicInfo & t1, const TribeBasicInfo & t2) {
 		return t1.uiposition < t2.uiposition;
 	}
 };
@@ -437,13 +384,12 @@ struct TribeBasicComparator {
 /**
  * Fills the given string vector with the names of all tribes that exist.
  */
-void Tribe_Descr::get_all_tribenames(std::vector<std::string> & target) {
-	assert(target.empty());
+std::vector<std::string> Tribe_Descr::get_all_tribenames() {
+	std::vector<std::string> tribenames;
 
 	//  get all tribes
 	std::vector<TribeBasicInfo> tribes;
-	filenameset_t m_tribes;
-	g_fs->FindFiles("tribes", "*", &m_tribes);
+	filenameset_t m_tribes = g_fs->ListDirectory("tribes");
 	for
 		(filenameset_t::iterator pname = m_tribes.begin();
 		 pname != m_tribes.end();
@@ -456,16 +402,16 @@ void Tribe_Descr::get_all_tribenames(std::vector<std::string> & target) {
 
 	std::sort(tribes.begin(), tribes.end(), TribeBasicComparator());
 	container_iterate_const(std::vector<TribeBasicInfo>, tribes, i)
-		target.push_back(i.current->name);
+		tribenames.push_back(i.current->name);
+	return tribenames;
 }
 
 
-void Tribe_Descr::get_all_tribe_infos(std::vector<TribeBasicInfo> & tribes) {
-	assert(tribes.empty());
+std::vector<TribeBasicInfo> Tribe_Descr::get_all_tribe_infos() {
+	std::vector<TribeBasicInfo> tribes;
 
 	//  get all tribes
-	filenameset_t m_tribes;
-	g_fs->FindFiles("tribes", "*", &m_tribes);
+	filenameset_t m_tribes = g_fs->ListDirectory("tribes");
 	for
 		(filenameset_t::iterator pname = m_tribes.begin();
 		 pname != m_tribes.end();
@@ -477,6 +423,7 @@ void Tribe_Descr::get_all_tribe_infos(std::vector<TribeBasicInfo> & tribes) {
 	}
 
 	std::sort(tribes.begin(), tribes.end(), TribeBasicComparator());
+	return tribes;
 }
 
 
@@ -543,45 +490,25 @@ uint32_t Tribe_Descr::get_resource_indicator
 /*
  * Return the given ware or die trying
  */
-Ware_Index Tribe_Descr::safe_ware_index(std::string const & warename) const {
+Ware_Index Tribe_Descr::safe_ware_index(const std::string & warename) const {
 	if (Ware_Index const result = ware_index(warename))
 		return result;
 	else
-		// If this point is reached, the defined ware is neither defined as normal ware nor as a compatibility.
 		throw game_data_error("tribe %s does not define ware type \"%s\"", name().c_str(), warename.c_str());
 }
 Ware_Index Tribe_Descr::safe_ware_index(const char * const warename) const {
 	if (Ware_Index const result = ware_index(warename))
 		return result;
 	else
-		// If this point is reached, the defined ware is neither defined as normal ware nor as a compatibility.
 		throw game_data_error("tribe %s does not define ware type \"%s\"", name().c_str(), warename);
 }
 
-Ware_Index Tribe_Descr::ware_index(std::string const & warename) const {
+Ware_Index Tribe_Descr::ware_index(const std::string & warename) const {
 	Ware_Index const wi = m_wares.get_index(warename);
-	if (!wi) {
-		// try to find the ware in compatibility wares std::map
-		std::map<std::string, std::string>::const_iterator it = m_compatibility_wares.find(warename);
-		if (m_compatibility_wares.find(warename) != m_compatibility_wares.end()) {
-			log ("ware %s found in compatibility map: %s!\n", warename.c_str(), it->second.c_str());
-			if (Ware_Index const result = m_wares.get_index(it->second))
-				return result;
-		}
-	}
 	return wi;
 }
 Ware_Index Tribe_Descr::ware_index(char const * const warename) const {
 	Ware_Index const wi = m_wares.get_index(warename);
-	if (!wi) {
-		// try to find the ware in compatibility wares std::map
-		std::map<std::string, std::string>::const_iterator it = m_compatibility_wares.find(warename);
-		if (m_compatibility_wares.find(warename) != m_compatibility_wares.end()) {
-			log ("ware %s found in compatibility map: %s!\n", warename, it->second.c_str());
-			if (Ware_Index const result = m_wares.get_index(it->second))
-				return result;
-		}
-	}
 	return wi;
 }
 
@@ -589,7 +516,7 @@ Ware_Index Tribe_Descr::ware_index(char const * const warename) const {
 /*
  * Return the given worker or die trying
  */
-Ware_Index Tribe_Descr::safe_worker_index(std::string const & workername) const
+Ware_Index Tribe_Descr::safe_worker_index(const std::string & workername) const
 {
 	if (Ware_Index const result = worker_index(workername))
 		return result;
@@ -620,19 +547,6 @@ Building_Index Tribe_Descr::safe_building_index
 			("tribe %s does not define building type \"%s\"",
 			 name().c_str(), buildingname);
 	return result;
-}
-
-/**
- * If there is a savegame compatibility information string concerning the
- * given immovable name, return it. Otherwise, return an empty string.
- */
-const std::vector<std::string> & Tribe_Descr::compatibility_immovable(const std::string & name) const
-{
-	static const std::vector<std::string> empty;
-	Compatibility::const_iterator it = m_compatibility_immovable.find(name);
-	if (it != m_compatibility_immovable.end())
-		return it->second;
-	return empty;
 }
 
 void Tribe_Descr::resize_ware_orders(size_t maxLength) {

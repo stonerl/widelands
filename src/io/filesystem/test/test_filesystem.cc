@@ -18,25 +18,28 @@
  */
 
 #include <exception>
+#ifdef _WIN32
+#include <sstream>
+#endif
+
 #include <boost/test/unit_test.hpp>
 
 #include "io/filesystem/disk_filesystem.h"
 
-#ifdef WIN32
-#include <sstream>
+#ifdef _WIN32
 static std::string Win32Path(std::string s)
 {
-	for(size_t i=0;i<s.size();i++)
+	for (size_t i = 0; i < s.size(); i++)
 		if (s[i] == '/') s[i] = '\\';
-	if (s.size()>0 && s[0] == '\\')
+	if (s.size() > 0 && s[0] == '\\')
 	{
 		// Insert drive letter part from current working directory
 		std::string cwd = RealFSImpl("").getWorkingDirectory();
-		s.insert(0, cwd.substr(0,2));
+		s.insert(0, cwd.substr(0, 2));
 	}
 	return s;
 }
-static int setenv(const char *envname, const char *envval, int overwrite)
+static int setenv(const char* envname, const char* envval, int overwrite)
 {
 	std::stringstream s;
 	s << envname << "=" << Win32Path(envval);
@@ -48,9 +51,9 @@ static int setenv(const char *envname, const char *envval, int overwrite)
 #endif
 
 BOOST_AUTO_TEST_SUITE(FileSystemTests)
-#ifndef WIN32
+#ifndef _WIN32
 #define TEST_CANONICALIZE_NAME(root, path, expected)                          \
-   BOOST_CHECK_EQUAL(RealFSImpl(root).FS_CanonicalizeName(path), expected);   
+   BOOST_CHECK_EQUAL(RealFSImpl(root).FS_CanonicalizeName(path), expected);
 #else
 #define TEST_CANONICALIZE_NAME(root, path, expected)                          \
    BOOST_CHECK_EQUAL(RealFSImpl(Win32Path(root)).FS_CanonicalizeName(path), Win32Path(expected));
@@ -102,8 +105,6 @@ BOOST_AUTO_TEST_CASE(test_canonicalize_name) {
 	TEST_CANONICALIZE_NAME("/usr/../home", "path", "/home/path");
 	TEST_CANONICALIZE_NAME("/usr/../../home", "path", "/home/path");
 	TEST_CANONICALIZE_NAME("/usr/test/..", "path", "/usr/path");
-//	TEST_CANONICALIZE_NAME("/usr/test/../..", "path", cwd + "/path");
-//	TEST_CANONICALIZE_NAME("/usr/test/../../..", "path", cwd + "/path");
 	TEST_CANONICALIZE_NAME("/usr/one/../two/..", "path", "/usr/path");
 	TEST_CANONICALIZE_NAME("/usr/one/../a/b/..", "path", "/usr/a/path");
 
@@ -115,8 +116,6 @@ BOOST_AUTO_TEST_CASE(test_canonicalize_name) {
 
 	TEST_CANONICALIZE_NAME("/home/test", "path/..", "/home/test");
 	TEST_CANONICALIZE_NAME("/home/test", "path/../..", "/home");
-//	TEST_CANONICALIZE_NAME("/home/test", "path/../../..", "");
-//	TEST_CANONICALIZE_NAME("/home/test", "path/../../../..", "");
 
 	TEST_CANONICALIZE_NAME("/home/test", "path/../one", "/home/test/one");
 	TEST_CANONICALIZE_NAME("/home/test", "path/../../one", "/home/one");
@@ -127,15 +126,15 @@ BOOST_AUTO_TEST_CASE(test_canonicalize_name) {
 
 	TEST_CANONICALIZE_NAME("/home/test/.", "./path", "/home/test/path");
 
-#ifdef WIN32
+#ifdef _WIN32
 	// Check drive letter handling.
 	BOOST_CHECK_EQUAL(RealFSImpl("C:\\").FS_CanonicalizeName("C:\\"), "C:");
-	BOOST_CHECK_EQUAL(RealFSImpl("C:\\").FS_CanonicalizeName("D:\\"), "C:\\D:"); 
+	BOOST_CHECK_EQUAL(RealFSImpl("C:\\").FS_CanonicalizeName("D:\\"), "C:\\D:");
 #endif
 }
 
 // Skip testing tilde expansion on windows.
-#ifndef WIN32
+#ifndef _WIN32
 // ~ gets expanded to $HOME
 BOOST_AUTO_TEST_CASE(test_canonicalize_name_home_expansion) {
 	setenv("HOME", "/my/home", 1);

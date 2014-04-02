@@ -20,10 +20,9 @@
 #ifndef UI_SCROLLBAR_H
 #define UI_SCROLLBAR_H
 
-#include <boost/signal.hpp>
+#include <boost/signals2.hpp>
 
-#include "panel.h"
-
+#include "ui_basic/panel.h"
 #include "rect.h"
 
 namespace UI {
@@ -51,7 +50,7 @@ public:
 		(Panel * parent,
 		 int32_t x, int32_t y, uint32_t w, uint32_t h, bool horiz);
 
-	boost::signal<void (int32_t)> moved;
+	boost::signals2::signal<void (int32_t)> moved;
 
 	void set_steps(int32_t steps);
 	void set_singlestepsize(uint32_t singlestepsize);
@@ -63,7 +62,7 @@ public:
 	uint32_t get_pagesize() const {return m_pagesize;}
 	uint32_t get_scrollpos() const {return m_pos;}
 
-	bool handle_mousepress  (Uint8 btn, int32_t x, int32_t y);
+	bool handle_mousepress  (Uint8 btn, int32_t x, int32_t y) override;
 
 	void set_force_draw(bool const t) {m_force_draw = t;}
 
@@ -77,12 +76,12 @@ private:
 
 	void draw_button(RenderTarget &, Area, Rect);
 	void draw_area  (RenderTarget &, Area, Rect);
-	void draw(RenderTarget &);
-	void think();
+	void draw(RenderTarget &) override;
+	void think() override;
 
-	bool handle_mouserelease(Uint8 btn, int32_t x, int32_t y);
+	bool handle_mouserelease(Uint8 btn, int32_t x, int32_t y) override;
 	bool handle_mousemove
-		(Uint8 state, int32_t mx, int32_t my, int32_t xdiff, int32_t ydiff);
+		(Uint8 state, int32_t mx, int32_t my, int32_t xdiff, int32_t ydiff) override;
 
 private:
 	bool m_horizontal;
@@ -97,10 +96,10 @@ private:
 	int32_t   m_time_nextact;
 	int32_t   m_knob_grabdelta; ///< only while m_pressed == Knob
 
-	PictureID m_pic_minus;      ///< left/up
-	PictureID m_pic_plus;       ///< right/down
-	PictureID m_pic_background;
-	PictureID m_pic_buttons;
+	const Image* m_pic_minus;      ///< left/up
+	const Image* m_pic_plus;       ///< right/down
+	const Image* m_pic_background;
+	const Image* m_pic_buttons;
 };
 
 }

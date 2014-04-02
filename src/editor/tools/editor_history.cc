@@ -17,16 +17,21 @@
  *
  */
 
-#include "editor_history.h"
-#include "editor_tool_action.h"
-#include "editor_action_args.h"
-#include "editor/editorinteractive.h"
+#include "editor/tools/editor_history.h"
+
 #include <string>
+
+#include "editor/editorinteractive.h"
+#include "editor/tools/editor_action_args.h"
+#include "editor/tools/editor_tool_action.h"
 
 // === Editor_Action_Args === //
 
 Editor_Action_Args::Editor_Action_Args(Editor_Interactive & base):
 	sel_radius(base.get_sel_radius()),
+	change_by(0),
+	cur_res(0),
+	set_to(0),
 	m_interval(0, 0),
 	refcount(0)
 {}

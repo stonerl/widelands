@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2004, 2006-2011 by the Widelands Development Team
+ * Copyright (C) 2004, 2006-2013 by the Widelands Development Team
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -20,32 +20,59 @@
 #ifndef ECONOMY_H
 #define ECONOMY_H
 
-#include <boost/function.hpp>
+#include <memory>
 #include <set>
 #include <vector>
 
-#include "supply_list.h"
-#include "ui_basic/unique_window.h"
+#include <boost/function.hpp>
+#include <boost/utility.hpp>
+
 #include "logic/instances.h"
 #include "logic/warelist.h"
 #include "logic/wareworker.h"
+#include "economy/supply_list.h"
+#include "ui_basic/unique_window.h"
 
+
+namespace Widelands {
+
+class Game;
+class Player;
+class Soldier;
+class Warehouse;
+struct Flag;
+struct RSPairStruct;
+class Request;
+struct Route;
+struct Router;
+struct Supply;
 
 /**
- * Economy represents a network of Flag through which wares can be transported.
+ * Each Economy represents all building and flags, which are connected over the same
+ * street network. In general a player can own multiple Economys, which
+ * operate independently from each other.
+ *
+ * Every Economy tracks the amount of wares inside of it and how high the
+ * demand for each ware is.
+ *
+ * \paragraph Merging and splitting
+ *
+ * During the course of a game Economy objects can be merged when new roads and ports are created,
+ * or split when roads and ports are destroyed.
+ *
+ * Splitting and merging economies are relatively expensive operations,
+ * and in particular during game shutdown or when a large network is destroyed
+ * in a military operation, cascading economy splits could take a lot of processing time.
+ * For this reason, economies do not split immediately when a road is destroyed,
+ * but instead keep track of where a potential split occured and evaluate the split lazily.
+ *
+ * This means that two flags which are connected by the road (and seafaring) network
+ * are \b always in the same economy, but two flags in the same economy are not always
+ * connected by roads or the seafaring network - though of course, most code operates
+ * on the assumption that they are, with fallbacks for when they aren't.
  */
-namespace Widelands {
-struct Player;
-struct Game;
-struct Flag;
-struct Route;
-struct RSPairStruct;
-class Warehouse;
-struct Request;
-struct Supply;
-struct Router;
-
-struct Economy {
+class Economy : boost::noncopyable {
+public:
 	friend class EconomyDataPacket;
 
 	/// Configurable target quantity for the supply of a ware type in the
@@ -67,7 +94,7 @@ struct Economy {
 	Economy(Player &);
 	~Economy();
 
-	Player & owner() const throw () {return m_owner;}
+	Player & owner() const {return m_owner;}
 
 	static void check_merge(Flag &, Flag &);
 	static void check_split(Flag &, Flag &);
@@ -80,14 +107,17 @@ struct Economy {
 
 	typedef boost::function<bool (Warehouse &)> WarehouseAcceptFn;
 	Warehouse * find_closest_warehouse
-		(Flag & start, WareWorker type = wwWORKER, Route * route = 0,
+		(Flag & start, WareWorker type = wwWORKER, Route * route = nullptr,
 		 uint32_t cost_cutoff = 0,
 		 const WarehouseAcceptFn & acceptfn = WarehouseAcceptFn());
 
 	std::vector<Flag *>::size_type get_nrflags() const {return m_flags.size();}
 	void    add_flag(Flag &);
 	void remove_flag(Flag &);
-	Flag & get_arbitrary_flag();
+
+	// Returns an arbitrary flag or nullptr if this is an economy without flags
+	// (i.e. an Expedition ship).
+	Flag* get_arbitrary_flag();
 
 	void set_ware_target_quantity  (Ware_Index, uint32_t, Time);
 	void set_worker_target_quantity(Ware_Index, uint32_t, Time);
@@ -100,7 +130,7 @@ struct Economy {
 
 	void    add_warehouse(Warehouse &);
 	void remove_warehouse(Warehouse &);
-	std::vector<Warehouse *> const & warehouses() const {return m_warehouses;}
+	const std::vector<Warehouse *>& warehouses() const {return m_warehouses;}
 
 	void    add_request(Request &);
 	void remove_request(Request &);
@@ -126,13 +156,13 @@ struct Economy {
 	/// ware type by overproducing a worker type from it.
 	bool needs_worker(Ware_Index) const;
 
-	Target_Quantity const & ware_target_quantity  (Ware_Index const i) const {
+	const Target_Quantity & ware_target_quantity  (Ware_Index const i) const {
 		return m_ware_target_quantities[i.value()];
 	}
 	Target_Quantity       & ware_target_quantity  (Ware_Index const i)       {
 		return m_ware_target_quantities[i.value()];
 	}
-	Target_Quantity const & worker_target_quantity(Ware_Index const i) const {
+	const Target_Quantity & worker_target_quantity(Ware_Index const i) const {
 		return m_worker_target_quantities[i.value()];
 	}
 	Target_Quantity       & worker_target_quantity(Ware_Index const i)       {
@@ -143,8 +173,8 @@ struct Economy {
 	UI::UniqueWindow::Registry m_optionswindow_registry;
 
 
-	WareList const & get_wares  () const {return m_wares;}
-	WareList const & get_workers() const {return m_workers;}
+	const WareList & get_wares  () const {return m_wares;}
+	const WareList & get_workers() const {return m_workers;}
 
 	///< called by \ref Cmd_Call_Economy_Balance
 	void balance(uint32_t timerid);
@@ -159,11 +189,12 @@ private:
 	void _reset_all_pathfinding_cycles();
 
 	void _merge(Economy &);
+	void _check_splits();
 	void _split(const std::set<OPtr<Flag> > &);
 
 	void _start_request_timer(int32_t delta = 200);
 
-	Supply * _find_best_supply(Game &, Request const &, int32_t & cost);
+	Supply * _find_best_supply(Game &, const Request &, int32_t & cost);
 	void _process_requests(Game &, RSPairStruct &);
 	void _balance_requestsupply(Game &);
 	void _handle_active_supplies(Game &);
@@ -179,9 +210,6 @@ private:
 
 	Player & m_owner;
 
-	/// True while rebuilding Economies (i.e. during split/merge)
-	bool m_rebuilding;
-
 	typedef std::vector<Flag *> Flags;
 	Flags m_flags;
 	WareList m_wares;     ///< virtual storage with all wares in this Economy
@@ -195,11 +223,17 @@ private:
 	Target_Quantity        * m_worker_target_quantities;
 	Router                 * m_router;
 
+	typedef std::pair<OPtr<Flag>, OPtr<Flag> > SplitPair;
+	std::vector<SplitPair> m_split_checks;
+
 	/**
 	 * ID for the next request balancing timer. Used to throttle
 	 * excessive calls to the request/supply balancing logic.
 	 */
 	uint32_t m_request_timerid;
+
+	static std::unique_ptr<Soldier> m_soldier_prototype;
+
 };
 
 }

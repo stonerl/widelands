@@ -1,11 +1,15 @@
-soundfx=../../../sound/farm/farm_animal
 size=big
 output=meat
 
 [buildcost]
-trunk=2
+log=2
 stone=2
 marblecolumn=2
+
+[return_on_dismantle]
+log=1
+stone=1
+marble=1
 
 [aihints]
 build_material=false
@@ -21,8 +25,8 @@ water=7
 work=_Work
 
 [work]
-return=skipped when economy needs water and not economy needs meat
-return=skipped when economy needs wheat and not economy needs meat
+return=skipped unless economy needs meat or not economy needs water
+return=skipped unless economy needs meat or not economy needs wheat
 sleep=25000
 consume=water wheat
 playFX=../../../sound/farm/farm_animal 180

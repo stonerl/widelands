@@ -17,7 +17,7 @@
  *
  */
 
-#include "widelands_map_objective_data_packet.h"
+#include "map_io/widelands_map_objective_data_packet.h"
 
 #include "logic/editor_game_base.h"
 #include "logic/game_data_error.h"
@@ -34,13 +34,12 @@ void Map_Objective_Data_Packet::Read
 	 Editor_Game_Base      &       egbase,
 	 bool                    const skip,
 	 Map_Map_Object_Loader &)
-throw (_wexception)
 {
 	if (skip)
 		return;
 
 	Profile prof;
-	try {prof.read("objective", 0, fs);} catch (...) {return;}
+	try {prof.read("objective", nullptr, fs);} catch (...) {return;}
 	Map & map = egbase.map();
 	Manager<Objective> & mom = map.mom();
 
@@ -48,7 +47,7 @@ throw (_wexception)
 		int32_t const packet_version =
 			prof.get_safe_section("global").get_safe_int("packet_version");
 		if (packet_version <= CURRENT_PACKET_VERSION) {
-			while (Section * const s = prof.get_next_section(0)) {
+			while (Section * const s = prof.get_next_section(nullptr)) {
 				char const * const         name = s->get_name();
 				try {
 					Objective & objective = *new Objective();
@@ -62,31 +61,30 @@ throw (_wexception)
 					objective.set_descr      (s->get_safe_string("descr"));
 					objective.set_visible (s->get_safe_bool  ("visible"));
 					objective.set_done       (s->get_bool  ("done", false));
-				} catch (_wexception const & e) {
-					throw game_data_error(_("%s: %s"), name, e.what());
+				} catch (const _wexception & e) {
+					throw game_data_error("%s: %s", name, e.what());
 				}
 			}
 		} else
 			throw game_data_error
-				(_("unknown/unhandled version %i"), packet_version);
-	} catch (_wexception const & e) {
-		throw game_data_error(_("Objectives: %s"), e.what());
+				("unknown/unhandled version %i", packet_version);
+	} catch (const _wexception & e) {
+		throw game_data_error("Objectives: %s", e.what());
 	}
 }
 
 
 void Map_Objective_Data_Packet::Write
 	(FileSystem & fs, Editor_Game_Base & egbase, Map_Map_Object_Saver &)
-throw (_wexception)
 {
 	Profile prof;
 	prof.create_section("global").set_int
 		("packet_version", CURRENT_PACKET_VERSION);
 
-	Manager<Objective> const & mom = egbase.map().mom();
+	const Manager<Objective> & mom = egbase.map().mom();
 	Manager<Objective>::Index const nr_objectives = mom.size();
 	for (Manager<Objective>::Index i = 0; i < nr_objectives; ++i) {
-		Objective const & objective = mom[i];
+		const Objective & objective = mom[i];
 		Section & s = prof.create_section(objective.name().c_str());
 		s.set_string("name",     objective.descname());
 		s.set_string("descr",    objective.descr());

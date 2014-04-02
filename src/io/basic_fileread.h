@@ -20,15 +20,15 @@
 #ifndef BASIC_FILEREAD_H
 #define BASIC_FILEREAD_H
 
-#include "io/filesystem/filesystem.h"
-#include "machdep.h"
-#ifdef WIN32
-#else
+#include <cassert>
+#include <limits>
+
+#ifndef _WIN32
 #include <sys/mman.h>
 #endif
 
-#include <cassert>
-#include <limits>
+#include "io/filesystem/filesystem.h"
+#include "machdep.h"
 
 /// Can be used to read a file. It works quite naively by reading the entire
 /// file into memory. Convenience functions are available for endian-safe
@@ -39,8 +39,8 @@ template<typename Base> struct basic_FileRead : public Base {
 		/// Returns a special value indicating invalidity.
 		static Pos Null() {return std::numeric_limits<size_t>::max();}
 
-		bool isNull() const throw () {return *this == Null();}
-		operator size_t() const throw () {return pos;}
+		bool isNull() const {return *this == Null();}
+		operator size_t() const {return pos;}
 		Pos operator++ () {return ++pos;}
 		Pos operator+= (Pos const other) {return pos += other.pos;}
 	private:
@@ -50,7 +50,7 @@ template<typename Base> struct basic_FileRead : public Base {
 	struct File_Boundary_Exceeded : public Base::_data_error {
 		File_Boundary_Exceeded() : Base::_data_error("end of file") {}
 	};
-	basic_FileRead () : data(0), m_fast(0) {}; /// Create the object with nothing to read.
+	basic_FileRead () : data(nullptr), length(0), m_fast(0) {}; /// Create the object with nothing to read.
 	~basic_FileRead() {if (data) Close();} /// Close the file if open.
 
 	/// Loads a file into memory. Reserves one additional byte which is zeroed,
@@ -79,7 +79,7 @@ template<typename Base> struct basic_FileRead : public Base {
 	void Close() {
 		assert(data);
 		if (m_fast) {
-#ifdef WIN32
+#ifdef _WIN32
 			assert(false);
 #else
 			munmap(data, length);
@@ -87,11 +87,11 @@ template<typename Base> struct basic_FileRead : public Base {
 		} else {
 			free(data);
 		}
-		data = 0;
+		data = nullptr;
 	}
 
-	size_t GetSize() const throw () {return length;}
-	bool EndOfFile() const throw () {return length <= filepos;}
+	size_t GetSize() const {return length;}
+	bool EndOfFile() const {return length <= filepos;}
 
 	/// Set the file pointer to the given location.
 	/// \throws File_Boundary_Exceeded if the pointer is out of bound.
@@ -104,9 +104,9 @@ template<typename Base> struct basic_FileRead : public Base {
 
 	/// Get the position that will be read from in the next read operation that
 	/// does not specify a position.
-	Pos GetPos() const throw () {return filepos;}
+	Pos GetPos() const {return filepos;}
 
-	size_t Data(void * const dst, const size_t bufsize) {
+	size_t Data(void * dst, size_t bufsize) {
 		assert(data);
 		size_t read = 0;
 		for (; read < bufsize and filepos < length; ++read, ++filepos)
@@ -146,7 +146,7 @@ template<typename Base> struct basic_FileRead : public Base {
 
 	char * ReadLine() {
 		if (EndOfFile())
-			return 0;
+			return nullptr;
 		char * result = data + filepos;
 		for (; data[filepos] and data[filepos] != '\n'; ++filepos)
 			if (data[filepos] == '\r') {

@@ -17,7 +17,9 @@
  *
  */
 
-#include <lua.hpp>
+#include "scripting/lua_game.h"
+
+#include <boost/format.hpp>
 
 #include "campvis.h"
 #include "economy/economy.h"
@@ -27,15 +29,13 @@
 #include "logic/objective.h"
 #include "logic/path.h"
 #include "logic/player.h"
+#include "logic/playersmanager.h"
 #include "logic/tribe.h"
+#include "scripting/c_utils.h"
+#include "scripting/lua_map.h"
+#include "scripting/scripting.h"
 #include "wui/interactive_player.h"
 #include "wui/story_message_box.h"
-
-#include "c_utils.h"
-#include "lua_map.h"
-#include "scripting.h"
-
-#include "lua_game.h"
 
 using namespace Widelands;
 using namespace LuaMap;
@@ -99,7 +99,7 @@ const MethodType<L_Player> L_Player::Methods[] = {
 	METHOD(L_Player, get_suitability),
 	METHOD(L_Player, allow_workers),
 	METHOD(L_Player, switchplayer),
-	{0, 0},
+	{nullptr, nullptr},
 };
 const PropertyType<L_Player> L_Player::Properties[] = {
 	PROP_RO(L_Player, name),
@@ -111,7 +111,7 @@ const PropertyType<L_Player> L_Player::Properties[] = {
 	PROP_RO(L_Player, inbox),
 	PROP_RW(L_Player, team),
 	PROP_RW(L_Player, see_all),
-	{0, 0, 0},
+	{nullptr, nullptr, nullptr},
 };
 
 /*
@@ -162,7 +162,7 @@ int L_Player::get_allowed_buildings(lua_State * L) {
 		a new item, use :meth:`add_objective`.
 */
 int L_Player::get_objectives(lua_State * L) {
-	Manager<Objective> const & mom = get_egbase(L).map().mom();
+	const Manager<Objective> & mom = get_egbase(L).map().mom();
 
 	lua_newtable(L);
 	for (Manager<Objective>::Index i = 0; i < mom.size(); i++) {
@@ -179,13 +179,17 @@ int L_Player::get_objectives(lua_State * L) {
 		(RO) :const:`true` if this player was defeated, :const:`false` otherwise
 */
 int L_Player::get_defeated(lua_State * L) {
-	const std::vector<uint32_t> & nr_workers =
-		get_game(L).get_general_statistics()[player_number() - 1].nr_workers;
+	Player & p = get(L, get_egbase(L));
+	bool have_warehouses = false;
 
-	if (not nr_workers.empty() and *nr_workers.rbegin() == 0)
-		lua_pushboolean(L, true);
-	else
-		lua_pushboolean(L, false);
+	for (uint32_t economy_nr = 0; economy_nr < p.get_nr_economies(); economy_nr++) {
+		if (!p.get_economy_by_number(economy_nr)->warehouses().empty()) {
+		  have_warehouses = true;
+		  break;
+		}
+	}
+
+	lua_pushboolean(L, !have_warehouses);
 	return 1;
 }
 
@@ -383,6 +387,7 @@ int L_Player::send_message(lua_State * L) {
 			 	 title,
 			 	 body,
 				 c,
+				 0,
 				 st),
 			popup);
 
@@ -466,7 +471,7 @@ int L_Player::message_box(lua_State * L) {
 	uint32_t cspeed = game.gameController()->desiredSpeed();
 	game.gameController()->setDesiredSpeed(0);
 
-	game.save_handler().set_allow_autosaving(false);
+	game.save_handler().set_allow_saving(false);
 
 	Story_Message_Box * mb =
 		new Story_Message_Box
@@ -482,7 +487,7 @@ int L_Player::message_box(lua_State * L) {
 
 	game.gameController()->setDesiredSpeed(cspeed);
 
-	game.save_handler().set_allow_autosaving(true);
+	game.save_handler().set_allow_saving(true);
 
 	return 1;
 }
@@ -579,7 +584,7 @@ int L_Player::add_objective(lua_State * L) {
 	Manager<Objective> & mom = map->mom();
 
 	std::string name = luaL_checkstring(L, 2);
-	if (mom[name] != 0)
+	if (mom[name] != nullptr)
 		return
 			report_error
 				(L, "An objective with the name '%s' already exists!", name.c_str()
@@ -776,7 +781,7 @@ int L_Player::set_flag_style(lua_State * L) {
 
 	try {
 		p.set_flag_style(p.tribe().flag_style_index(name));
-	} catch (Tribe_Descr::Nonexistent) {
+	} catch (Tribe_Descr::Nonexistent &) {
 		return report_error(L, "Flag style <%s> does not exist!\n", name);
 	}
 	return 0;
@@ -798,7 +803,7 @@ int L_Player::set_frontier_style(lua_State * L) {
 
 	try {
 		p.set_frontier_style(p.tribe().frontier_style_index(name));
-	} catch (Tribe_Descr::Nonexistent) {
+	} catch (Tribe_Descr::Nonexistent &) {
 		return report_error(L, "Frontier style <%s> does not exist!\n", name);
 	}
 	return 0;
@@ -854,11 +859,11 @@ int L_Player::allow_workers(lua_State * L) {
 	const Tribe_Descr & tribe = get(L, game).tribe();
 	Player & player = get(L, game);
 
-	std::vector<Ware_Index> const & worker_types_without_cost =
+	const std::vector<Ware_Index> & worker_types_without_cost =
 		tribe.worker_types_without_cost();
 
 	for (Ware_Index i = Ware_Index::First(); i < tribe.get_nrworkers(); ++i) {
-		Worker_Descr const & worker_descr = *tribe.get_worker_descr(i);
+		const Worker_Descr & worker_descr = *tribe.get_worker_descr(i);
 		if (not worker_descr.is_buildable())
 			continue;
 
@@ -970,7 +975,7 @@ const char L_Objective::className[] = "Objective";
 const MethodType<L_Objective> L_Objective::Methods[] = {
 	METHOD(L_Objective, remove),
 	METHOD(L_Objective, __eq),
-	{0, 0},
+	{nullptr, nullptr},
 };
 const PropertyType<L_Objective> L_Objective::Properties[] = {
 	PROP_RO(L_Objective, name),
@@ -978,7 +983,7 @@ const PropertyType<L_Objective> L_Objective::Properties[] = {
 	PROP_RW(L_Objective, body),
 	PROP_RW(L_Objective, visible),
 	PROP_RW(L_Objective, done),
-	{0, 0, 0},
+	{nullptr, nullptr, nullptr},
 };
 
 L_Objective::L_Objective(Widelands::Objective o) {
@@ -1027,7 +1032,7 @@ int L_Objective::set_title(lua_State * L) {
 /* RST
 	.. attribute:: body
 
-		(RW) The complete text of this objective. Can be Widelands RichText.
+		(RW) The complete text of this objective. Can be Widelands Richtext.
 */
 int L_Objective::get_body(lua_State * L) {
 	Objective & o = get(L, get_game(L));
@@ -1058,8 +1063,10 @@ int L_Objective::set_visible(lua_State * L) {
 	.. attribute:: done
 
 		(RW) defines if this objective is already fulfilled. If done is
-		:const`true`, the objective will not be shown to the user, no matter what
-		:attr:`visible` is set to.
+		:const`true`, the objective will not be shown to the user, no matter what.
+		:attr:`visible` is set to. A savegame will be created when this attribute
+		is changed to :const`true`.
+
 */
 int L_Objective::get_done(lua_State * L) {
 	Objective & o = get(L, get_game(L));
@@ -1069,6 +1076,22 @@ int L_Objective::get_done(lua_State * L) {
 int L_Objective::set_done(lua_State * L) {
 	Objective & o = get(L, get_game(L));
 	o.set_done(luaL_checkboolean(L, -1));
+
+	const int32_t autosave = g_options.pull_section("global").get_int("autosave", 0);
+	if (autosave <= 0) {
+		return 0;
+	}
+
+	if (o.done()) {
+		/** TRANSLATORS: File name for saving objective achieved */
+		/** TRANSLATORS: %1$s = map name. %2$s = achievement name */
+		std::string filename = (boost::format
+			(_("%1$s (achieved %2$s)"))
+			% get_egbase(L).get_map()->get_name()
+			% o.descname().c_str()
+		).str();
+		get_game(L).save_handler().request_save(filename);
+	}
 	return 0;
 }
 
@@ -1086,7 +1109,7 @@ int L_Objective::remove(lua_State * L) {
 }
 
 int L_Objective::__eq(lua_State * L) {
-	Manager<Objective> const & mom = get_game(L).map().mom();
+	const Manager<Objective> & mom = get_game(L).map().mom();
 
 	const Objective * me = mom[m_name];
 	const Objective * you = mom[(*get_user_class<L_Objective>(L, 2))->m_name];
@@ -1105,6 +1128,7 @@ Objective & L_Objective::get(lua_State * L, Widelands::Game & g) {
 	if (!o)
 		report_error
 			(L, "Objective with name '%s' doesn't exist!", m_name.c_str());
+	assert(o != nullptr);  // report_error never returns.
 	return *o;
 }
 
@@ -1119,7 +1143,7 @@ Message
 const char L_Message::className[] = "Message";
 const MethodType<L_Message> L_Message::Methods[] = {
 	METHOD(L_Message, __eq),
-	{0, 0},
+	{nullptr, nullptr},
 };
 const PropertyType<L_Message> L_Message::Properties[] = {
 	PROP_RO(L_Message, sender),
@@ -1129,7 +1153,7 @@ const PropertyType<L_Message> L_Message::Properties[] = {
 	PROP_RO(L_Message, duration),
 	PROP_RO(L_Message, field),
 	PROP_RW(L_Message, status),
-	{0, 0, 0},
+	{nullptr, nullptr, nullptr},
 };
 
 L_Message::L_Message(uint8_t plr, Message_Id id) {
@@ -1280,35 +1304,33 @@ const Message & L_Message::get(lua_State * L, Widelands::Game & game) {
 
 
 /* RST
-.. function:: report_result(plr, has_won[, points = 0, extra = ""])
+.. function:: report_result(plr, result[, info = ""])
 
 	Reports the game ending to the metaserver if this is an Internet
 	network game. Otherwise, does nothing.
 
 	:arg plr: The Player to report results for.
 	:type plr: :class:`~wl.game.Player`
-	:arg has_won: :const:`true` if this player has won
-	:type has_won: :class:`boolean`
-	:type points: number of points the player should be rewarded for this game
-	:arg points: :class:`integer`
-	:arg extra: a string containing extra data for this particular win
-		condition. This will vary from game type to game type.
-	:type extra: :class:`string`
+	:arg result: The player result (0: lost, 1: won, 2: resigned)
+	:type result: :class:`number`
+	:arg info: a string containing extra data for this particular win
+		condition. This will vary from game type to game type. See
+		:class:`PlayerEndStatus` for allowed values
+	:type info: :class:`string`
 
 */
+// TODO(sirver): this should be a method of wl.Game(). Fix for b19.
 static int L_report_result(lua_State * L) {
-	int32_t points = 0;
+	std::string info = "";
 	if (lua_gettop(L) >= 3)
-		points = luaL_checkint32(L, 3);
+		info = luaL_checkstring(L, 3);
 
-	std::string extra = "";
-	if (lua_gettop(L) >= 4)
-		extra = luaL_checkstring(L, 4);
+	Widelands::PlayerEndResult result = static_cast<Widelands::PlayerEndResult>
+		(luaL_checknumber(L, 2));
 
 	get_game(L).gameController()->report_result
 		((*get_user_class<L_Player>(L, 1))->get(L, get_game(L)).player_number(),
-		 points, luaL_checkboolean(L, 2), extra
-	);
+		 result, info);
 	return 0;
 }
 
@@ -1317,14 +1339,17 @@ static int L_report_result(lua_State * L) {
  *                            MODULE FUNCTIONS
  * ========================================================================
  */
-const static struct luaL_reg wlgame [] = {
+const static struct luaL_Reg wlgame [] = {
 	{"report_result", &L_report_result},
-	{0, 0}
+	{nullptr, nullptr}
 };
 
 void luaopen_wlgame(lua_State * L) {
-	luaL_register(L, "wl.game", wlgame);
-	lua_pop(L, 1); // pop the table
+	lua_getglobal(L, "wl");  // S: wl_table
+	lua_pushstring(L, "game"); // S: wl_table "game"
+	luaL_newlib(L, wlgame);  // S: wl_table "game" wl.game_table
+	lua_settable(L, -3); // S: wl_table
+	lua_pop(L, 1); // S:
 
 	register_class<L_Player>(L, "game", true);
 	add_parent<L_Player, LuaBases::L_PlayerBase>(L);
@@ -1335,4 +1360,3 @@ void luaopen_wlgame(lua_State * L) {
 }
 
 };
-

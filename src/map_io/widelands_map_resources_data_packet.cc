@@ -17,15 +17,15 @@
  *
  */
 
-#include "widelands_map_resources_data_packet.h"
+#include "map_io/widelands_map_resources_data_packet.h"
+
+#include "log.h"
 #include "logic/editor_game_base.h"
 #include "logic/game_data_error.h"
 #include "logic/map.h"
-#include "logic/world.h"
 #include "logic/widelands_fileread.h"
 #include "logic/widelands_filewrite.h"
-
-#include "log.h"
+#include "logic/world.h"
 
 namespace Widelands {
 
@@ -34,7 +34,6 @@ namespace Widelands {
 
 void Map_Resources_Data_Packet::Read
 	(FileSystem & fs, Editor_Game_Base & egbase, bool, Map_Map_Object_Loader &)
-throw (_wexception)
 {
 	FileRead fr;
 
@@ -104,7 +103,6 @@ throw (_wexception)
  */
 void Map_Resources_Data_Packet::Write
 	(FileSystem & fs, Editor_Game_Base & egbase, Map_Map_Object_Saver &)
-throw (_wexception)
 {
 	FileWrite fw;
 
@@ -114,16 +112,14 @@ throw (_wexception)
 	// of the resources at run time doesn't matter.
 	// (saved like terrains)
 	// Write the number of resources
-	Map   const & map   = egbase.map  ();
-	World const & world = map   .world();
+	const Map   & map   = egbase.map  ();
+	const World & world = map   .world();
 	uint8_t const nr_res = world.get_nr_resources();
 	fw.Unsigned16(nr_res);
 
 	//  write all resources names and their id's
-	std::map<std::string, uint8_t> smap;
 	for (int32_t i = 0; i < nr_res; ++i) {
-		Resource_Descr const & res = *world.get_resource(i);
-		smap[res.name().c_str()] = i;
+		const Resource_Descr & res = *world.get_resource(i);
 		fw.Unsigned16(i);
 		fw.CString(res.name().c_str());
 	}
@@ -133,7 +129,7 @@ throw (_wexception)
 	//  - amount
 	for (uint16_t y = 0; y < map.get_height(); ++y) {
 		for (uint16_t x = 0; x < map.get_width(); ++x) {
-			Field const & f = map[Coords(x, y)];
+			const Field & f = map[Coords(x, y)];
 			int32_t       res          = f.get_resources          ();
 			int32_t const       amount = f.get_resources_amount   ();
 			int32_t const start_amount = f.get_starting_res_amount();

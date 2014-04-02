@@ -17,12 +17,12 @@
  *
  */
 
-#include "mapfringeregion.h"
+#include "logic/mapfringeregion.h"
 
 namespace Widelands {
 
 template <>
-bool MapFringeRegion<Area<FCoords> >::advance(const Map & map) throw () {
+bool MapFringeRegion<Area<FCoords> >::advance(const Map & map) {
 	switch (m_phase) {
 	case 0:
 		if (m_area.radius) {
@@ -31,6 +31,7 @@ bool MapFringeRegion<Area<FCoords> >::advance(const Map & map) throw () {
 		}
 		else
 			return false;
+		/* no break */
 	case 1: map.get_trn(m_area, &m_area); break;
 	case 2: map.get_tln(m_area, &m_area); break;
 	case 3: map. get_ln(m_area, &m_area); break;
@@ -39,6 +40,7 @@ bool MapFringeRegion<Area<FCoords> >::advance(const Map & map) throw () {
 	case 6: map. get_rn(m_area, &m_area); break;
 	default:
 		assert(false);
+		break;
 	}
 	if (--m_remaining_in_phase == 0) {
 		m_remaining_in_phase = m_area.radius;
@@ -48,7 +50,7 @@ bool MapFringeRegion<Area<FCoords> >::advance(const Map & map) throw () {
 }
 
 template <>
-bool MapFringeRegion<Area<> >::advance(const Map & map) throw () {
+bool MapFringeRegion<Area<> >::advance(const Map & map) {
 	switch (m_phase) {
 	case 0:
 		if (m_area.radius) {
@@ -57,6 +59,7 @@ bool MapFringeRegion<Area<> >::advance(const Map & map) throw () {
 		}
 		else
 			return false;
+		/* no break */
 	case 1: map.get_trn(m_area, &m_area); break;
 	case 2: map.get_tln(m_area, &m_area); break;
 	case 3: map. get_ln(m_area, &m_area); break;
@@ -65,6 +68,7 @@ bool MapFringeRegion<Area<> >::advance(const Map & map) throw () {
 	case 6: map. get_rn(m_area, &m_area); break;
 	default:
 		assert(false);
+		break;
 	}
 	if (--m_remaining_in_phase == 0) {
 		m_remaining_in_phase = m_area.radius;

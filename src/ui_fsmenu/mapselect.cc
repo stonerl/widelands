@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2002, 2006-2012 by the Widelands Development Team
+ * Copyright (C) 2002, 2006-2013 by the Widelands Development Team
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -16,14 +16,16 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
 
+#include "ui_fsmenu/mapselect.h"
+
 #include <cstdio>
 
-#include "i18n.h"
-#include "wexception.h"
+#include <boost/format.hpp>
 
 #include "gamecontroller.h"
 #include "gamesettings.h"
 #include "graphic/graphic.h"
+#include "i18n.h"
 #include "io/filesystem/layered_filesystem.h"
 #include "log.h"
 #include "logic/editor_game_base.h"
@@ -32,9 +34,7 @@
 #include "s2map.h"
 #include "ui_basic/box.h"
 #include "ui_basic/checkbox.h"
-
-
-#include "mapselect.h"
+#include "wexception.h"
 
 
 using Widelands::WL_Map_Loader;
@@ -50,13 +50,13 @@ Fullscreen_Menu_MapSelect::Fullscreen_Menu_MapSelect
 // Text labels
 	m_title
 		(this,
-		 get_w() / 2, get_h() * 7 / 50,
-		 _("Choose your map!"),
+		 get_w() / 2, get_h() / 10,
+		 _("Choose a map"),
 		 UI::Align_HCenter),
 	m_label_load_map_as_scenario
 		(this,
 		 get_w() * 23 / 25, get_h() * 11 / 40,
-		 _("Load Map as scenario: "),
+		 _("Load Map as scenario"),
 		 UI::Align_Right),
 	m_label_name
 		(this,
@@ -101,12 +101,12 @@ Fullscreen_Menu_MapSelect::Fullscreen_Menu_MapSelect
 	m_back
 		(this, "back",
 		 get_w() * 71 / 100, get_h() * 17 / 20, m_butw, m_buth,
-		 g_gr->get_picture(PicMod_UI, "pics/but0.png"),
+		 g_gr->images().get("pics/but0.png"),
 		 _("Back"), std::string(), true, false),
 	m_ok
 		(this, "ok",
 		 get_w() * 71 / 100, get_h() * 9 / 10, m_butw, m_buth,
-		 g_gr->get_picture(PicMod_UI, "pics/but2.png"),
+		 g_gr->images().get("pics/but2.png"),
 		 _("OK"), std::string(), false, false),
 
 // Checkbox
@@ -146,9 +146,10 @@ Fullscreen_Menu_MapSelect::Fullscreen_Menu_MapSelect
 	m_ok.set_font(font_small());
 
 #define NR_PLAYERS_WIDTH 35
-	m_table.add_column(NR_PLAYERS_WIDTH, _("#"), UI::Align_HCenter);
+	/** TRANSLATORS: Column title for number of players in map list */
+	m_table.add_column(NR_PLAYERS_WIDTH, _("#"), "", UI::Align_HCenter);
 	m_table.add_column
-		(m_table.get_w() - NR_PLAYERS_WIDTH, _("Map Name"), UI::Align_Left);
+		(m_table.get_w() - NR_PLAYERS_WIDTH, _("Map Name"), "", UI::Align_Left);
 	m_table.set_column_compare
 		(1,
 		 boost::bind
@@ -169,14 +170,15 @@ Fullscreen_Menu_MapSelect::Fullscreen_Menu_MapSelect
 	vbox->set_size(get_w(), 25);
 	vbox = new UI::Box(this, m_table.get_x(), m_table.get_y() - 90, UI::Box::Horizontal, m_table.get_w());
 	_add_tag_checkbox(vbox, "official", _("Official Map"));
+	_add_tag_checkbox(vbox, "seafaring", _("Seafaring Map"));
 	vbox->set_size(get_w(), 25);
 	vbox = new UI::Box(this, m_table.get_x(), m_table.get_y() - 60, UI::Box::Horizontal, m_table.get_w());
 	_add_tag_checkbox(vbox, "1v1", _("1v1"));
-	_add_tag_checkbox(vbox, "2teams", _("2 Player Teams"));
-	_add_tag_checkbox(vbox, "3teams", _("3 Player Teams"));
+	_add_tag_checkbox(vbox, "2teams", _("Teams of 2"));
+	_add_tag_checkbox(vbox, "3teams", _("Teams of 3"));
 	vbox->set_size(get_w(), 25);
 	vbox = new UI::Box(this, m_table.get_x(), m_table.get_y() - 30, UI::Box::Horizontal, m_table.get_w());
-	_add_tag_checkbox(vbox, "4teams", _("4 Player Teams"));
+	_add_tag_checkbox(vbox, "4teams", _("Teams of 4"));
 	_add_tag_checkbox(vbox, "ffa", _("Free for all"));
 	_add_tag_checkbox(vbox, "unbalanced", _("Unbalanced"));
 	vbox->set_size(get_w(), 25);
@@ -190,6 +192,7 @@ Fullscreen_Menu_MapSelect::Fullscreen_Menu_MapSelect
 		m_label_load_map_as_scenario.set_visible(false);
 	}
 
+	m_table.focus();
 	fill_list();
 }
 
@@ -199,11 +202,12 @@ void Fullscreen_Menu_MapSelect::think()
 		m_ctrl->think();
 }
 
+
 bool Fullscreen_Menu_MapSelect::compare_maprows
 	(uint32_t rowa, uint32_t rowb)
 {
-	MapData const & r1 = m_maps_data[m_table[rowa]];
-	MapData const & r2 = m_maps_data[m_table[rowb]];
+	const MapData & r1 = m_maps_data[m_table[rowa]];
+	const MapData & r2 = m_maps_data[m_table[rowb]];
 
 	if (!r1.width and !r2.width) {
 		return r1.name < r2.name;
@@ -223,14 +227,14 @@ bool Fullscreen_Menu_MapSelect::is_scenario()
 MapData const * Fullscreen_Menu_MapSelect::get_map() const
 {
 	if (not m_table.has_selection())
-		return 0;
+		return nullptr;
 	return &m_maps_data[m_table.get_selected()];
 }
 
 
 void Fullscreen_Menu_MapSelect::ok()
 {
-	MapData const & mapdata = m_maps_data[m_table.get_selected()];
+	const MapData & mapdata = m_maps_data[m_table.get_selected()];
 
 	if (!mapdata.width) {
 		m_curdir = mapdata.filename;
@@ -247,7 +251,7 @@ void Fullscreen_Menu_MapSelect::ok()
  */
 void Fullscreen_Menu_MapSelect::map_selected(uint32_t)
 {
-	MapData const & map = m_maps_data[m_table.get_selected()];
+	const MapData & map = m_maps_data[m_table.get_selected()];
 
 	if (map.width) {
 		char buf[256];
@@ -256,7 +260,7 @@ void Fullscreen_Menu_MapSelect::map_selected(uint32_t)
 		std::string world(map.world);
 		if (map.height) { // if height == 0 : dedicated server map info without local map
 			std::string worldpath("worlds/" + map.world);
-			Profile prof((worldpath + "/conf").c_str(), 0, "world_" + map.world);
+			Profile prof((worldpath + "/conf").c_str(), nullptr, "world_" + map.world);
 			Section & global = prof.get_safe_section("world");
 			world = global.get_safe_string("name");
 		}
@@ -321,8 +325,7 @@ void Fullscreen_Menu_MapSelect::fill_list()
 		// This is the normal case
 
 		//  Fill it with all files we find in all directories.
-		filenameset_t files;
-		g_fs->FindFiles(m_curdir, "*", &files);
+		filenameset_t files = g_fs->ListDirectory(m_curdir);
 
 		int32_t ndirs = 0;
 
@@ -330,7 +333,7 @@ void Fullscreen_Menu_MapSelect::fill_list()
 		//about the absolute filesystem top!) we manually add ".."
 		if (m_curdir != m_basedir) {
 			MapData map;
-	#ifndef WIN32
+	#ifndef _WIN32
 			map.filename = m_curdir.substr(0, m_curdir.rfind('/'));
 	#else
 			map.filename = m_curdir.substr(0, m_curdir.rfind('\\'));
@@ -340,9 +343,11 @@ void Fullscreen_Menu_MapSelect::fill_list()
 				m_table.add(m_maps_data.size() - 1);
 
 			te.set_string(0, "");
+			std::string parent_string =
+				(boost::format("\\<%s\\>") % _("parent")).str();
 			te.set_picture
-				(1,  g_gr->get_picture(PicMod_Game, "pics/ls_dir.png"),
-				_("<parent>"));
+				(1,  g_gr->images().get("pics/ls_dir.png"),
+				parent_string);
 
 			++ndirs;
 		}
@@ -372,7 +377,7 @@ void Fullscreen_Menu_MapSelect::fill_list()
 
 			te.set_string(0, "");
 			te.set_picture
-				(1,  g_gr->get_picture(PicMod_Game, "pics/ls_dir.png"),
+				(1,  g_gr->images().get("pics/ls_dir.png"),
 				FileSystem::FS_Filename(name));
 
 			++ndirs;
@@ -389,7 +394,7 @@ void Fullscreen_Menu_MapSelect::fill_list()
 			{
 				char const * const name = pname->c_str();
 
-				Widelands::Map_Loader * const ml = map.get_correct_loader(name);
+				std::unique_ptr<Widelands::Map_Loader> ml = map.get_correct_loader(name);
 				if (!ml)
 					continue;
 
@@ -428,11 +433,9 @@ void Fullscreen_Menu_MapSelect::fill_list()
 					te.set_string(0, buf);
 					i18n::Textdomain td("maps");
 					te.set_picture
-						(1,  g_gr->get_picture
-						(PicMod_Game,
-						dynamic_cast<WL_Map_Loader const *>(ml) ?
-						(mapdata.scenario ? "pics/ls_wlscenario.png" : "pics/ls_wlmap.png")
-						:
+						(1,  g_gr->images().get
+						 (dynamic_cast<WL_Map_Loader*>(ml.get()) ?
+							  (mapdata.scenario ? "pics/ls_wlscenario.png" : "pics/ls_wlmap.png") :
 						"pics/ls_s2map.png"),
 						_(mapdata.name));
 				} catch (const std::exception & e) {
@@ -442,8 +445,6 @@ void Fullscreen_Menu_MapSelect::fill_list()
 				} catch (...) {
 					log("Mapselect: Skip %s due to unknown exception\n", name);
 				}
-
-				delete ml;
 			}
 		}
 	} else {
@@ -455,7 +456,7 @@ void Fullscreen_Menu_MapSelect::fill_list()
 
 			const DedicatedMapInfos & dmap = m_settings->settings().maps.at(i);
 			char const * const name = dmap.path.c_str();
-			Widelands::Map_Loader * const ml = map.get_correct_loader(name);
+			std::unique_ptr<Widelands::Map_Loader> ml(map.get_correct_loader(name));
 			try {
 				if (!ml)
 					throw wexception("Not useable!");
@@ -463,7 +464,6 @@ void Fullscreen_Menu_MapSelect::fill_list()
 				map.set_filename(name);
 				ml->preload_map(true);
 
-				MapData mapdata;
 				mapdata.filename    = name;
 				mapdata.name        = map.get_name();
 				mapdata.author      = map.get_author();
@@ -489,8 +489,7 @@ void Fullscreen_Menu_MapSelect::fill_list()
 				sprintf(buf, "(%i)", mapdata.nrplayers);
 				te.set_string(0, buf);
 				te.set_picture
-					(1, g_gr->get_picture
-						(PicMod_Game, (mapdata.scenario ? "pics/ls_wlscenario.png" : "pics/ls_wlmap.png")),
+					(1, g_gr->images().get((mapdata.scenario ? "pics/ls_wlscenario.png" : "pics/ls_wlmap.png")),
 					 mapdata.name.c_str());
 
 			} catch (...) {
@@ -500,8 +499,8 @@ void Fullscreen_Menu_MapSelect::fill_list()
 				mapdata.filename    = name;
 				mapdata.name        = dmap.path.substr(5, dmap.path.size() - 1);
 				mapdata.author      = _("unknown");
-				mapdata.description =
-					_("This map file is not present on your filesystem. Data shown here was sent by the server.");
+				mapdata.description = _("This map file is not present in your filesystem."
+							" The data shown here was sent by the server.");
 				mapdata.hint        = "";
 				mapdata.world       = _("unknown");
 				mapdata.nrplayers   = dmap.players;
@@ -517,12 +516,9 @@ void Fullscreen_Menu_MapSelect::fill_list()
 				sprintf(buf, "(%i)", mapdata.nrplayers);
 				te.set_string(0, buf);
 				te.set_picture
-					(1, g_gr->get_picture
-						(PicMod_Game, (mapdata.scenario ? "pics/ls_wlscenario.png" : "pics/ls_wlmap.png")),
-					 mapdata.name.c_str());
+					(1, g_gr->images().get
+					 ((mapdata.scenario ? "pics/ls_wlscenario.png" : "pics/ls_wlmap.png")), mapdata.name.c_str());
 			}
-
-			delete ml;
 		}
 	}
 
@@ -546,7 +542,7 @@ UI::Checkbox * Fullscreen_Menu_MapSelect::_add_tag_checkbox
 		(boost::bind(&Fullscreen_Menu_MapSelect::_tagbox_changed, this, id, _1));
 
 	box->add(cb, UI::Box::AlignLeft, true);
-	UI::Textarea * ta = new UI::Textarea(box, displ_name, UI::Align_CenterLeft, 100);
+	UI::Textarea * ta = new UI::Textarea(box, displ_name, UI::Align_CenterLeft);
 	box->add(ta, UI::Box::AlignLeft);
 	box->add_space(25);
 
@@ -577,4 +573,3 @@ void Fullscreen_Menu_MapSelect::_tagbox_changed(int32_t id, bool to) {
 
 	fill_list();
 }
-

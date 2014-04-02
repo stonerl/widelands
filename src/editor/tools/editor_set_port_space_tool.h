@@ -20,48 +20,46 @@
 #ifndef EDITOR_SET_PORT_SPACE_TOOL_H
 #define EDITOR_SET_PORT_SPACE_TOOL_H
 
-#include "editor_tool.h"
-
+#include "editor/tools/editor_tool.h"
 #include "logic/widelands.h"
 
 #define FSEL_ESPS_FILENAME "pics/fsel_editor_set_port_space.png"
 #define FSEL_EUPS_FILENAME "pics/fsel_editor_unset_port_space.png"
 
 /// Unsets a buildspace for ports.
-struct Editor_Unset_Port_Space_Tool : public Editor_Tool {
+class Editor_Unset_Port_Space_Tool : public Editor_Tool {
+public:
 	Editor_Unset_Port_Space_Tool();
 
 	int32_t handle_click_impl
 		(Widelands::Map & map, Widelands::Node_and_Triangle<> center,
-		 Editor_Interactive & parent, Editor_Action_Args & args);
+		 Editor_Interactive & parent, Editor_Action_Args & args) override;
 
 	int32_t handle_undo_impl
 		(Widelands::Map & map, Widelands::Node_and_Triangle<> center,
-		 Editor_Interactive & parent, Editor_Action_Args & args);
+		 Editor_Interactive & parent, Editor_Action_Args & args) override;
 
-	char const * get_sel_impl() const {return FSEL_EUPS_FILENAME;}
+	char const * get_sel_impl() const override {return FSEL_EUPS_FILENAME;}
 };
 
 
 /// Sets a buildspace for ports.
-struct Editor_Set_Port_Space_Tool : public Editor_Tool {
+class Editor_Set_Port_Space_Tool : public Editor_Tool {
+public:
 	Editor_Set_Port_Space_Tool(Editor_Unset_Port_Space_Tool &);
 
 	int32_t handle_click_impl
 		(Widelands::Map & map, Widelands::Node_and_Triangle<> center,
-		 Editor_Interactive & parent, Editor_Action_Args & args);
+		 Editor_Interactive & parent, Editor_Action_Args & args) override;
 
 	int32_t handle_undo_impl
 		(Widelands::Map & map, Widelands::Node_and_Triangle<> center,
-		 Editor_Interactive & parent, Editor_Action_Args & args);
+		 Editor_Interactive & parent, Editor_Action_Args & args) override;
 
-	char const * get_sel_impl() const {return FSEL_ESPS_FILENAME;}
-
-private:
-	Editor_Unset_Port_Space_Tool & m_unset_tool;
+	char const * get_sel_impl() const override {return FSEL_ESPS_FILENAME;}
 };
 
 int32_t Editor_Tool_Set_Port_Space_Callback
-	(Widelands::TCoords<Widelands::FCoords>, void *, int32_t);
+	(const Widelands::TCoords<Widelands::FCoords>& c, Widelands::Map& map);
 
 #endif

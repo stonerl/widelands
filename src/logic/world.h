@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2002, 2006-2011 by the Widelands Development Team
+ * Copyright (C) 2002, 2006-2013 by the Widelands Development Team
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -20,18 +20,17 @@
 #ifndef WORLD_H
 #define WORLD_H
 
-#include "bob.h"
-#include "descr_maintainer.h"
-#include "immovable.h"
-#include "worlddata.h"
-
-#include "widelands.h"
+#include "logic/bob.h"
+#include "description_maintainer.h"
+#include "logic/immovable.h"
+#include "logic/widelands.h"
+#include "logic/worlddata.h"
 
 struct Section;
 
 namespace Widelands {
 
-struct Editor_Game_Base;
+class Editor_Game_Base;
 
 #define WORLD_NAME_LEN 128
 #define WORLD_AUTHOR_LEN 128
@@ -45,18 +44,18 @@ struct World_Descr_Header {
 
 struct Resource_Descr : boost::noncopyable {
 	typedef Resource_Index Index;
-	Resource_Descr() {}
+	Resource_Descr() : m_is_detectable(true), m_max_amount(0) {}
 	~Resource_Descr() {}
 
-	void parse(Section &, std::string const &);
+	void parse(Section &, const std::string &);
 
-	const std::string & name     () const throw () {return m_name;}
-	std::string const & descname() const throw () {return m_descname;}
+	const std::string & name     () const {return m_name;}
+	const std::string & descname() const {return m_descname;}
 
-	bool is_detectable() const throw () {return m_is_detectable;}
-	int32_t get_max_amount() const throw () {return m_max_amount;}
+	bool is_detectable() const {return m_is_detectable;}
+	int32_t get_max_amount() const {return m_max_amount;}
 
-	std::string const & get_editor_pic(uint32_t amount) const;
+	const std::string & get_editor_pic(uint32_t amount) const;
 
 private:
 	struct Indicator {
@@ -80,16 +79,16 @@ struct Terrain_Descr : boost::noncopyable {
 
 	typedef Terrain_Index Index;
 	Terrain_Descr
-		(char const * directory, Section *, Descr_Maintainer<Resource_Descr> *);
+		(char const * directory, Section *, DescriptionMaintainer<Resource_Descr> *);
 	~Terrain_Descr();
 
 	void load_graphics();
 
-	uint32_t         get_texture() const throw () {return m_texture;}
-	uint8_t        get_is     () const throw () {return m_is;}
-	const std::string & name() const throw () {return m_name;}
-	const std::string & descname() const throw () {return m_descname;}
-	int32_t resource_value(const Resource_Index resource) const throw () {
+	uint32_t         get_texture() const {return m_texture;}
+	uint8_t        get_is     () const {return m_is;}
+	const std::string & name() const {return m_name;}
+	const std::string & descname() const {return m_descname;}
+	int32_t resource_value(const Resource_Index resource) const {
 		return
 			resource == get_default_resources() or is_resource_valid(resource) ?
 			(get_is() & TERRAIN_UNPASSABLE ? 8 : 1) : -1;
@@ -103,30 +102,32 @@ struct Terrain_Descr : boost::noncopyable {
 		return m_valid_resources[index];
 	}
 
-	bool is_resource_valid(const int32_t res) const throw () {
+	bool is_resource_valid(const int32_t res) const {
 		for (int32_t i = 0; i < m_nr_valid_resources; ++i)
 			if (m_valid_resources[i] == res)
 				return true;
 		return false;
 	}
 	int8_t get_default_resources() const {return m_default_resources;}
-	int32_t get_default_resources_amount() const throw () {
+	int32_t get_default_resources_amount() const {
 		return m_default_amount;
 	}
+	int32_t dither_layer() const {return m_dither_layer;}
 
 private:
 	const std::string m_name;
 	const std::string m_descname;
-	char  * m_picnametempl;
+	std::string m_picnametempl;
 	uint32_t    m_frametime;
 	uint8_t   m_is;
+
+	int32_t m_dither_layer;
 
 	uint8_t         * m_valid_resources;
 	uint8_t           m_nr_valid_resources;
 	int8_t            m_default_resources;
 	int32_t           m_default_amount;
 	uint32_t          m_texture; //  renderer's texture
-
 };
 
 struct MapGenInfo;
@@ -189,10 +190,10 @@ struct MapGenBobKind {
 	size_t getNumImmovableBobs() const {return m_ImmovableBobs.size();}
 	size_t getNumMoveableBobs() const {return m_MoveableBobs.size();}
 
-	std::string const & getImmovableBob(size_t index) const {
+	const std::string & getImmovableBob(size_t index) const {
 		return m_ImmovableBobs[index];
 	};
-	std::string const & getMoveableBob(size_t index) const {
+	const std::string & getMoveableBob(size_t index) const {
 		return m_MoveableBobs[index];
 	};
 
@@ -252,7 +253,7 @@ struct MapGenInfo {
 	uint32_t getSumLandWeight() const;
 
 	size_t getNumBobAreas() const;
-	MapGenBobArea const & getBobArea(size_t index) const;
+	const MapGenBobArea & getBobArea(size_t index) const;
 	uint32_t getSumBobAreaWeight() const;
 
 private:
@@ -291,23 +292,23 @@ private:
   * it can read a world file.
   */
 struct World : boost::noncopyable {
-	friend struct Game;
+	friend class Game;
 
 	enum {
 		OK = 0,
 		ERR_WRONGVERSION
 	};
 
-	World(std::string const & name);
+	World(const std::string & name);
 
 	static bool exists_world(std::string); ///  check if a world really exists
 	static void get_all_worlds(std::vector<std::string> &);
 
 	void load_graphics();
 
-	const char * get_name  () const throw () {return hd.name;}
-	const char * get_author() const throw () {return hd.author;}
-	const char * get_descr () const throw () {return hd.descr;}
+	const char * get_name  () const {return hd.name;}
+	const char * get_author() const {return hd.author;}
+	const char * get_descr () const {return hd.descr;}
 
 	Terrain_Index index_of_terrain(char const * const name) const {
 		return ters.get_index(name);
@@ -315,20 +316,20 @@ struct World : boost::noncopyable {
 	Terrain_Descr & terrain_descr(Terrain_Index const i) const {
 		return *ters.get(i);
 	}
-	Terrain_Descr const & get_ter(Terrain_Index const i) const {
+	const Terrain_Descr & get_ter(Terrain_Index const i) const {
 		assert(i < ters.get_nitems());
 		return *ters.get(i);
 	}
 	Terrain_Descr const * get_ter(char const * const name) const {
 		int32_t const i = ters.get_index(name);
-		return i != -1 ? ters.get(i) : 0;
+		return i != -1 ? ters.get(i) : nullptr;
 	}
 	int32_t get_nr_terrains() const {return ters.get_nitems();}
 	int32_t get_bob(char const * const l) const {return bobs.get_index(l);}
-	Bob::Descr const * get_bob_descr(uint16_t const index) const {
+	BobDescr const * get_bob_descr(uint16_t const index) const {
 		return bobs.get(index);
 	}
-	Bob::Descr const * get_bob_descr(const std::string & name) const {
+	BobDescr const * get_bob_descr(const std::string & name) const {
 		return bobs.exists(name.c_str());
 	}
 	int32_t get_nr_bobs() const {return bobs.get_nitems();}
@@ -349,7 +350,7 @@ struct World : boost::noncopyable {
 	}
 	int32_t get_nr_resources() const {return m_resources.get_nitems();}
 	int32_t safe_resource_index(const char * const warename) const;
-	std::string const & basedir() const {return m_basedir;}
+	const std::string & basedir() const {return m_basedir;}
 
 	MapGenInfo & getMapGenInfo();
 
@@ -357,15 +358,15 @@ private:
 	std::string m_basedir; //  base directory, where the main conf file resides
 	World_Descr_Header                hd;
 
-	Descr_Maintainer<Bob::Descr>      bobs;
-	Descr_Maintainer<Immovable_Descr> immovables;
-	Descr_Maintainer<Terrain_Descr>   ters;
-	Descr_Maintainer<Resource_Descr>  m_resources;
+	DescriptionMaintainer<BobDescr>      bobs;
+	DescriptionMaintainer<Immovable_Descr> immovables;
+	DescriptionMaintainer<Terrain_Descr>   ters;
+	DescriptionMaintainer<Resource_Descr>  m_resources;
 
 	//  TODO: Should this be a description-maintainer?
 	MapGenInfo m_mapGenInfo;
 
-	void parse_root_conf(std::string const & name, Profile & root_conf);
+	void parse_root_conf(const std::string & name, Profile & root_conf);
 	void parse_resources();
 	void parse_terrains ();
 	void parse_bobs     (std::string & directory, Profile & root_conf);

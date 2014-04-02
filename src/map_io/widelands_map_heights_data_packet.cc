@@ -17,14 +17,14 @@
  *
  */
 
-#include "widelands_map_heights_data_packet.h"
+#include "map_io/widelands_map_heights_data_packet.h"
 
 #include "io/filewrite.h"
 #include "logic/editor_game_base.h"
 #include "logic/game_data_error.h"
 #include "logic/map.h"
-#include "logic/world.h"
 #include "logic/widelands_fileread.h"
+#include "logic/world.h"
 
 namespace Widelands {
 
@@ -33,7 +33,6 @@ namespace Widelands {
 
 void Map_Heights_Data_Packet::Read
 	(FileSystem & fs, Editor_Game_Base & egbase, bool, Map_Map_Object_Loader &)
-throw (_wexception)
 {
 
 	FileRead fr;
@@ -48,9 +47,9 @@ throw (_wexception)
 				map[i].set_height(fr.Unsigned8());
 		} else
 			throw game_data_error
-				(_("unknown/unhandled version %u"), packet_version);
-	} catch (_wexception const & e) {
-		throw game_data_error(_("heights: %s"), e.what());
+				("unknown/unhandled version %u", packet_version);
+	} catch (const _wexception & e) {
+		throw game_data_error("heights: %s", e.what());
 	}
 }
 
@@ -60,7 +59,7 @@ throw (_wexception)
  */
 void Map_Heights_Data_Packet::Write
 	(FileSystem & fs, Editor_Game_Base & egbase, Map_Map_Object_Saver &)
-	throw (_wexception)
+
 {
 	FileWrite fw;
 

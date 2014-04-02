@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2002, 2006-2010 by the Widelands Development Team
+ * Copyright (C) 2002, 2006-2013 by the Widelands Development Team
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -17,17 +17,7 @@
  *
  */
 
-#include "profile.h"
-
-#include "build_info.h"
-#include "io/fileread.h"
-#include "io/filewrite.h"
-#include "i18n.h"
-#include "logic/player.h"
-#include "logic/tribe.h"
-#include "wexception.h"
-
-#include "log.h"
+#include "profile/profile.h"
 
 #include <cctype>
 #include <cstdarg>
@@ -35,6 +25,15 @@
 #include <cstring>
 #include <limits>
 #include <string>
+
+#include "build_info.h"
+#include "i18n.h"
+#include "io/fileread.h"
+#include "io/filewrite.h"
+#include "log.h"
+#include "logic/player.h"
+#include "logic/tribe.h"
+#include "wexception.h"
 
 #define TRUE_WORDS 4
 char const * trueWords[TRUE_WORDS] =
@@ -60,7 +59,7 @@ Section::Value::Value(const char * const nname, const char * const nval) :
 	m_used(false), m_name(strdup(nname)), m_value(strdup(nval))
 {}
 
-Section::Value::Value(Section::Value const & o) :
+Section::Value::Value(const Section::Value & o) :
 m_used(o.m_used), m_name(strdup(o.m_name)), m_value(strdup(o.m_value)) {}
 
 Section::Value::~Value()
@@ -69,7 +68,7 @@ Section::Value::~Value()
 	free(m_value);
 }
 
-Section::Value & Section::Value::operator= (Section::Value const & o)
+Section::Value & Section::Value::operator= (const Section::Value & o)
 {
 	if (this != &o) {
 		free(m_name);
@@ -188,30 +187,29 @@ Section
 */
 
 char const * Section::get_name() const {
-	return m_section_name;
+	return m_section_name.c_str();
+}
+void Section::set_name(const std::string& name) {
+	m_section_name = name;
 }
 
 Section::Section(Profile * const prof, const char * const name) :
-m_profile(prof), m_used(false), m_section_name(strdup(name)) {}
+m_profile(prof), m_used(false), m_section_name(name) {}
 
 Section::Section(const Section & o) :
 	m_profile     (o.m_profile),
 	m_used        (o.m_used),
-	m_section_name(strdup(o.m_section_name)),
+	m_section_name(o.m_section_name),
 	m_values      (o.m_values)
 {
 	assert(this != &o);
 }
 
-Section::~Section() {free(m_section_name);}
-
-Section & Section::operator= (Section const & o) {
+Section & Section::operator= (const Section & o) {
 	if (this != &o) {
-		free(m_section_name);
-
 		m_profile      = o.m_profile;
 		m_used         = o.m_used;
-		m_section_name = strdup(o.m_section_name);
+		m_section_name = o.m_section_name;
 		m_values       = o.m_values;
 	}
 
@@ -271,8 +269,7 @@ Section::Value * Section::get_val(char const * const name)
 			i.current->mark_used();
 			return &*i.current;
 		}
-
-	return 0;
+	return nullptr;
 }
 
 /**
@@ -291,7 +288,7 @@ Section::Value * Section::get_next_val(char const * const name)
 				return &*i.current;
 			}
 
-	return 0;
+	return nullptr;
 }
 
 Section::Value & Section::create_val
@@ -370,6 +367,15 @@ char const * Section::get_safe_string(char const * const name)
 	return v->get_string();
 }
 
+/**
+ * Return the key value as a plain string or throw an exception if the key
+ * does not exist.
+ */
+const char * Section::get_safe_string(const std::string & name)
+{
+	return get_safe_string(name.c_str());
+}
+
 /** Section::get_safe_Coords(const char * const name)
  *
  * Return the key value as a Coords or throw an exception if the key
@@ -385,13 +391,13 @@ Widelands::Coords Section::get_safe_Coords
 }
 
 
-Widelands::Immovable_Descr const & Section::get_safe_Immovable_Type
+const Widelands::Immovable_Descr & Section::get_safe_Immovable_Type
 	(char const * tribe, char const * name,
 	 Widelands::Editor_Game_Base & egbase)
 {
 	char const * const immname = get_safe_string(name);
-	if (char const * const tribename = get_string(tribe, 0)) {
-		Widelands::Tribe_Descr const & tridescr =
+	if (char const * const tribename = get_string(tribe, nullptr)) {
+		const Widelands::Tribe_Descr & tridescr =
 			egbase.manually_load_tribe(tribename);
 		if
 			(Widelands::Immovable_Descr const * const result =
@@ -402,7 +408,7 @@ Widelands::Immovable_Descr const & Section::get_safe_Immovable_Type
 				("tribe %s does not define immovable type \"%s\"",
 				 tribename,        immname);
 	} else {
-		Widelands::World       const & world    =
+		const Widelands::World       & world    =
 			egbase.map().world();
 		if
 			(Widelands::Immovable_Descr const * const result =
@@ -422,7 +428,7 @@ Widelands::Building_Index Section::get_safe_Building_Index
 	 Widelands::Editor_Game_Base &       egbase,
 	 Widelands::Player_Number      const player)
 {
-	Widelands::Tribe_Descr const & tribe = egbase.manually_load_tribe(player);
+	const Widelands::Tribe_Descr & tribe = egbase.manually_load_tribe(player);
 	char const * const b = get_safe_string(name);
 	if (Widelands::Building_Index const idx = tribe.building_index(b))
 		return idx;
@@ -433,12 +439,12 @@ Widelands::Building_Index Section::get_safe_Building_Index
 }
 
 
-Widelands::Building_Descr const & Section::get_safe_Building_Type
+const Widelands::Building_Descr & Section::get_safe_Building_Type
 	(char const * const name,
 	 Widelands::Editor_Game_Base &       egbase,
 	 Widelands::Player_Number      const player)
 {
-	Widelands::Tribe_Descr const & tribe = egbase.manually_load_tribe(player);
+	const Widelands::Tribe_Descr & tribe = egbase.manually_load_tribe(player);
 	char const * const b = get_safe_string(name);
 	if
 		(Widelands::Building_Descr const * const result =
@@ -468,10 +474,11 @@ int32_t Section::get_int(char const * const name, int32_t const def)
 
 	try {
 		return v->get_int();
-	} catch (std::exception const & e) {
+	} catch (const std::exception & e) {
 		m_profile->error("%s", e.what());
-		return def;
 	}
+
+	return def;
 }
 
 
@@ -480,7 +487,7 @@ uint32_t Section::get_natural(char const * const name, uint32_t const def)
 	if (Value * const v = get_val(name))
 		try {
 			return v->get_natural();
-		} catch (std::exception const & e) {
+		} catch (const std::exception & e) {
 			m_profile->error("%s", e.what());
 			return def;
 		}
@@ -492,16 +499,16 @@ uint32_t Section::get_natural(char const * const name, uint32_t const def)
 
 uint32_t Section::get_positive(char const * const name, uint32_t const def)
 {
-	if (Value * const v = get_val(name))
+	if (Value * const v = get_val(name)) {
 		try {
 			return v->get_positive();
-		} catch (std::exception const & e) {
+		} catch (const std::exception & e) {
 			m_profile->error("%s", e.what());
 			return def;
 		}
-	else
-		return def;
+	}
 
+	return def;
 }
 
 
@@ -522,10 +529,11 @@ bool Section::get_bool(char const * const name, bool const def)
 
 	try {
 		return v->get_bool();
-	} catch (std::exception const & e) {
+	} catch (const std::exception & e) {
 		m_profile->error("%s", e.what());
-		return def;
 	}
+
+	return def;
 }
 
 /**
@@ -592,7 +600,7 @@ char const * Section::get_next_bool
 {
 	Value * const v = get_next_val(name);
 	if (!v)
-		return 0;
+		return nullptr;
 
 	if (value)
 		*value = v->get_bool();
@@ -636,7 +644,7 @@ void Section::set_Coords
 
 void Section::set_Immovable_Type
 	(char const * const tribe, char const * const name,
-	 Widelands::Immovable_Descr const & descr)
+	 const Widelands::Immovable_Descr & descr)
 {
 	if (Widelands::Tribe_Descr const * const tridescr = descr.get_owner_tribe())
 		set_string(tribe, tridescr->name());
@@ -740,19 +748,19 @@ void Profile::check_used() const
 /**
  * Retrieve the first section of the given name and mark it used.
  *
- * Args: name  name of the section
+ * @param name name of the section
  *
- * Returns: pointer to the section (or 0 if the section doesn't exist)
+ * @return pointer to the section (or 0 if the section doesn't exist)
  */
-Section * Profile::get_section(char const * const name)
+Section * Profile::get_section(const std::string & name)
 {
 	container_iterate(Section_list, m_sections, i)
-		if (!strcasecmp(i.current->get_name(), name)) {
+		if (!strcasecmp(i.current->get_name(), name.c_str())) {
 			i.current->mark_used();
 			return &*i.current;
 		}
 
-	return 0;
+	return nullptr;
 }
 
 /**
@@ -796,7 +804,7 @@ Section * Profile::get_next_section(char const * const name)
 				return &*i.current;
 			}
 
-	return 0;
+	return nullptr;
 }
 
 
@@ -860,12 +868,12 @@ void Profile::read
 		FileRead fr;
 		fr.Open(fs, filename);
 
-		char    * p = 0;
-		Section * s = 0;
+		char    * p = nullptr;
+		Section * s = nullptr;
 
 		bool reading_multiline = 0;
 		std::string data;
-		char * key;
+		char * key = nullptr;
 		bool translate_line = false;
 		while (char * line = fr.ReadLine()) {
 			++linenr;
@@ -885,7 +893,7 @@ void Profile::read
 					throw wexception("missing ']' after \"%s\"", p);
 				s = &create_section_duplicate(p);
 			} else {
-				char * tail = 0;
+				char * tail = nullptr;
 				translate_line = false;
 				if (reading_multiline) {
 					// Note: comments are killed by walking backwards into the string
@@ -971,12 +979,12 @@ void Profile::read
 			}
 		}
 	}
-	catch (FileNotFound_error const & e) {
+	catch (const FileNotFound_error &) {
 		//It's no problem if the config file does not exist. (It'll get
 		//written on exit anyway)
 		log("There's no configuration file, using default values.\n");
 	}
-	catch (std::exception const & e) {
+	catch (const std::exception & e) {
 		error("%s:%u: %s", filename, linenr, e.what());
 	}
 
@@ -1043,6 +1051,7 @@ void Profile::write
 						break;
 					default:
 						tempstr += *it;
+						break;
 					}
 
 				if (multiline)

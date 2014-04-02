@@ -3,13 +3,15 @@ project (widelands)
 cmake_minimum_required (VERSION 2.6)
 
 # Used as versioning, if WL_VERSION_STANDARD is definded.
+# TODO(sirver): This is redundant and should not be used anywhere. We have a
+# script that determines the version.
 if (WL_VERSION_STANDARD)
 	# Set the values below for standard versioning.
 	# As long as WL_VERSION_MAJOR is 0, the naming will be in form of
 	# "Build${WL_VERSION_MINOR}" + ".${WL_VERSION_PATCH}" if WL_VERSION_PATCH is
 	# defined.
 	set (WL_VERSION_MAJOR 0)
-	set (WL_VERSION_MINOR 17)
+	set (WL_VERSION_MINOR 19)
 
 	# Just define in case that we release patches for official builds
 	#set (WL_VERSION_PATCH 90)
@@ -107,15 +109,17 @@ endif (CMAKE_BUILD_TYPE STREQUAL "Debug")
 # unit_test_framework is for testing only
 if (WL_UNIT_TESTS)
   message(STATUS "Enabled unit tests")
-if (DEFINED MSVC)
-  set (BUILD_SHARED_LIBS OFF)
-else (DEFINED MSVC)
-  set (Boost_USE_STATIC_LIBS  OFF)
-endif (DEFINED MSVC)
-  set (Boost_FIND_COMPONENTS unit_test_framework signals)
+  if (DEFINED MSVC)
+    set (BUILD_SHARED_LIBS OFF)
+	set (Boost_USE_STATIC_RUNTIME ON)
+	set (Boost_USE_STATIC_LIBS ON)
+  else (DEFINED MSVC)
+    set (Boost_USE_STATIC_LIBS  OFF)
+  endif (DEFINED MSVC)
+  set (Boost_FIND_COMPONENTS unit_test_framework)
   set (Boost_USE_MULTITHREADED ON)
   set (Boost_DETAILED_FAILURE_MSG ON)
-  find_package(Boost 1.35.0 COMPONENTS unit_test_framework signals REQUIRED)
+  find_package(Boost 1.48 COMPONENTS unit_test_framework REQUIRED)
 
   if (NOT DEFINED MSVC)
   # If boost unit test library is linked dynamically, BOOST_TEST_DYN_LINK must be defined
@@ -139,94 +143,137 @@ endif (DEFINED MSVC)
   )
 else (WL_UNIT_TESTS)
   message(STATUS "Disabled Unit Tests")
-  set (Boost_FIND_COMPONENTS signals)
-  set (Boost_USE_STATIC_LIBS   ON)
-  set (Boost_USE_MULTITHREADED ON)
-  set (Boost_DETAILED_FAILURE_MSG ON)
-  find_package(Boost 1.35.0 COMPONENTS signals REQUIRED)
+  find_package(Boost 1.48 REQUIRED)
 endif (WL_UNIT_TESTS)
 
 option (WL_STRICT "If strict compilation mode is requested (almost every warning is an error)" OFF)
 
 set (PARAMETER_COMPILERFLAG_OLDSTYLECAST_EXTENDED "-Wold-style-cast -isystem ${Boost_INCLUDE_DIR}")
 set (PARAMETER_COMPILERFLAG_OLDSTYLECAST "-Wold-style-cast")
-set (PARAMETER_COMPILERFLAG_GENERICWARNINGS "-Wno-attributes -Wall")
-set (PARAMETER_COMPILERFLAG_EXTRAWARNINGS "-Wextra -Wsign-promo")
+set (PARAMETER_COMPILERFLAG_GENERICWARNINGS "-Wall -Wextra")
+set (PARAMETER_COMPILERFLAG_EXTRAWARNINGS "-Wformat -Wformat-nonliteral -Wformat-security -Wformat-y2k -Winit-self -Winvalid-pch -Wmissing-include-dirs -Woverlength-strings -Wpacked -Wpointer-arith -Wredundant-decls -Wshadow -Wsign-promo -Wswitch-default -Wundef -Wunused -Wunused-macros")
+set (PARAMETER_COMPILERFLAG_GCCWARNINGS "-Wlogical-op -Wsync-nand -Wtrampolines")
 set (PARAMETER_COMPILERFLAG_STRICT "-Werror -Wno-error=old-style-cast -Wno-error=deprecated-declarations -fdiagnostics-show-option")
-IF (CMAKE_BUILD_TYPE STREQUAL "Debug")
-  include(CheckCXXCompilerFlag) #this include should be safe
-  CHECK_CXX_COMPILER_FLAG(${PARAMETER_COMPILERFLAG_OLDSTYLECAST_EXTENDED} Compiler_old-style-cast_supported)
-  IF (Compiler_old-style-cast_supported)
-    EXEC_PROGRAM(${CMAKE_CXX_COMPILER}
-      ARGS --version
-      OUTPUT_VARIABLE WLBUILD_COMPILERVERSION
-    )
-    STRING(REGEX REPLACE ".*([0-9])\\.([0-9])\\.([0-9]).*" "\\1.\\2.\\3" WLBUILD_COMPILERVERSION_REP ${WLBUILD_COMPILERVERSION})
-    IF (WLBUILD_COMPILERVERSION_REP STREQUAL "4.3.2" OR WLBUILD_COMPILERVERSION_REP STREQUAL "4.3.1")
-      message("===== ATTENTION ===================================================")
-      message("Your compiler has been identified as GCC 4.3.1 or GCC 4.3.2")
-      message(" ")
-      message("There is a bug regarding this version, see http://gcc.gnu.org/bugzilla/show_bug.cgi?id=38000")
-      message("and https://bugs.launchpad.net/widelands/+bug/549479 for details.")
-      message("Build will disable -isystem usage, expect lots of warnings from Boost header files.")
-      message("Widelands should still compile and link correctly.")
-      message("If the compiler identification is correct, please consider updating your gcc.")
-      message("This warning message will disappear at GCC 4.3.3 and higher.")
-      message("If you feel this is wrong, please submit a bug with widelands (not with GCC!)")
-      message("and add the following information how cmake sees your C++ compiler:")
-      message(" ")
-      message("--------------------------------")
-      message("${WLBUILD_COMPILERVERSION}")
-      message("--------------------------------")
-      message(" ")
-      message("Thank you for taking your time to read this.")
-      message("===================================================================")
-      set (WL_COMPILERFLAG_OLDSTYLECAST " ${PARAMETER_COMPILERFLAG_OLDSTYLECAST}") #the space is on purpose!
-    ELSE (WLBUILD_COMPILERVERSION_REP STREQUAL "4.3.2" OR WLBUILD_COMPILERVERSION_REP STREQUAL "4.3.1")
+include(CheckCXXCompilerFlag) #this include should be safe
+
+# Enable c++11 features.
+if (NOT WIN32)
+  set (PARAMETER_COMPILERFLAG_CXXSTD "-std=c++11")
+else()
+  set (PARAMETER_COMPILERFLAG_CXXSTD "-std=gnu++11")
+endif()
+
+if(CMAKE_COMPILER_IS_GNUCXX)
+  EXECUTE_PROCESS(COMMAND ${CMAKE_CXX_COMPILER} -dumpversion OUTPUT_VARIABLE GCC_VERSION)
+  if (GCC_VERSION VERSION_LESS 4.7)
+    if (GCC_VERSION VERSION_LESS 4.6)
+      if (NOT WIN32)
+        set (PARAMETER_COMPILERFLAG_CXXSTD "-std=c++0x -Dnullptr=NULL")
+      else()
+        set (PARAMETER_COMPILERFLAG_CXXSTD "-std=gnu++0x -Dnullptr=NULL")
+      endif()
+    else()
+      if (NOT WIN32)
+        set (PARAMETER_COMPILERFLAG_CXXSTD "-std=c++0x")
+      else()
+        set (PARAMETER_COMPILERFLAG_CXXSTD "-std=gnu++0x")
+      endif()
+    endif()
+  endif()
+endif()
+
+CHECK_CXX_COMPILER_FLAG(${PARAMETER_COMPILERFLAG_CXXSTD} Compiler_std_supported)
+IF (Compiler_std_supported)
+  set (WL_COMPILERFLAG_CXXSTD " ${PARAMETER_COMPILERFLAG_CXXSTD}") #the space is on purpose!
+ENDIF (Compiler_std_supported)
+
+
+CHECK_CXX_COMPILER_FLAG(${PARAMETER_COMPILERFLAG_OLDSTYLECAST_EXTENDED} Compiler_old-style-cast_supported)
+IF (Compiler_old-style-cast_supported)
+  EXEC_PROGRAM(${CMAKE_CXX_COMPILER}
+    ARGS --version
+    OUTPUT_VARIABLE WLBUILD_COMPILERVERSION
+  )
+  STRING(REGEX REPLACE ".*([0-9])\\.([0-9])\\.([0-9]).*" "\\1.\\2.\\3" WLBUILD_COMPILERVERSION_REP ${WLBUILD_COMPILERVERSION})
+  IF (WLBUILD_COMPILERVERSION_REP STREQUAL "4.3.2" OR WLBUILD_COMPILERVERSION_REP STREQUAL "4.3.1")
+    message("===== ATTENTION ===================================================")
+    message("Your compiler has been identified as GCC 4.3.1 or GCC 4.3.2")
+    message(" ")
+    message("There is a bug regarding this version, see http://gcc.gnu.org/bugzilla/show_bug.cgi?id=38000")
+    message("and https://bugs.launchpad.net/widelands/+bug/549479 for details.")
+    message("Build will disable -isystem usage, expect lots of warnings from Boost header files.")
+    message("Widelands should still compile and link correctly.")
+    message("If the compiler identification is correct, please consider updating your gcc.")
+    message("This warning message will disappear at GCC 4.3.3 and higher.")
+    message("If you feel this is wrong, please submit a bug with widelands (not with GCC!)")
+    message("and add the following information how cmake sees your C++ compiler:")
+    message(" ")
+    message("--------------------------------")
+    message("${WLBUILD_COMPILERVERSION}")
+    message("--------------------------------")
+    message(" ")
+    message("Thank you for taking your time to read this.")
+    message("===================================================================")
+    set (WL_COMPILERFLAG_OLDSTYLECAST " ${PARAMETER_COMPILERFLAG_OLDSTYLECAST}") #the space is on purpose!
+  ELSE (WLBUILD_COMPILERVERSION_REP STREQUAL "4.3.2" OR WLBUILD_COMPILERVERSION_REP STREQUAL "4.3.1")
+    IF (CMAKE_BUILD_TYPE STREQUAL "Debug")
       set (WL_COMPILERFLAG_OLDSTYLECAST " ${PARAMETER_COMPILERFLAG_OLDSTYLECAST_EXTENDED}") #the space is on purpose!
-    ENDIF (WLBUILD_COMPILERVERSION_REP STREQUAL "4.3.2" OR WLBUILD_COMPILERVERSION_REP STREQUAL "4.3.1")
-  ENDIF (Compiler_old-style-cast_supported)
+    ELSE (CMAKE_BUILD_TYPE STREQUAL "Debug")
+      include_directories(SYSTEM ${Boost_INCLUDE_DIR})
+    ENDIF (CMAKE_BUILD_TYPE STREQUAL "Debug")
+  ENDIF (WLBUILD_COMPILERVERSION_REP STREQUAL "4.3.2" OR WLBUILD_COMPILERVERSION_REP STREQUAL "4.3.1")
+ENDIF (Compiler_old-style-cast_supported)
 
-  CHECK_CXX_COMPILER_FLAG(${PARAMETER_COMPILERFLAG_GENERICWARNINGS} Compiler_generic_warnings_supported)
-  IF (Compiler_generic_warnings_supported)
-    set (WL_COMPILERFLAG_GENERICWARNINGS " ${PARAMETER_COMPILERFLAG_GENERICWARNINGS}") #the space is on purpose!
-  ENDIF (Compiler_generic_warnings_supported)
-  IF (WL_EXTRAWARNINGS)
-    CHECK_CXX_COMPILER_FLAG(${PARAMETER_COMPILERFLAG_EXTRAWARNINGS} Compiler_extra_warnings_supported)
-    IF (Compiler_extra_warnings_supported)
-      set (WL_COMPILERFLAG_EXTRAWARNINGS " ${PARAMETER_COMPILERFLAG_EXTRAWARNINGS}") #the space is on purpose!
-    ENDIF (Compiler_extra_warnings_supported)
-  ENDIF (WL_EXTRAWARNINGS)
+CHECK_CXX_COMPILER_FLAG(${PARAMETER_COMPILERFLAG_GENERICWARNINGS} Compiler_generic_warnings_supported)
+IF (Compiler_generic_warnings_supported)
+  set (WL_COMPILERFLAG_GENERICWARNINGS " ${PARAMETER_COMPILERFLAG_GENERICWARNINGS}") #the space is on purpose!
+ENDIF (Compiler_generic_warnings_supported)
 
-  IF (WL_STRICT)
-    CHECK_CXX_COMPILER_FLAG(${PARAMETER_COMPILERFLAG_STRICT} Compiler_strict_mode_supported)
-    IF (Compiler_strict_mode_supported)
-      set (WL_COMPILERFLAG_STRICT " ${PARAMETER_COMPILERFLAG_STRICT}") #the space is on purpose!
-      message(STATUS "Strict mode enabled, expect compilation errors instead of compilation warnings!")
-    ENDIF (Compiler_strict_mode_supported)
-  ENDIF (WL_STRICT)
-ENDIF (CMAKE_BUILD_TYPE STREQUAL "Debug")
+CHECK_CXX_COMPILER_FLAG(${PARAMETER_COMPILERFLAG_EXTRAWARNINGS} Compiler_extra_warnings_supported)
+IF (Compiler_extra_warnings_supported)
+  set (WL_COMPILERFLAG_EXTRAWARNINGS " ${PARAMETER_COMPILERFLAG_EXTRAWARNINGS}") #the space is on purpose!
+ELSE (Compiler_extra_warnings_supported)
+  message("Warning: couldn't set the following compiler options: ${PARAMETER_COMPILERFLAG_EXTRAWARNINGS}. Most likely these options are available in a newer release of your compiler.")
+ENDIF (Compiler_extra_warnings_supported)
+
+CHECK_CXX_COMPILER_FLAG(${PARAMETER_COMPILERFLAG_GCCWARNINGS} Compiler_gcc_warnings_supported)
+IF (Compiler_gcc_warnings_supported)
+  set (WL_COMPILERFLAG_GCCWARNINGS " ${PARAMETER_COMPILERFLAG_GCCWARNINGS}") #the space is on purpose!
+ELSE (Compiler_gcc_warnings_supported)
+  message("Warning: could not add additional GCC-specific warning options: ${PARAMETER_COMPILERFLAG_GCCWARNINGS}. Most likely you are using a different compiler, like Clang/LLVM or Visual Studio.")
+ENDIF (Compiler_gcc_warnings_supported)
+
+CHECK_CXX_COMPILER_FLAG(${PARAMETER_COMPILERFLAG_GCCWARNINGS} Compiler_gcc_warnings_supported)
+
+IF (WL_STRICT)
+  CHECK_CXX_COMPILER_FLAG(${PARAMETER_COMPILERFLAG_STRICT} Compiler_strict_mode_supported)
+  IF (Compiler_strict_mode_supported)
+    set (WL_COMPILERFLAG_STRICT " ${PARAMETER_COMPILERFLAG_STRICT}") #the space is on purpose!
+    message(STATUS "Strict mode enabled, expect compilation errors instead of compilation warnings!")
+  ENDIF (Compiler_strict_mode_supported)
+ENDIF (WL_STRICT)
 
 # CMAKE only defines "-g", but we need -DDEBUG also, and we need -DNOPARACHUTE (for SDL) in Debug
-set (CMAKE_CXX_FLAGS_DEBUG "-g -DDEBUG -DNOPARACHUTE${WL_COMPILERFLAG_OLDSTYLECAST}${WL_COMPILERFLAG_GENERICWARNINGS}${WL_COMPILERFLAG_EXTRAWARNINGS}${WL_COMPILERFLAG_STRICT}" CACHE STRING "Set by widelands CMakeLists.txt" FORCE)
+set (CMAKE_CXX_FLAGS_DEBUG "${WL_COMPILERFLAG_CXXSTD} -g -DDEBUG -DNOPARACHUTE${WL_COMPILERFLAG_OLDSTYLECAST}${WL_COMPILERFLAG_GENERICWARNINGS}${WL_COMPILERFLAG_EXTRAWARNINGS}${WL_COMPILERFLAG_GCCWARNINGS}${WL_COMPILERFLAG_STRICT}" CACHE STRING "Set by widelands CMakeLists.txt" FORCE)
+
+set (WL_COMPILERFLAG_OPTIMIZATIONS "-O3")
 
 #This can be removed if no one uses gcc 4.5.1 or 4.5.2 any more
-IF (${CMAKE_COMPILER_IS_GNUCXX})
-EXEC_PROGRAM (
+IF (CMAKE_COMPILER_IS_GNUCXX)
+  EXEC_PROGRAM (
     ${CMAKE_CXX_COMPILER}
     ARGS --version
     OUTPUT_VARIABLE WLBUILD_COMPILERVERSION
-    )
-    STRING(REGEX REPLACE ".*(4)\\.(5)\\.([0-9]).*" "\\1.\\2.\\3" WLBUILD_COMPILERVERSION_REP ${WLBUILD_COMPILERVERSION})
-    IF (WLBUILD_COMPILERVERSION_REP STREQUAL "4.5.1" OR WLBUILD_COMPILERVERSION_REP STREQUAL "4.5.2")
-        message("Detected gcc ${WLBUILD_COMPILERVERSION_REP}")
-        message("Suffering from gcc bug, disabling -O3")
-        set (CMAKE_CXX_FLAGS_RELEASE "-O2 -DNDEBUG" CACHE STRING "Set by widelands CMakeLists.txt" FORCE)
-    ELSE (WLBUILD_COMPILERVERSION_REP STREQUAL "4.5.1" OR WLBUILD_COMPILERVERSION_REP STREQUAL "4.5.2")
-        #This line is the default and should be preserved.
-        set (CMAKE_CXX_FLAGS_RELEASE "-O3 -DNDEBUG" CACHE STRING "Set by widelands CMakeLists.txt" FORCE)
-    ENDIF (WLBUILD_COMPILERVERSION_REP STREQUAL "4.5.1" OR WLBUILD_COMPILERVERSION_REP STREQUAL "4.5.2")
-ENDIF (${CMAKE_COMPILER_IS_GNUCXX})
+  )
+  STRING(REGEX REPLACE ".*(4)\\.(5)\\.([0-9]).*" "\\1.\\2.\\3" WLBUILD_COMPILERVERSION_REP ${WLBUILD_COMPILERVERSION})
+  IF (WLBUILD_COMPILERVERSION_REP STREQUAL "4.5.1" OR WLBUILD_COMPILERVERSION_REP STREQUAL "4.5.2")
+    message("Detected gcc ${WLBUILD_COMPILERVERSION_REP}")
+    message("Suffering from gcc bug, disabling -O3")
+    set (WL_COMPILERFLAG_OPTIMIZATIONS "-O2")
+  ENDIF (WLBUILD_COMPILERVERSION_REP STREQUAL "4.5.1" OR WLBUILD_COMPILERVERSION_REP STREQUAL "4.5.2")
+ENDIF (CMAKE_COMPILER_IS_GNUCXX)
+
+set (CMAKE_CXX_FLAGS_RELEASE "${WL_COMPILERFLAG_CXXSTD} ${WL_COMPILERFLAG_OPTIMIZATIONS} -DNDEBUG${WL_COMPILERFLAG_OLDSTYLECAST}${WL_COMPILERFLAG_GENERICWARNINGS}${WL_COMPILERFLAG_EXTRAWARNINGS}${WL_COMPILERFLAG_GCCWARNINGS}${WL_COMPILERFLAG_STRICT}" CACHE STRING "Set by widelands CMakeLists.txt" FORCE)
 
 #If building with MSVC, then check for 3rdparty libs
 if (DEFINED MSVC)
@@ -254,17 +301,19 @@ if (DEFINED MSVC)
 
   find_library(INTL_LIBRARY NAMES intl libintl)
 
-  set (MSVC_DISABLE_WARNINGS "/wd4290 /wd4800 /wo4373 /wd4355")
+  set (MSVC_DISABLE_WARNINGS "/wd4146 /wd4290 /wd4355 /wd4373 /wd4800")
   # CMAKE only defines "-g", but we need -DDEBUG also, and we need -DNOPARACHUTE (for SDL) in Debug
   set (CMAKE_CXX_FLAGS_DEBUG " -DDEBUG -DNOPARACHUTE /MTd /Zi /D_DEBUG ${MSVC_DISABLE_WARNINGS}" CACHE STRING "Set by widelands CMakeLists.txt" FORCE)
 
   set (CMAKE_CXX_FLAGS_RELEASE "-O3 -DNDEBUG /MT /GL ${MSVC_DISABLE_WARNINGS}" CACHE STRING "Set by widelands CMakeLists.txt" FORCE)
 
   set (CMAKE_EXE_LINKER_FLAGS_DEBUG "/debug /LTCG /NODEFAULTLIB:libcmt.lib" CACHE STRING "Set by widelands CMakeLists.txt" FORCE)
-
-else (DEFINED MSVC)
-  set (HAVE_VARARRAY TRUE CACHE BOOL "Use variable length arrays to improve performance. Requires gcc." )
 endif (DEFINED MSVC)
+
+IF (MINGW)
+  set (CMAKE_EXE_LINKER_FLAGS "-Wl,--large-address-aware" CACHE STRING "Set by widelands CMakeLists.txt" FORCE)
+  message (STATUS "Enabled large address awareness on mingw32")
+endif (MINGW)
 
 IF (CMAKE_BUILD_TYPE STREQUAL "Debug")
   message (STATUS "Using compiler flags: ${CMAKE_CXX_FLAGS_DEBUG}")
@@ -277,27 +326,21 @@ if (DEFINED WL_3RDPARTY_DIR)
   set (CMAKE_LIBRARY_PATH "${WL_3RDPARTY_DIR}/lib")
 endif (DEFINED WL_3RDPARTY_DIR)
 
-#on freeBSD this must be explicitely linked
-if (CMAKE_SYSTEM_NAME MATCHES "FreeBSD")
-  find_library(EXECINFO_LIBRARY NAMES execinfo)
-endif (CMAKE_SYSTEM_NAME MATCHES "FreeBSD")
+# on BSD this must be explicitly linked
+if (CMAKE_SYSTEM_NAME MATCHES "FreeBSD" OR CMAKE_SYSTEM_NAME MATCHES "OpenBSD")
+  # Not needed on Debian GNU/kFreeBSD..
+  if (NOT CMAKE_SYSTEM_NAME MATCHES "kFreeBSD")
+    find_library(EXECINFO_LIBRARY NAMES execinfo)
+  endif (NOT CMAKE_SYSTEM_NAME MATCHES "kFreeBSD")
+endif (CMAKE_SYSTEM_NAME MATCHES "FreeBSD" OR CMAKE_SYSTEM_NAME MATCHES "OpenBSD")
 
 
 # Check for opengl
 # TODO Check for SDL_opengl.h and add to include path
-find_package(OpenGL)
-if (OPENGL_FOUND)
-  # OpenGL Headers are not needed directly. Instead SDL_opengl.h should be searched
-  add_definitions("-DUSE_OPENGL")
-  find_package(GLEW)
-  if (GLEW_FOUND)
-    add_definitions(${GLEW_EXTRA_DEFINITIONS})
-  else (GLEW FOUND)
-    message (STATUS "GLEW library not found, check your libraries path and installed packages!")
-  endif (GLEW_FOUND)
-else (OPENGL_FOUND)
-  message (STATUS "OpenGL support disabled, check your libraries path and installed packages!")
-endif (OPENGL_FOUND)
+find_package(OpenGL REQUIRED)
+# OpenGL Headers are not needed directly. Instead SDL_opengl.h should be searched
+find_package(GLEW REQUIRED)
+add_definitions(${GLEW_EXTRA_DEFINITIONS})
 
 # ...but using MAJOR, MINOR and PATCH
 if (DEFINED WL_VERSION_MAJOR)
@@ -353,7 +396,7 @@ if (NOT DEFINED WL_VERSION)
     BzrRevision ALL
     COMMAND ${CMAKE_COMMAND} -DWL_INSTALL_PREFIX=${WL_INSTALL_PREFIX} -DWL_INSTALL_BINDIR=${WL_INSTALL_BINDIR} -DWL_INSTALL_DATADIR=${WL_INSTALL_DATADIR} -DWL_INSTALL_LOCALEDIR=${WL_INSTALL_LOCALEDIR} -DPYTHON_EXECUTABLE=${PYTHON_EXECUTABLE} -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE} -DSOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR} -DBINARY_DIR=${CMAKE_CURRENT_BINARY_DIR} -P ${CMAKE_CURRENT_SOURCE_DIR}/BzrRevision.cmake
   )
-  
+
   # Detect version now
   execute_process (
     COMMAND ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/utils/detect_revision.py
@@ -391,31 +434,55 @@ include_directories(${PNG_INCLUDE_DIR})
 find_package(ZLIB REQUIRED)
 include_directories(${ZLIB_INCLUDE_DIR})
 
-if (APPLE OR WIN32)
-  find_package(intl REQUIRED)
-  include_directories(${INTL_INCLUDE_DIR})
-endif (APPLE OR WIN32)
+# Check if we have a working minizip library
+find_package(Minizip)
+if (MINIZIP_FOUND)
+  include_directories(${MINIZIP_INCLUDE_DIR})
+endif (MINIZIP_FOUND)
+
+if (APPLE OR WIN32 OR CMAKE_SYSTEM_NAME MATCHES "FreeBSD")
+  if (NOT CMAKE_SYSTEM_NAME MATCHES "kFreeBSD")
+    find_package(intl REQUIRED)
+    include_directories(${INTL_INCLUDE_DIR})
+    endif (NOT CMAKE_SYSTEM_NAME MATCHES "kFreeBSD")
+endif (APPLE OR WIN32 OR CMAKE_SYSTEM_NAME MATCHES "FreeBSD")
+
+# Gettext is required, but it does not provide GETTEXT_INCLUDE_DIR or
+# GETTEXT_LIBRARY as "usual" libraries do
+find_package(Gettext REQUIRED)
 
 find_package(SDL REQUIRED)
 include_directories(${SDL_INCLUDE_DIR})
 
 find_package(SDL_image REQUIRED)
 include_directories(${SDLIMAGE_INCLUDE_DIR})
+if (NOT SDLIMAGE_FOUND)
+  message(FATAL_ERROR "Required package SDL_image not found, please install and re-run cmake")
+endif (NOT SDLIMAGE_FOUND)
 
 find_package(SDL_mixer REQUIRED)
 include_directories(${SDLMIXER_INCLUDE_DIR})
+if (NOT SDLMIXER_FOUND)
+  message(FATAL_ERROR "Required package SDL_mixer not found, please install and re-run cmake")
+endif (NOT SDLMIXER_FOUND)
 
 find_package(SDL_net REQUIRED)
 include_directories(${SDLNET_INCLUDE_DIR})
+if (NOT SDLNET_FOUND)
+  message(FATAL_ERROR "Required package SDL_net not found, please install and re-run cmake")
+endif (NOT SDLNET_FOUND)
 
 find_package(SDL_ttf REQUIRED)
 include_directories(${SDLTTF_INCLUDE_DIR})
+if (NOT SDLTTF_FOUND)
+  message(FATAL_ERROR "Required package SDL_ttf not found, please install and re-run cmake")
+endif (NOT SDLTTF_FOUND)
 
 find_package(SDL_gfx REQUIRED)
 include_directories(${SDLGFX_INCLUDE_DIR})
-
-find_package(Lua51 REQUIRED)
-include_directories(${LUA_INCLUDE_DIR})
+if (NOT SDLGFX_FOUND)
+  message(FATAL_ERROR "Required package SDL_gfx not found, please install and re-run cmake")
+endif (NOT SDLGFX_FOUND)
 
 IF (WIN32)
   SET(GUI_TYPE WIN32)
@@ -549,7 +616,7 @@ if (WIN32)
   set(CPACK_NSIS_PACKAGE_NAME "Widelands")
   set(CPACK_NSIS_DISPLAY_NAME "Widelands ${WL_VERSION}")
   set(CPACK_NSIS_DISPLAY_NAME_SET "TRUE")
-  
+
   # Optional dialogs
   if (NOT DEFINED CPACK_NSIS_LANGUAGE_DIALOG)
     set(CPACK_NSIS_LANGUAGE_DIALOG "ON")
@@ -607,7 +674,7 @@ if (WIN32)
     DeleteRegValue HKCR \\\".wmf\\\" \\\"WidelandsMapFile\\\"
     DeleteRegKey /ifempty HKCR \\\".wmf\\\"
     DeleteRegKey HKCR \\\"WidelandsMapFile\\\"
-    
+
     Delete \\\"$INSTDIR\\\\stdout.txt\\\"
     Delete \\\"$INSTDIR\\\\stderr.txt\\\"
     Delete \\\"$INSTDIR\\\"
@@ -620,8 +687,3 @@ elseif (WIN32)
 endif (WIN32)
 
 include(CPack)
-
-# Temporary warning about clang as long as widelands does not run stable
-IF (${CMAKE_CXX_COMPILER_ID} STREQUAL "Clang")
-  message( WARNING "WARNING!!! You seem to compile widelands using the clang/llvm compiler infrastructure. Please note that we do not yet support compiling with clang. You are very likely to run into problems. We are working on it, though. In the mean time, please use GCC infrastructure to compile widelands. You can use the CMake parameter -DCMAKE_CXX_COMPILER=g++ to force GCC if you have it installed. Thank you for your understanding.")
-ENDIF (${CMAKE_CXX_COMPILER_ID} STREQUAL "Clang")

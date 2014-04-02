@@ -17,12 +17,12 @@
  *
  */
 
-#include "editor_delete_bob_tool.h"
+#include "editor/tools/editor_delete_bob_tool.h"
 
-#include "logic/field.h"
-#include "logic/mapregion.h"
 #include "editor/editorinteractive.h"
 #include "logic/bob.h"
+#include "logic/field.h"
+#include "logic/mapregion.h"
 
 /**
  * Deletes the bob at the given location
@@ -42,7 +42,7 @@ int32_t Editor_Delete_Bob_Tool::handle_click_impl
 			args.obob_type.push_back(&bob->descr());
 			bob->remove(egbase);
 		} else {
-			args.obob_type.push_back(NULL);
+			args.obob_type.push_back(nullptr);
 		}
 	while (mr.advance(map));
 	return radius + 2;

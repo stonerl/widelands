@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2002-2004, 2006-2010, 2012 by the Widelands Development Team
+ * Copyright (C) 2002-2004, 2006-2010, 2012-2013 by the Widelands Development Team
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -17,37 +17,34 @@
  *
  */
 
-#include "worker_descr.h"
-
-#include "carrier.h"
+#include "logic/worker_descr.h"
 
 #include "graphic/graphic.h"
 #include "helper.h"
 #include "i18n.h"
-#include "nodecaps.h"
+#include "logic/carrier.h"
+#include "logic/nodecaps.h"
+#include "logic/soldier.h"
+#include "logic/tribe.h"
+#include "logic/worker.h"
+#include "logic/worker_program.h"
 #include "profile/profile.h"
-#include "soldier.h"
-#include "sound/sound_handler.h"
-#include "tribe.h"
-#include "wexception.h"
-#include "worker.h"
-#include "worker_program.h"
-
 #include "ref_cast.h"
-#include <scripting/pdep/llimits.h>
+#include "sound/sound_handler.h"
+#include "wexception.h"
 
 namespace Widelands {
 
 Worker_Descr::Worker_Descr
 	(char const * const _name, char const * const _descname,
-	 std::string const & directory, Profile & prof, Section & global_s,
-	 Tribe_Descr const & _tribe)
+	 const std::string & directory, Profile & prof, Section & global_s,
+	 const Tribe_Descr & _tribe)
 	:
-	Bob::Descr(_name, _descname, directory, prof, global_s, &_tribe),
+	BobDescr(_name, _descname, directory, prof, global_s, &_tribe),
 	m_helptext(global_s.get_string("help", "")),
 	m_ware_hotspot(global_s.get_Point("ware_hotspot", Point(0, 15))),
 	m_icon_fname(directory + "/menu.png"),
-	m_icon(g_gr->get_no_picture()),
+	m_icon(nullptr),
 	m_buildable     (false),
 	m_level_experience(-1),
 	m_becomes (Ware_Index::Null())
@@ -76,7 +73,7 @@ Worker_Descr::Worker_Descr
 				if (count != value)
 					throw wexception("count is out of range 1 .. 255");
 				m_buildcost.insert(std::pair<std::string, uint8_t>(input, value));
-			} catch (_wexception const & e) {
+			} catch (const _wexception & e) {
 				throw wexception
 					("[buildcost] \"%s=%s\": %s",
 					 val->get_name(), val->get_string(), e.what());
@@ -86,23 +83,11 @@ Worker_Descr::Worker_Descr
 	// If worker has a work animation load and add it.
 	Section * work_s = prof.get_section("work");
 	if (work_s)
-		add_animation("work", g_anim.get(directory, *work_s, "work.png"));
+		add_animation("work", g_gr->animations().load(directory, *work_s));
 
 	// Read the walking animations
-	m_walk_anims.parse
-		(*this, directory, prof, "walk_??", prof.get_section("walk"));
-
-	//  Soldiers have no walkload.
-	if (not global_s.has_val("max_hp_level"))
-		m_walkload_anims.parse
-			(*this,
-			 directory,
-			 prof,
-			 "walkload_??",
-			 prof.get_section("walkload"));
-
-	while (Section::Value const * const v = global_s.get_next_val("soundfx"))
-		g_sound_handler.load_fx(directory, v->get_string());
+	m_walk_anims.parse(*this, directory, prof, "walk");
+	m_walkload_anims.parse(*this, directory, prof, "walkload", true);
 
 	// Read the becomes and experience
 	if (char const * const becomes_name = global_s.get_string("becomes")) {
@@ -116,7 +101,7 @@ Worker_Descr::Worker_Descr
 		std::transform
 			(program_name.begin(), program_name.end(), program_name.begin(),
 			 tolower);
-		WorkerProgram * program = 0;
+		WorkerProgram * program = nullptr;
 
 		try {
 			if (m_programs.count(program_name))
@@ -132,16 +117,10 @@ Worker_Descr::Worker_Descr
 			m_programs[program_name.c_str()] = program;
 		}
 
-		catch (std::exception const & e) {
+		catch (const std::exception & e) {
 			delete program;
 			throw wexception("program %s: %s", program_name.c_str(), e.what());
 		}
-	}
-
-	// Read compatibility information
-	if (Section * compat_s = prof.get_section("compatibility_program")) {
-		while (const Section::Value * v = compat_s->get_next_val())
-			m_compatibility_programs[v->get_name()] = v->get_string();
 	}
 }
 
@@ -160,7 +139,7 @@ Worker_Descr::~Worker_Descr()
  */
 void Worker_Descr::load_graphics()
 {
-	m_icon = g_gr->get_picture(PicMod_Game, m_icon_fname.c_str());
+	m_icon = g_gr->images().get(m_icon_fname);
 }
 
 
@@ -168,7 +147,7 @@ void Worker_Descr::load_graphics()
  * Get a program from the workers description.
  */
 WorkerProgram const * Worker_Descr::get_program
-	(std::string const & programname) const
+	(const std::string & programname) const
 {
 	Programs::const_iterator it = m_programs.find(programname);
 
@@ -177,20 +156,6 @@ WorkerProgram const * Worker_Descr::get_program
 			("%s has no program '%s'", name().c_str(), programname.c_str());
 
 	return it->second;
-}
-
-/**
- * Get the compatibility information for the given program name.
- *
- * Returns an empty string if no compatibility information for this program is found.
- */
-const std::string & Worker_Descr::compatibility_program(const std::string & programname) const
-{
-	static const std::string empty;
-	std::map<std::string, std::string>::const_iterator it = m_compatibility_programs.find(programname);
-	if (it != m_compatibility_programs.end())
-		return it->second;
-	return empty;
 }
 
 /**
@@ -212,7 +177,7 @@ const
 }
 
 
-uint32_t Worker_Descr::movecaps() const throw () {return MOVECAPS_WALK;}
+uint32_t Worker_Descr::movecaps() const {return MOVECAPS_WALK;}
 
 
 /**
@@ -233,12 +198,12 @@ bool Worker_Descr::can_act_as(Ware_Index const index) const {
 		return true;
 
 	// if requested worker type can be promoted, compare with that type
-	Worker_Descr const & descr = *tribe().get_worker_descr(index);
+	const Worker_Descr & descr = *tribe().get_worker_descr(index);
 	Ware_Index const becomes_index = descr.becomes();
 	return becomes_index ? can_act_as(becomes_index) : false;
 }
 
-Ware_Index Worker_Descr::worker_index() const throw () {
+Ware_Index Worker_Descr::worker_index() const {
 	return tribe().worker_index(name().c_str());
 }
 

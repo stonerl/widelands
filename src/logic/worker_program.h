@@ -20,12 +20,9 @@
 #ifndef WORKER_PROGRAM_H
 #define WORKER_PROGRAM_H
 
-
-#include "bob.h"
-#include "worker.h"
-
+#include "logic/bob.h"
 #include "workarea_info.h"
-#include "writeHTML.h"
+#include "logic/worker.h"
 
 namespace Widelands {
 
@@ -49,10 +46,10 @@ struct WorkerProgram : public BobProgramBase {
 	WorkerProgram(const std::string & name) : m_name(name) {}
 	virtual ~WorkerProgram() {}
 
-	std::string get_name() const {return m_name;}
+	std::string get_name() const override {return m_name;}
 	typedef std::vector<Worker::Action> Actions;
 	Actions::size_type get_size() const {return m_actions.size();}
-	Actions const & actions() const {return m_actions;}
+	const Actions & actions() const {return m_actions;}
 	Worker::Action const * get_action(int32_t idx) const {
 		assert(idx >= 0);
 		assert(static_cast<uint32_t>(idx) < m_actions.size());
@@ -61,9 +58,6 @@ struct WorkerProgram : public BobProgramBase {
 
 	void parse(Worker_Descr *, Parser *, char const * name);
 	const Workarea_Info & get_workarea_info() const {return m_workarea_info;}
-#ifdef WRITE_GAME_DATA_AS_HTML
-	void writeHTML(::FileWrite &, Worker_Descr const &) const;
-#endif
 
 private:
 	Workarea_Info m_workarea_info;
@@ -82,7 +76,7 @@ private:
 		 Worker::Action                 *,
 		 Parser                         *,
 		 const std::vector<std::string> & cmd);
-	void parse_createitem
+	void parse_createware
 		(Worker_Descr                   *,
 		 Worker::Action                 *,
 		 Parser                         *,

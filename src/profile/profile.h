@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2002, 2006-2009 by the Widelands Development Team
+ * Copyright (C) 2002, 2006-2013 by the Widelands Development Team
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -20,6 +20,9 @@
 #ifndef PROFILE_H
 #define PROFILE_H
 
+#include <cstring>
+#include <vector>
+
 #include <boost/noncopyable.hpp>
 
 //TODO: as soon as g_fs is not needed anymore, next include can be changed
@@ -27,19 +30,18 @@
 #include "io/filesystem/layered_filesystem.h"
 #include "logic/widelands.h"
 #include "logic/widelands_geometry.h"
-
 #include "point.h"
+#include "port.h"
 
-#include <vector>
 
 namespace Widelands {
 struct Building_Descr;
-struct Editor_Game_Base;
+class Editor_Game_Base;
 struct Immovable_Descr;
 };
 
 extern struct Profile g_options;
-struct FileSystem;
+class FileSystem;
 
 /**
  * Represents one section inside the .ini-style file, basically as a list of
@@ -68,10 +70,10 @@ struct Section {
 		char * m_value;
 
 		Value(char const * nname, char const * nval);
-		Value(Value const &);
+		Value(const Value &);
 		~Value();
 
-		Value & operator= (Value const &);
+		Value & operator= (const Value &);
 
 		char const * get_name() const {return m_name;}
 
@@ -94,19 +96,19 @@ struct Section {
 
 	Section(Profile *, char const * name);
 	Section(const Section &);
-	~Section();
 
-	Section & operator= (Section const &);
+	Section & operator= (const Section &);
 
 	/// \returns whether a value with the given name exists.
 	/// Does not mark the value as used.
 	bool has_val(char const * name) const;
 
 	Value * get_val     (char const * name);
-	Value * get_next_val(char const * name = 0);
+	Value * get_next_val(char const * name = nullptr);
 	uint32_t get_num_values() const {return m_values.size();}
 
 	char const * get_name() const;
+	void set_name(const std::string&);
 
 	bool is_used() const;
 	void mark_used();
@@ -127,7 +129,7 @@ struct Section {
 		 bool                     def = false);
 	const char *             get_string
 		(char             const * name,
-		 char             const * def = 0);
+		 char             const * def = nullptr);
 	Point                    get_Point
 		(char             const * name,
 		 Point                    def = Point (0, 0));
@@ -149,18 +151,19 @@ struct Section {
 		(const char * name);
 	const char *              get_safe_string
 		(const char * name);
+	const char * get_safe_string(const std::string & name);
 	Widelands::Coords         get_safe_Coords
 		(const char * name, Widelands::Extent);
 	Widelands::Player_Number  get_safe_Player_Number
 		(char const * name,
 		 Widelands::Player_Number nr_players);
-	Widelands::Immovable_Descr const & get_safe_Immovable_Type
+	const Widelands::Immovable_Descr & get_safe_Immovable_Type
 		(char const * tribe, char const * name,
 		 Widelands::Editor_Game_Base &);
 	Widelands::Building_Index get_safe_Building_Index
 		(char const * name,
 		 Widelands::Editor_Game_Base &, Widelands::Player_Number);
-	Widelands::Building_Descr const & get_safe_Building_Type
+	const Widelands::Building_Descr & get_safe_Building_Type
 		(char const * name,
 		 Widelands::Editor_Game_Base &, Widelands::Player_Number);
 
@@ -178,12 +181,12 @@ struct Section {
 	void set_string_duplicate
 		(char const *       name, char        const *       value);
 	void set_string
-		(char const * const name, std::string const &       value)
+		(char const * const name, const std::string &       value)
 	{
 		set_string(name, value.c_str());
 	}
 	void set_string_duplicate
-		(char const * const name, std::string const &       value)
+		(char const * const name, const std::string &       value)
 	{
 		set_string_duplicate(name, value.c_str());
 	}
@@ -191,7 +194,7 @@ struct Section {
 		(char const * name, Widelands::Coords value);
 	void set_Immovable_Type
 		(char const * tribe, char const * name,
-		 Widelands::Immovable_Descr const &);
+		 const Widelands::Immovable_Descr &);
 	void set_Building_Index
 		(char const * name,
 		 Widelands::Building_Index value,
@@ -207,7 +210,7 @@ struct Section {
 private:
 	Profile  * m_profile;
 	bool       m_used;
-	char     * m_section_name;
+	std::string m_section_name;
 	Value_list m_values;
 };
 
@@ -235,7 +238,7 @@ struct Profile : boost::noncopyable {
 	Profile(int32_t error_level = err_throw);
 	Profile
 		(char const * filename,
-		 char const * global_section = 0,
+		 char const * global_section = nullptr,
 		 int32_t      error_level    = err_throw);
 	Profile
 		(char const * filename,
@@ -248,17 +251,17 @@ struct Profile : boost::noncopyable {
 
 	void read
 		(const char * const filename,
-		 const char * const global_section = 0,
+		 const char * const global_section = nullptr,
 		 FileSystem & = *g_fs);
 	void write
 		(const char * const filename,
 		 bool used_only = true,
 		 FileSystem & = *g_fs);
 
-	Section * get_section     (char const * name);
+	Section * get_section     (const std::string & name);
 	Section & get_safe_section(const std::string & name);
 	Section & pull_section    (char const * name);
-	Section * get_next_section(char const * name = 0);
+	Section * get_next_section(char const * name = nullptr);
 
 	/// If a section with the given name already exists, return a reference to
 	/// it. Otherwise create a new section with the given name and return a

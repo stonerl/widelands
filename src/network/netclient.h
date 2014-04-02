@@ -23,10 +23,11 @@
 #include "chat.h"
 #include "gamecontroller.h"
 #include "gamesettings.h"
-#include "network.h"
+#include "network/network.h"
 
 struct NetClientImpl;
 
+//FIXME Use composition instead of inheritance
 /**
  * NetClient manages the lifetime of a network game in which this computer
  * participates as a client.
@@ -40,59 +41,63 @@ struct NetClient :
 	private SyncCallback,
 	public  ChatProvider
 {
-	NetClient (IPaddress *, std::string const & playername, bool internet = false);
+	NetClient (IPaddress *, const std::string & playername, bool internet = false);
 	virtual ~NetClient ();
 
 	void run();
 
 	// GameController interface
-	void think();
-	void sendPlayerCommand(Widelands::PlayerCommand &);
-	int32_t getFrametime();
-	std::string getGameDescription();
+	void think() override;
+	void sendPlayerCommand(Widelands::PlayerCommand &) override;
+	int32_t getFrametime() override;
+	std::string getGameDescription() override;
 
-	uint32_t realSpeed();
-	uint32_t desiredSpeed();
-	void setDesiredSpeed(uint32_t speed);
-	bool isPaused();
-	void setPaused(bool paused);
+	uint32_t realSpeed() override;
+	uint32_t desiredSpeed() override;
+	void setDesiredSpeed(uint32_t speed) override;
+	bool isPaused() override;
+	void setPaused(bool paused) override;
+	void report_result
+		(uint8_t player, Widelands::PlayerEndResult result, const std::string & info) override;
 	// End GameController interface
 
 	// GameSettingsProvider interface
-	virtual GameSettings const & settings();
+	virtual const GameSettings & settings() override;
 
-	virtual void setScenario(bool);
-	virtual bool canChangeMap();
-	virtual bool canChangePlayerState(uint8_t number);
-	virtual bool canChangePlayerTribe(uint8_t number);
-	virtual bool canChangePlayerInit (uint8_t number);
-	virtual bool canChangePlayerTeam (uint8_t number);
+	virtual void setScenario(bool) override;
+	virtual bool canChangeMap() override;
+	virtual bool canChangePlayerState(uint8_t number) override;
+	virtual bool canChangePlayerTribe(uint8_t number) override;
+	virtual bool canChangePlayerInit (uint8_t number) override;
+	virtual bool canChangePlayerTeam (uint8_t number) override;
 
-	virtual bool canLaunch();
+	virtual bool canLaunch() override;
 
 	virtual void setMap
-		(std::string const & mapname,
-		 std::string const & mapfilename,
+		(const std::string & mapname,
+		 const std::string & mapfilename,
 		 uint32_t maxplayers,
-		 bool savegame = false);
-	virtual void setPlayerState    (uint8_t number, PlayerSettings::State state);
-	virtual void setPlayerAI       (uint8_t number, std::string const & ai, bool const random_ai = false);
-	virtual void nextPlayerState   (uint8_t number);
-	virtual void setPlayerTribe   (uint8_t number, std::string const & tribe, bool const random_tribe = false);
-	virtual void setPlayerInit     (uint8_t number, uint8_t index);
-	virtual void setPlayerName     (uint8_t number, std::string const & name);
-	virtual void setPlayer         (uint8_t number, PlayerSettings ps);
-	virtual void setPlayerNumber   (uint8_t number);
-	virtual void setPlayerTeam     (uint8_t number, Widelands::TeamNumber team);
-	virtual void setPlayerCloseable(uint8_t number, bool closeable);
-	virtual void setPlayerShared   (uint8_t number, uint8_t shared);
-	virtual void setWinCondition   (std::string);
-	virtual void nextWinCondition  ();
-	virtual std::string getWinCondition();
+		 bool savegame = false) override;
+	virtual void setPlayerState    (uint8_t number, PlayerSettings::State state) override;
+	virtual void setPlayerAI
+		(uint8_t number, const std::string & ai, bool const random_ai = false) override;
+	virtual void nextPlayerState   (uint8_t number) override;
+	virtual void setPlayerTribe
+		(uint8_t number, const std::string & tribe, bool const random_tribe = false) override;
+	virtual void setPlayerInit     (uint8_t number, uint8_t index) override;
+	virtual void setPlayerName     (uint8_t number, const std::string & name) override;
+	virtual void setPlayer         (uint8_t number, PlayerSettings ps) override;
+	virtual void setPlayerNumber   (uint8_t number) override;
+	virtual void setPlayerTeam     (uint8_t number, Widelands::TeamNumber team) override;
+	virtual void setPlayerCloseable(uint8_t number, bool closeable) override;
+	virtual void setPlayerShared   (uint8_t number, uint8_t shared) override;
+	virtual void setWinConditionScript   (std::string) override;
+	virtual void nextWinCondition  () override;
+	virtual std::string getWinConditionScript() override;
 
 	// ChatProvider interface
-	void send(std::string const & msg);
-	std::vector<ChatMessage> const & getMessages() const;
+	void send(const std::string & msg) override;
+	const std::vector<ChatMessage> & getMessages() const override;
 
 private:
 	/// for unique backupname
@@ -100,7 +105,7 @@ private:
 
 	NetTransferFile * file;
 
-	void syncreport();
+	void syncreport() override;
 
 	void handle_packet(RecvPacket &);
 	void handle_network ();
@@ -108,7 +113,7 @@ private:
 	void recvOnePlayer(uint8_t  number, Widelands::StreamRead &);
 	void recvOneUser  (uint32_t number, Widelands::StreamRead &);
 	void disconnect
-		(std::string const & reason, std::string const & arg = "", bool sendreason = true, bool showmsg = true);
+		(const std::string & reason, const std::string & arg = "", bool sendreason = true, bool showmsg = true);
 
 	NetClientImpl * d;
 	bool m_internet;

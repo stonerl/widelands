@@ -32,12 +32,12 @@ struct EmptyAI : Computer_Player {
 	EmptyAI(Widelands::Game & g, const Widelands::Player_Number pid)
 	: Computer_Player(g, pid) {}
 
-	void think() {}
+	void think() override {}
 
 	struct EmptyAIImpl : Implementation {
 		EmptyAIImpl() {name = _("None");}
 		Computer_Player * instantiate
-			(Widelands::Game & g, Widelands::Player_Number const pid) const
+			(Widelands::Game & g, Widelands::Player_Number const pid) const override
 		{
 			return new EmptyAI(g, pid);
 		}
@@ -48,7 +48,7 @@ struct EmptyAI : Computer_Player {
 
 EmptyAI::EmptyAIImpl EmptyAI::implementation;
 
-Computer_Player::ImplementationVector const &
+const Computer_Player::ImplementationVector &
 Computer_Player::getImplementations()
 {
 	static std::vector<Computer_Player::Implementation const *> impls;
@@ -66,7 +66,7 @@ Computer_Player::getImplementations()
 const Computer_Player::Implementation * Computer_Player::getImplementation
 	(const std::string & name)
 {
-	ImplementationVector const & vec = getImplementations();
+	const ImplementationVector & vec = getImplementations();
 
 	container_iterate_const(ImplementationVector, vec, i)
 		if ((*i.current)->name == name)

@@ -20,10 +20,13 @@
 #ifndef FULLSCREEN_MENU_INTERNET_LOBBY_H
 #define FULLSCREEN_MENU_INTERNET_LOBBY_H
 
+#include <cstring>
+#include <string>
+#include <vector>
+
+#include "ui_fsmenu/base.h"
 #include "network/internet_gaming.h"
 #include "network/network_lan_promotion.h"
-
-#include "base.h"
 #include "ui_basic/button.h"
 #include "ui_basic/editbox.h"
 #include "ui_basic/listselect.h"
@@ -32,15 +35,11 @@
 #include "ui_basic/textarea.h"
 #include "wui/gamechatpanel.h"
 
-#include <string>
-#include <cstring>
-#include <vector>
-
 struct Fullscreen_Menu_Internet_Lobby : public Fullscreen_Menu_Base {
 
 	Fullscreen_Menu_Internet_Lobby (const char *, const char *, bool);
 
-	virtual void think();
+	virtual void think() override;
 
 	/// \returns the maximum number of clients that may connect
 	int32_t get_maxclients() {
@@ -53,6 +52,7 @@ private:
 	uint32_t m_buth;
 	uint32_t m_lisw;
 	uint32_t m_fs;
+	uint32_t m_prev_clientlist_len;
 	std::string m_fn;
 	UI::Textarea title, m_clients, m_opengames;
 	UI::Textarea m_servername;
@@ -69,8 +69,8 @@ private:
 	const char * password;
 	bool         reg;
 
-	void fillGamesList (std::vector<INet_Game> const &);
-	void fillClientList(std::vector<INet_Client> const &);
+	void fillGamesList (const std::vector<INet_Game> &);
+	void fillClientList(const std::vector<INet_Client> &);
 
 	void connectToMetaserver();
 

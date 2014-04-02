@@ -20,8 +20,8 @@
 #ifndef EDITOR_DRAW_TOOL_H
 #define EDITOR_DRAW_TOOL_H
 
-#include "editor_tool.h"
-#include "editor_tool_action.h"
+#include "editor/tools/editor_tool.h"
+#include "editor/tools/editor_tool_action.h"
 
 ///  This is not a real editor tool. It serves to combine 'hold down mouse and move'
 ///  tool actions in one class.
@@ -30,15 +30,15 @@ struct Editor_Draw_Tool : public Editor_Tool {
 
 	int32_t handle_click_impl
 		(Widelands::Map & map, Widelands::Node_and_Triangle<> center,
-		 Editor_Interactive & parent, Editor_Action_Args & args);
+		 Editor_Interactive & parent, Editor_Action_Args & args) override;
 
 	int32_t handle_undo_impl
 		(Widelands::Map & map, Widelands::Node_and_Triangle<> center,
-		 Editor_Interactive & parent, Editor_Action_Args & args);
+		 Editor_Interactive & parent, Editor_Action_Args & args) override;
 
-	Editor_Action_Args format_args_impl(Editor_Interactive & parent);
+	Editor_Action_Args format_args_impl(Editor_Interactive & parent) override;
 
-	char const * get_sel_impl() const {
+	char const * get_sel_impl() const override {
 		return "EDITOR_DRAW_TOOL";
 	}
 

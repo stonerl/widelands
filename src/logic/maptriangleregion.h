@@ -20,7 +20,7 @@
 #ifndef MAPTRIANGLEREGION_H
 #define MAPTRIANGLEREGION_H
 
-#include "map.h"
+#include "logic/map.h"
 
 namespace Widelands {
 
@@ -43,9 +43,9 @@ namespace Widelands {
 template <typename Coords_type = TCoords<>, typename Radius_type = uint16_t>
 struct MapTriangleRegion
 {
-	MapTriangleRegion(Map const &, Coords_type, uint16_t radius);
+	MapTriangleRegion(const Map &, Coords_type, uint16_t radius);
 
-	const Coords_type & location() const throw ();
+	const Coords_type & location() const;
 
 	/**
 	 * Moves on to the next location, traversing the region by row.
@@ -61,7 +61,7 @@ struct MapTriangleRegion
 	 * can then be redone by calling advance again, which will return true
 	 * until it reaches the first location the next time around, and so on.
 	 */
-	bool advance(const Map &) throw ();
+	bool advance(const Map &);
 };
 template <> struct MapTriangleRegion<FCoords> {
 	MapTriangleRegion(const Map & map, const Area<FCoords> area) :
@@ -74,9 +74,9 @@ template <> struct MapTriangleRegion<FCoords> {
 		m_left = m_area;
 	}
 
-	const TCoords<FCoords> & location() const throw () {return m_area;}
+	const TCoords<FCoords> & location() const {return m_area;}
 
-	bool advance(const Map & map) throw () {
+	bool advance(const Map & map) {
 		if (--m_remaining_in_row) {
 			if (m_area.t == TCoords<FCoords>::D)
 				m_area.t = TCoords<FCoords>::R;
@@ -105,11 +105,11 @@ private:
 };
 template <typename Coords_type> struct MapTriangleRegion<TCoords<Coords_type> >
 {
-	MapTriangleRegion(Map const &, Area<TCoords<Coords_type>, uint16_t>);
+	MapTriangleRegion(const Map &, Area<TCoords<Coords_type>, uint16_t>);
 
-	const TCoords<Coords_type> & location() const throw () {return m_location;}
+	const TCoords<Coords_type> & location() const {return m_location;}
 
-	bool advance(const Map &) throw ();
+	bool advance(const Map &);
 
 private:
 	const bool m_radius_is_odd;

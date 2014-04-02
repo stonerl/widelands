@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2002-2004, 2006-2010 by the Widelands Development Team
+ * Copyright (C) 2002-2004, 2006-2013 by the Widelands Development Team
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -24,8 +24,8 @@
 #include "economy/portdock.h"
 #include "economy/transfer.h"
 #include "economy/ware_instance.h"
-#include "worker_descr.h"
-#include "productionsite.h"
+#include "logic/productionsite.h"
+#include "logic/worker_descr.h"
 
 namespace Widelands {
 class Building;
@@ -34,7 +34,7 @@ class Building;
  * Worker is the base class for all humans (and actually potential non-humans,
  * too) that belong to a tribe.
  *
- * Every worker can carry one (item) ware.
+ * Every worker can carry one ware.
  *
  * Workers can be in one of the following meta states:
  *  - Request: the worker is walking to his job somewhere
@@ -49,7 +49,7 @@ class Worker : public Bob {
 	MO_DESCR(Worker_Descr);
 
 	struct Action {
-		typedef bool (Worker::*execute_t)(Game &, Bob::State &, Action const &);
+		typedef bool (Worker::*execute_t)(Game &, Bob::State &, const Action &);
 
 		enum {
 			walkObject = 1, //  walk to objvar1
@@ -70,9 +70,6 @@ class Worker : public Bob {
 		std::string sparam1;
 
 		std::vector<std::string> sparamv;
-#ifdef WRITE_GAME_DATA_AS_HTML
-		void writeHTML(::FileWrite &, Worker_Descr const &) const;
-#endif
 	};
 
 
@@ -83,25 +80,25 @@ public:
 	virtual Worker_Descr::Worker_Type get_worker_type() const {
 		return descr().get_worker_type();
 	}
-	char const * type_name() const throw () {return "worker";}
-	virtual Bob::Type get_bob_type() const throw () {return Bob::WORKER;}
+	char const * type_name() const override {return "worker";}
+	virtual Bob::Type get_bob_type() const override {return Bob::WORKER;}
 
 	uint32_t get_animation(char const * const str) const {
 		return descr().get_animation(str);
 	}
-	PictureID icon() const throw () {return descr().icon();}
-	Ware_Index becomes() const throw () {return descr().becomes();}
-	Ware_Index worker_index() const throw () {return descr().worker_index();}
-	const Tribe_Descr * get_tribe() const throw () {return descr().get_tribe();}
-	Tribe_Descr const & tribe() const throw () {return descr().tribe();}
-	const std::string & descname() const throw () {return descr().descname();}
+	const Image* icon() const {return descr().icon();}
+	Ware_Index becomes() const {return descr().becomes();}
+	Ware_Index worker_index() const {return descr().worker_index();}
+	const Tribe_Descr * get_tribe() const {return descr().get_tribe();}
+	const Tribe_Descr & tribe() const {return descr().tribe();}
+	const std::string & descname() const {return descr().descname();}
 
 	Player & owner() const {assert(get_owner()); return *get_owner();}
 	PlayerImmovable * get_location(Editor_Game_Base & egbase) {
 		return m_location.get(egbase);
 	}
 	OPtr<PlayerImmovable> get_location() const {return m_location;}
-	Economy * get_economy() const throw () {return m_economy;}
+	Economy * get_economy() const {return m_economy;}
 
 	/// Sets the location of the worker initially. It may not have a previous
 	/// location. Does not add the worker to the location's set of workers (it
@@ -118,21 +115,21 @@ public:
 	void set_location(PlayerImmovable *);
 	void set_economy(Economy *);
 
-	WareInstance       * get_carried_item(Editor_Game_Base       & egbase) {
-		return m_carried_item.get(egbase);
+	WareInstance       * get_carried_ware(Editor_Game_Base       & egbase) {
+		return m_carried_ware.get(egbase);
 	}
-	WareInstance const * get_carried_item(Editor_Game_Base const & egbase) const
+	WareInstance const * get_carried_ware(const Editor_Game_Base & egbase) const
 	{
-		return m_carried_item.get(egbase);
+		return m_carried_ware.get(egbase);
 	}
-	void set_carried_item(Editor_Game_Base &, WareInstance *);
-	WareInstance * fetch_carried_item(Editor_Game_Base &);
+	void set_carried_ware(Editor_Game_Base &, WareInstance *);
+	WareInstance * fetch_carried_ware(Editor_Game_Base &);
 
 	void schedule_incorporate(Game &);
 	void incorporate(Game &);
 
-	virtual void init(Editor_Game_Base &);
-	virtual void cleanup(Editor_Game_Base &);
+	virtual void init(Editor_Game_Base &) override;
+	virtual void cleanup(Editor_Game_Base &) override;
 
 	bool wakeup_flag_capacity(Game &, Flag &);
 	bool wakeup_leave_building(Game &, Building &);
@@ -149,8 +146,6 @@ public:
 	void create_needed_experience(Game &);
 	Ware_Index level             (Game &);
 
-	void flash(const std::string & newname);
-
 	int32_t get_needed_experience() const {
 		return descr().get_level_experience();
 	}
@@ -158,22 +153,23 @@ public:
 	bool needs_experience() const {return get_needed_experience() != -1;}
 
 	// debug
-	virtual void log_general_info(Editor_Game_Base const &);
+	virtual void log_general_info(const Editor_Game_Base &) override;
 
 	// worker-specific tasks
 	void start_task_transfer(Game &, Transfer *);
 	void cancel_task_transfer(Game &);
 	Transfer * get_transfer() const {return m_transfer;}
 
-	void start_task_shipping(Game &, PortDock &);
+	void start_task_shipping(Game &, PortDock*);
 	void end_shipping(Game &);
 	bool is_shipping();
 
 	void start_task_buildingwork(Game &);
 	void update_task_buildingwork(Game &);
+	void evict(Game &);
 
-	void start_task_return(Game & game, bool dropitem);
-	void start_task_program(Game & game, std::string const & programname);
+	void start_task_return(Game & game, bool dropware);
+	void start_task_program(Game & game, const std::string & programname);
 
 	void start_task_gowarehouse(Game &);
 	void start_task_dropoff(Game &, WareInstance &);
@@ -187,16 +183,17 @@ public:
 	void start_task_geologist
 		(Game &,
 		 uint8_t attempts, uint8_t radius,
-		 std::string const & subcommand);
+		 const std::string & subcommand);
 
 	void start_task_scout(Game &, uint16_t, uint32_t);
 
 protected:
-	void draw_inner(Editor_Game_Base const &, RenderTarget &, Point) const;
-	virtual void draw(Editor_Game_Base const &, RenderTarget &, Point) const;
-	virtual void init_auto_task(Game &);
+	virtual bool is_evict_allowed();
+	void draw_inner(const Editor_Game_Base &, RenderTarget &, const Point&) const;
+	virtual void draw(const Editor_Game_Base &, RenderTarget &, const Point&) const override;
+	virtual void init_auto_task(Game &) override;
 
-	bool does_carry_ware() {return m_carried_item.is_set();}
+	bool does_carry_ware() {return m_carried_ware.is_set();}
 
 	void set_program_objvar(Game &, State &, Map_Object * obj);
 
@@ -230,7 +227,7 @@ private:
 	void gowarehouse_signalimmediate
 		(Game &,
 		 State &,
-		 std::string const & signal);
+		 const std::string & signal);
 	void gowarehouse_pop(Game & game, State & state);
 	void dropoff_update(Game &, State &);
 	void releaserecruit_update(Game &, State &);
@@ -244,25 +241,25 @@ private:
 	void scout_update(Game &, State &);
 
 	// Program commands
-	bool run_mine             (Game &, State &, Action const &);
-	bool run_breed            (Game &, State &, Action const &);
-	bool run_createitem       (Game &, State &, Action const &);
-	bool run_setdescription   (Game &, State &, Action const &);
-	bool run_setbobdescription(Game &, State &, Action const &);
-	bool run_findobject       (Game &, State &, Action const &);
-	bool run_findspace        (Game &, State &, Action const &);
-	bool run_walk             (Game &, State &, Action const &);
-	bool run_animation        (Game &, State &, Action const &);
-	bool run_return           (Game &, State &, Action const &);
-	bool run_object           (Game &, State &, Action const &);
-	bool run_plant            (Game &, State &, Action const &);
-	bool run_create_bob       (Game &, State &, Action const &);
-	bool run_removeobject     (Game &, State &, Action const &);
-	bool run_geologist        (Game &, State &, Action const &);
-	bool run_geologist_find   (Game &, State &, Action const &);
-	bool run_scout            (Game &, State &, Action const &);
-	bool run_playFX           (Game &, State &, Action const &);
-	bool run_construct        (Game &, State &, Action const &);
+	bool run_mine             (Game &, State &, const Action &);
+	bool run_breed            (Game &, State &, const Action &);
+	bool run_createware       (Game &, State &, const Action &);
+	bool run_setdescription   (Game &, State &, const Action &);
+	bool run_setbobdescription(Game &, State &, const Action &);
+	bool run_findobject       (Game &, State &, const Action &);
+	bool run_findspace        (Game &, State &, const Action &);
+	bool run_walk             (Game &, State &, const Action &);
+	bool run_animation        (Game &, State &, const Action &);
+	bool run_return           (Game &, State &, const Action &);
+	bool run_object           (Game &, State &, const Action &);
+	bool run_plant            (Game &, State &, const Action &);
+	bool run_create_bob       (Game &, State &, const Action &);
+	bool run_removeobject     (Game &, State &, const Action &);
+	bool run_geologist        (Game &, State &, const Action &);
+	bool run_geologist_find   (Game &, State &, const Action &);
+	bool run_scout            (Game &, State &, const Action &);
+	bool run_playFX           (Game &, State &, const Action &);
+	bool run_construct        (Game &, State &, const Action &);
 
 	// Displays a message to the player if a find... program can't be
 	// executed
@@ -270,7 +267,7 @@ private:
 
 	OPtr<PlayerImmovable> m_location; ///< meta location of the worker
 	Economy          * m_economy;      ///< economy this worker is registered in
-	OPtr<WareInstance>    m_carried_item; ///< item we are carrying
+	OPtr<WareInstance>    m_carried_ware; ///< ware we are carrying
 	IdleWorkerSupply * m_supply;   ///< supply while gowarehouse and not transfer
 	Transfer * m_transfer; ///< where we are currently being sent
 	int32_t                m_current_exp;  ///< current experience
@@ -282,23 +279,23 @@ protected:
 		Loader();
 
 		virtual void load(FileRead &);
-		virtual void load_pointers();
-		virtual void load_finish();
+		virtual void load_pointers() override;
+		virtual void load_finish() override;
 
 	protected:
-		virtual const Task * get_task(const std::string & name);
-		virtual const BobProgramBase * get_program(const std::string & name);
+		virtual const Task * get_task(const std::string & name) override;
+		virtual const BobProgramBase * get_program(const std::string & name) override;
 
 	private:
 		uint32_t m_location;
-		uint32_t m_carried_item;
+		uint32_t m_carried_ware;
 		Transfer::ReadData m_transfer;
 	};
 
 	virtual Loader * create_loader();
 
 public:
-	virtual void save(Editor_Game_Base &, Map_Map_Object_Saver &, FileWrite &);
+	virtual void save(Editor_Game_Base &, Map_Map_Object_Saver &, FileWrite &) override;
 	virtual void do_save
 		(Editor_Game_Base &, Map_Map_Object_Saver &, FileWrite &);
 

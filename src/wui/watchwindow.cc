@@ -17,28 +17,25 @@
  *
  */
 
-#include "watchwindow.h"
-
-#include "logic/bob.h"
-#include "logic/game.h"
-#include "graphic/graphic.h"
-#include "i18n.h"
-#include "interactive_gamebase.h"
-#include "interactive_player.h"
-#include "logic/map.h"
-#include "logic/player.h"
-#include "mapview.h"
-#include "mapviewpixelconstants.h"
-#include "mapviewpixelfunctions.h"
-#include "profile/profile.h"
-
-#include "ui_basic/button.h"
-#include "ui_basic/window.h"
-
-#include "upcast.h"
+#include "wui/watchwindow.h"
 
 #include <vector>
 
+#include "graphic/graphic.h"
+#include "i18n.h"
+#include "logic/bob.h"
+#include "logic/game.h"
+#include "logic/map.h"
+#include "logic/player.h"
+#include "profile/profile.h"
+#include "ui_basic/button.h"
+#include "ui_basic/window.h"
+#include "upcast.h"
+#include "wui/interactive_gamebase.h"
+#include "wui/interactive_player.h"
+#include "wui/mapview.h"
+#include "wui/mapviewpixelconstants.h"
+#include "wui/mapviewpixelfunctions.h"
 
 #define NUM_VIEWS 5
 #define REFRESH_TIME 5000
@@ -61,7 +58,7 @@ struct WatchWindow : public UI::Window {
 		return ref_cast<Interactive_GameBase, UI::Panel>(*get_parent()).game();
 	}
 
-	boost::signal<void (Point)> warp_mainview;
+	boost::signals2::signal<void (Point)> warp_mainview;
 
 	void add_view(Widelands::Coords);
 	void next_view(bool first = false);
@@ -72,7 +69,7 @@ struct WatchWindow : public UI::Window {
 	void toggle_buttons();
 
 protected:
-	virtual void think();
+	virtual void think() override;
 	void stop_tracking_by_drag(int32_t x, int32_t y);
 
 private:
@@ -89,7 +86,7 @@ private:
 };
 
 
-static WatchWindow * g_watch_window = 0;
+static WatchWindow * g_watch_window = nullptr;
 
 WatchWindow::WatchWindow
 	(Interactive_GameBase &       parent,
@@ -106,8 +103,8 @@ WatchWindow::WatchWindow
 		new UI::Button
 			(this, "follow",
 			 0, h - 34, 34, 34,
-			 g_gr->get_picture(PicMod_UI, "pics/but0.png"),
-			 g_gr->get_picture(PicMod_UI, "pics/menu_watch_follow.png"),
+			 g_gr->images().get("pics/but0.png"),
+			 g_gr->images().get("pics/menu_watch_follow.png"),
 			 _("Follow"));
 	followbtn->sigclicked.connect(boost::bind(&WatchWindow::do_follow, this));
 
@@ -115,9 +112,9 @@ WatchWindow::WatchWindow
 		new UI::Button
 			(this, "center_mainview_here",
 			 34, h - 34, 34, 34,
-			 g_gr->get_picture(PicMod_UI, "pics/but0.png"),
-			 g_gr->get_picture(PicMod_UI, "pics/menu_goto.png"),
-			 _("Center mainview on this"));
+			 g_gr->images().get("pics/but0.png"),
+			 g_gr->images().get("pics/menu_goto.png"),
+			 _("Center the main view on this"));
 	gotobtn->sigclicked.connect(boost::bind(&WatchWindow::do_goto, this));
 
 	if (_single_window) {
@@ -126,7 +123,7 @@ WatchWindow::WatchWindow
 				new UI::Button
 					(this, "view",
 					 74 + (17 * i), 200 - 34, 17, 34,
-					 g_gr->get_picture(PicMod_UI, "pics/but0.png"),
+					 g_gr->images().get("pics/but0.png"),
 					 "-", std::string(),
 					 false);
 			view_btns[i]->sigclicked.connect
@@ -137,8 +134,8 @@ WatchWindow::WatchWindow
 			new UI::Button
 				(this, "close",
 				 w - 34, h - 34, 34, 34,
-				 g_gr->get_picture(PicMod_UI, "pics/but0.png"),
-				 g_gr->get_picture(PicMod_UI, "pics/menu_abort.png"),
+				 g_gr->images().get("pics/but0.png"),
+				 g_gr->images().get("pics/menu_abort.png"),
 				 _("Close"));
 		closebtn->sigclicked.connect(boost::bind(&WatchWindow::close_cur_view, this));
 	}
@@ -162,7 +159,7 @@ void WatchWindow::add_view(Widelands::Coords const coords) {
 		return;
 	WatchWindowView view;
 
-	view.tracking = 0;
+	view.tracking = nullptr;
 	view.view_point = calc_coords(coords);
 	last_visit = game().get_gametime();
 
@@ -223,7 +220,7 @@ void WatchWindow::show_view(bool) {
 }
 
 WatchWindow::~WatchWindow() {
-	g_watch_window = 0;
+	g_watch_window = nullptr;
 
 	//  If we are destructed because our parent is destructed, our parent may
 	//  not be an Interactive_GameBase any more (it may just be an UI::Panel).
@@ -259,12 +256,14 @@ void WatchWindow::think()
 		pos = bob->calc_drawpos(game(), pos);
 
 		Widelands::Map & map = game().map();
-		if (1 < game().get_ipl()->player().vision(map.get_index(bob->get_position(), map.get_width()))) {
+		// Drop the tracking if it leaves our vision range
+		Interactive_Player* ipl = game().get_ipl();
+		if (ipl && 1 >= ipl->player().vision(map.get_index(bob->get_position(), map.get_width()))) {
+			// Not in sight
+			views[cur_index].tracking = nullptr;
+		} else {
 			mapview.set_viewpoint
 				(pos - Point(mapview.get_w() / 2, mapview.get_h() / 2), false);
-		} else {
-			// stop tracking
-			views[cur_index].tracking = 0;
 		}
 	}
 
@@ -281,7 +280,7 @@ void WatchWindow::stop_tracking_by_drag(int32_t, int32_t) {
 	//Disable switching while dragging
 	if (mapview.is_dragging()) {
 		last_visit = game().get_gametime();
-		views[cur_index].tracking = 0;
+		views[cur_index].tracking = nullptr;
 	}
 }
 
@@ -294,11 +293,8 @@ void WatchWindow::stop_tracking_by_drag(int32_t, int32_t) {
 void WatchWindow::do_follow()
 {
 	Widelands::Game & g = game();
-	if
-		(Widelands::Map_Object const * const obj =
-			views[cur_index].tracking.get(g))
-	{
-		views[cur_index].tracking = 0;
+	if (views[cur_index].tracking.get(g)) {
+		views[cur_index].tracking = nullptr;
 	} else {
 		//  Find the nearest bob. Other object types can not move and are
 		//  therefore not of interest.
@@ -324,7 +320,7 @@ void WatchWindow::do_follow()
 				break;
 		//  Find the bob closest to us
 		int32_t closest_dist = -1;
-		Widelands::Bob * closest = 0;
+		Widelands::Bob * closest = nullptr;
 		for (uint32_t i = 0; i < bobs.size(); ++i) {
 			Widelands::Bob * const bob = bobs[i];
 			Point p;
@@ -333,9 +329,10 @@ void WatchWindow::do_follow()
 			p = bob->calc_drawpos(g, p);
 			int32_t const dist =
 				MapviewPixelFunctions::calc_pix_distance(map, p, pos);
+			Interactive_Player* ipl = game().get_ipl();
 			if
 				((!closest || closest_dist > dist)
-				 && (1 < game().get_ipl()->player().vision(map.get_index(bob->get_position(), map.get_width()))))
+				 && (!ipl || 1 < ipl->player().vision(map.get_index(bob->get_position(), map.get_width()))))
 			{
 				closest = bob;
 				closest_dist = dist;

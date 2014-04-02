@@ -3,9 +3,13 @@ buildable=no
 enhanced_building=yes
 output=coal
 
-[buildcost]
-trunk=4
+[enhancement_cost]
+log=4
 raw_stone=2
+
+[return_on_dismantle_on_enhanced]
+log=2
+raw_stone=1
 
 [working positions]
 master-miner=1
@@ -34,19 +38,15 @@ produce=coal:3
 [idle]
 pics=deeper_coalmine_i_??.png
 hotspot=60 37
-playercolor=true
 
 [working]
 pics=deeper_coalmine_w_??.png
 hotspot=60 37
-playercolor=true
 
 [build]
 pics=deeper_coalmine_b_??.png
 hotspot=60 37
-playercolor=true
 
 [empty]
 pics=deeper_coalmine_e_??.png
 hotspot=60 37
-playercolor=true

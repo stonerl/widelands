@@ -20,19 +20,19 @@
 #ifndef GAME_CMD_QUEUE_DATA_PACKET_H
 #define GAME_CMD_QUEUE_DATA_PACKET_H
 
-#include "game_data_packet.h"
+#include "game_io/game_data_packet.h"
 
 namespace Widelands {
 
-struct Game;
+class Game;
 
 /*
  * This contains all the preload data needed to identify
  * a game for a user (for example in a listbox)
  */
 struct Game_Cmd_Queue_Data_Packet : public Game_Data_Packet {
-	void Read (FileSystem &, Game &, Map_Map_Object_Loader * = 0);
-	void Write(FileSystem &, Game &, Map_Map_Object_Saver  * = 0);
+	void Read (FileSystem &, Game &, Map_Map_Object_Loader * = nullptr) override;
+	void Write(FileSystem &, Game &, Map_Map_Object_Saver  * = nullptr) override;
 };
 
 }

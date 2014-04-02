@@ -17,7 +17,7 @@
  *
  */
 
-#include "story_message_box.h"
+#include "wui/story_message_box.h"
 
 #include "constants.h"
 #include "graphic/graphic.h"
@@ -30,14 +30,14 @@
  */
 Story_Message_Box::Story_Message_Box
 	(UI::Panel * const parent,
-	 std::string const & title,
-	 std::string const & body,
-	 std::string const & button_text,
+	 const std::string & title,
+	 const std::string & body,
+	 const std::string & button_text,
 	 int32_t  const gposx, int32_t  const gposy,
 	 uint32_t const w,     uint32_t const h)
 	: UI::Window(parent, "story_message_box", 0, 0, 600, 400, title.c_str())
 {
-	UI::Multiline_Textarea * m_text = 0;
+	UI::Multiline_Textarea * m_text = nullptr;
 	int32_t const spacing = 5;
 	int32_t       offsy   = 5;
 	int32_t       offsx   = spacing;
@@ -55,7 +55,7 @@ Story_Message_Box::Story_Message_Box
 	if (m_text)
 		m_text->set_text(body);
 
-	int32_t const but_width = 80;
+	int32_t const but_width = 120;
 	int32_t space = get_inner_w() - 2 * spacing;
 	space -= but_width;
 	space /= 2; // center button
@@ -65,10 +65,9 @@ Story_Message_Box::Story_Message_Box
 	UI::Button * okbtn = new UI::Button
 		(this, "ok",
 		 posx, posy, but_width, 20,
-		 g_gr->get_picture(PicMod_UI, "pics/but0.png"),
+		 g_gr->images().get("pics/but0.png"),
 		 button_text);
 	okbtn->sigclicked.connect(boost::bind(&Story_Message_Box::clicked_ok, boost::ref(*this)));
-		posx += but_width;
 
 	center_to_parent();
 

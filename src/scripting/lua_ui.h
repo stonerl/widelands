@@ -20,14 +20,12 @@
 #ifndef LUA_UI_H
 #define LUA_UI_H
 
-#include <lua.hpp>
-
+#include "scripting/eris/lua.hpp"
+#include "scripting/luna.h"
 #include "ui_basic/button.h"
 #include "ui_basic/tabpanel.h"
 #include "ui_basic/window.h"
 #include "wui/interactive_base.h"
-
-#include "luna.h"
 
 namespace LuaUi {
 
@@ -36,7 +34,7 @@ namespace LuaUi {
  */
 class L_UiModuleClass : public LunaClass {
 	public:
-		const char * get_modulename() {return "ui";}
+		const char * get_modulename() override {return "ui";}
 };
 
 
@@ -47,18 +45,18 @@ protected:
 public:
 	LUNA_CLASS_HEAD(L_Panel);
 
-	L_Panel() : m_panel(0) {}
+	L_Panel() : m_panel(nullptr) {}
 	L_Panel(UI::Panel * p) : m_panel(p) {}
-	L_Panel(lua_State * L) : m_panel(0) {
+	L_Panel(lua_State * L) : m_panel(nullptr) {
 		report_error(L, "Cannot instantiate a '%s' directly!", className);
 	}
 	virtual ~L_Panel() {}
 
-	virtual void __persist(lua_State * L) {
+	virtual void __persist(lua_State * L) override {
 		report_error
 			(L, "Trying to persist a User Interface Panel which is no supported!");
 	}
-	virtual void __unpersist(lua_State * L) {
+	virtual void __unpersist(lua_State * L) override {
 		report_error
 			(L, "Trying to unpersist a User Interface Panel which is "
 			 "not supported!");
@@ -179,6 +177,9 @@ public:
 	L_MapView(Map_View * p) : L_Panel(p) {};
 	L_MapView(lua_State * L);
 	virtual ~L_MapView() {}
+
+	virtual void __persist(lua_State *) override {}
+	virtual void __unpersist(lua_State * L) override;
 
 	/*
 	 * Properties

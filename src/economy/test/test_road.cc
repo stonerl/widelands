@@ -18,12 +18,13 @@
  */
 
 #include <exception>
+
 #include <boost/test/unit_test.hpp>
 
-#include "economy/road.h"
 #include "economy/flag.h"
-#include "logic/instances.h"
+#include "economy/road.h"
 #include "logic/editor_game_base.h"
+#include "logic/instances.h"
 #include "logic/player.h"
 
 using namespace Widelands;
@@ -40,7 +41,7 @@ struct TestingFlag : public Flag {
 struct TestingMap : public Map {
 	TestingMap(int const w, int const h) : Map() {set_size(w, h);}
 
-	virtual void recalc_for_field_area(Area<FCoords>) {}
+	virtual void recalc_for_field_area(Area<FCoords>) override {}
 
 };
 
@@ -51,13 +52,12 @@ struct WlTestFixture {
 	WlTestFixture() {
 	g_fs = new LayeredFileSystem();
 	}
-	~WlTestFixture() { delete g_fs; g_fs=0;}
-
+	~WlTestFixture() {delete g_fs; g_fs = nullptr;}
 };
 
 struct SimpleRoadTestsFixture : public WlTestFixture {
-	SimpleRoadTestsFixture() : 
-		g(0),
+	SimpleRoadTestsFixture() :
+		g(nullptr),
 		path(Coords(5, 5))
 	{
 		map = new TestingMap(32, 32);

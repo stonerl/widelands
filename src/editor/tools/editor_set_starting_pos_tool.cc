@@ -17,12 +17,12 @@
  *
  */
 
-#include "editor_set_starting_pos_tool.h"
+#include "editor/tools/editor_set_starting_pos_tool.h"
 
-#include "logic/building.h"
 #include "editor/editorinteractive.h"
-#include "editor_tool.h"
+#include "editor/tools/editor_tool.h"
 #include "graphic/graphic.h"
+#include "logic/building.h"
 #include "logic/map.h"
 #include "wui/overlay_manager.h"
 
@@ -33,11 +33,8 @@ static int32_t m_current_player;
  * static callback function for overlay calculation
  */
 int32_t Editor_Tool_Set_Starting_Pos_Callback
-	(Widelands::TCoords<Widelands::FCoords> const c, void * const data, int32_t)
+	(const Widelands::TCoords<Widelands::FCoords>& c, Widelands::Map& map)
 {
-	assert(data);
-	Widelands::Map const & map = *static_cast<Widelands::Map const *>(data);
-
 	// Area around already placed players
 	Widelands::Player_Number const nr_players = map.get_nrplayers();
 	for (Widelands::Player_Number p = 1, last = m_current_player - 1;; ++p) {
@@ -59,7 +56,7 @@ int32_t Editor_Tool_Set_Starting_Pos_Callback
 }
 
 Editor_Set_Starting_Pos_Tool::Editor_Set_Starting_Pos_Tool()
-	: Editor_Tool(*this, *this, false), m_current_sel_pic(0)
+	: Editor_Tool(*this, *this, false), m_current_sel_pic(nullptr)
 {
 	m_current_player = 0;
 	strcpy(fsel_picsname, FSEL_PIC_FILENAME);
@@ -89,22 +86,17 @@ int32_t Editor_Set_Starting_Pos_Tool::handle_click_impl
 		char picname[] = "pics/editor_player_00_starting_pos.png";
 		picname[19] += m_current_player / 10;
 		picname[20] += m_current_player % 10;
-		const PictureID picid = g_gr->get_picture(PicMod_Game,  picname);
-		uint32_t w, h;
-		g_gr->get_picture_size(picid, w, h);
+		const Image* pic = g_gr->images().get(picname);
 
 		//  check if field is valid
-		if
-		(Editor_Tool_Set_Starting_Pos_Callback
-		        (map.get_fcoords(center.node), &map, 0))
-		{
+		if (Editor_Tool_Set_Starting_Pos_Callback(map.get_fcoords(center.node), map)) {
 			Overlay_Manager & overlay_manager = map.overlay_manager();
 			//  remove old overlay if any
-			overlay_manager.remove_overlay(old_sp, picid);
+			overlay_manager.remove_overlay(old_sp, pic);
 
 			//  add new overlay
 			overlay_manager.register_overlay
-			(center.node, picid, 8, Point(w / 2, STARTING_POS_HOTSPOT_Y));
+			(center.node, pic, 8, Point(pic->width() / 2, STARTING_POS_HOTSPOT_Y));
 
 			//  set new player pos
 			map.set_starting_pos(m_current_player, center.node);
@@ -116,7 +108,6 @@ int32_t Editor_Set_Starting_Pos_Tool::handle_click_impl
 
 Widelands::Player_Number Editor_Set_Starting_Pos_Tool::get_current_player
 () const
-throw()
 {
 	return m_current_player;
 }

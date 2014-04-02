@@ -22,7 +22,7 @@
 
 #include "logic/widelands_fileread.h"
 #include "logic/widelands_filewrite.h"
-#include "widelands_map_data_packet.h"
+#include "map_io/widelands_map_data_packet.h"
 
 namespace Widelands {
 
@@ -34,14 +34,14 @@ class Building;
  */
 struct Map_Building_Data_Packet : public Map_Data_Packet {
 	void Read
-		(FileSystem &, Editor_Game_Base &, bool, Map_Map_Object_Loader &)
-		throw (_wexception);
-	void Write(FileSystem &, Editor_Game_Base &, Map_Map_Object_Saver &)
-		throw (_wexception);
+		(FileSystem &, Editor_Game_Base &, bool, Map_Map_Object_Loader &) override
+	;
+	void Write(FileSystem &, Editor_Game_Base &, Map_Map_Object_Saver &) override
+	;
 
 protected:
 	void read_priorities (Building       &, FileRead  &);
-	void write_priorities(Building const &, FileWrite &);
+	void write_priorities(const Building &, FileWrite &);
 };
 
 }

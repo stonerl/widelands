@@ -17,17 +17,16 @@
  *
  */
 
-#include "editor_tool_change_height_options_menu.h"
-
-#include "editor/tools/editor_increase_height_tool.h"
-#include "editor/tools/editor_set_height_tool.h"
-#include "editor/editorinteractive.h"
-#include "graphic/graphic.h"
-#include "i18n.h"
-
-#include "ui_basic/button.h"
+#include "editor/ui_menus/editor_tool_change_height_options_menu.h"
 
 #include <cstdio>
+
+#include "editor/editorinteractive.h"
+#include "editor/tools/editor_increase_height_tool.h"
+#include "editor/tools/editor_set_height_tool.h"
+#include "graphic/graphic.h"
+#include "i18n.h"
+#include "ui_basic/button.h"
 
 #define width  20
 #define height 20
@@ -42,14 +41,14 @@ Editor_Tool_Change_Height_Options_Menu::Editor_Tool_Change_Height_Options_Menu
 	m_change_by_label
 		(this,
 		 hmargin(), vmargin(), get_inner_w() - 2 * hmargin(), height,
-		 _("In-/Decrease Value"), UI::Align_BottomCenter),
+		 _("Increase/Decrease Value"), UI::Align_BottomCenter),
 	m_change_by_increase
 		(this, "incr_change_by",
 		 get_inner_w() - hmargin() - width,
 		 m_change_by_label.get_y() + m_change_by_label.get_h() + spacing(),
 		 width, height,
-		 g_gr->get_picture(PicMod_UI, "pics/but1.png"),
-		 g_gr->get_picture(PicMod_UI, "pics/scrollbar_up.png"),
+		 g_gr->images().get("pics/but1.png"),
+		 g_gr->images().get("pics/scrollbar_up.png"),
 		 std::string(),
 		 increase_tool.get_change_by() < MAX_FIELD_HEIGHT_DIFF),
 	m_change_by_decrease
@@ -57,8 +56,8 @@ Editor_Tool_Change_Height_Options_Menu::Editor_Tool_Change_Height_Options_Menu
 		 hmargin(),
 		 m_change_by_increase.get_y(),
 		 width, height,
-		 g_gr->get_picture(PicMod_UI, "pics/but1.png"),
-		 g_gr->get_picture(PicMod_UI, "pics/scrollbar_down.png"),
+		 g_gr->images().get("pics/but1.png"),
+		 g_gr->images().get("pics/scrollbar_down.png"),
 		 std::string(),
 		 1 < increase_tool.get_change_by()),
 	m_change_by_value
@@ -84,8 +83,8 @@ Editor_Tool_Change_Height_Options_Menu::Editor_Tool_Change_Height_Options_Menu
 		 m_change_by_increase.get_x(),
 		 m_set_to_label.get_y() + m_set_to_label.get_h() + vspacing(),
 		 width, height,
-		 g_gr->get_picture(PicMod_UI, "pics/but1.png"),
-		 g_gr->get_picture(PicMod_UI, "pics/scrollbar_up.png"),
+		 g_gr->images().get("pics/but1.png"),
+		 g_gr->images().get("pics/scrollbar_up.png"),
 		 std::string(),
 		 increase_tool.set_tool().get_interval().min < MAX_FIELD_HEIGHT),
 	m_set_to_decrease
@@ -93,8 +92,8 @@ Editor_Tool_Change_Height_Options_Menu::Editor_Tool_Change_Height_Options_Menu
 		 hmargin(),
 		 m_set_to_increase.get_y(),
 		 width, height,
-		 g_gr->get_picture(PicMod_UI, "pics/but1.png"),
-		 g_gr->get_picture(PicMod_UI, "pics/scrollbar_down.png"),
+		 g_gr->images().get("pics/but1.png"),
+		 g_gr->images().get("pics/scrollbar_down.png"),
 		 std::string(),
 		 0 < increase_tool.set_tool().get_interval().min),
 	m_set_to_value

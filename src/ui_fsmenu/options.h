@@ -20,26 +20,25 @@
 #ifndef FULLSCREEN_MENU_OPTIONS_H
 #define FULLSCREEN_MENU_OPTIONS_H
 
-#include "base.h"
+#include <cstring>
+#include <string>
+#include <vector>
 
+#include "ui_fsmenu/base.h"
 #include "ui_basic/button.h"
 #include "ui_basic/checkbox.h"
 #include "ui_basic/listselect.h"
 #include "ui_basic/spinbox.h"
 #include "ui_basic/textarea.h"
 
-#include <string>
-#include <cstring>
-#include <vector>
-
-struct Fullscreen_Menu_Options;
+class Fullscreen_Menu_Options;
 struct Section;
 
-struct Options_Ctrl {
+class Options_Ctrl {
+public:
 	struct Options_Struct {
 		int32_t xres;
 		int32_t yres;
-		int32_t depth;
 		bool inputgrab;
 		bool fullscreen;
 		bool single_watchwin;
@@ -61,7 +60,6 @@ struct Options_Ctrl {
 		bool message_sound;
 		bool nozip;
 		std::string ui_font;
-		int32_t speed_of_new_game;
 		int32_t border_snap_distance;
 		int32_t panel_snap_distance;
 	};
@@ -80,7 +78,8 @@ private:
  * Fullscreen Optionsmenu. A modal optionsmenu
  */
 
-struct Fullscreen_Menu_Options : public Fullscreen_Menu_Base {
+class Fullscreen_Menu_Options : public Fullscreen_Menu_Base {
+public:
 	Fullscreen_Menu_Options(Options_Ctrl::Options_Struct opt);
 	Options_Ctrl::Options_Struct get_values();
 	enum {
@@ -88,6 +87,9 @@ struct Fullscreen_Menu_Options : public Fullscreen_Menu_Base {
 		om_ok      = 1,
 		om_restart = 2
 	};
+
+	/// Handle keypresses
+	virtual bool handle_key(bool down, SDL_keysym code) override;
 
 private:
 	uint32_t                          m_vbutw;
@@ -127,19 +129,22 @@ private:
 
 	void advanced_options();
 
-	struct res {
+	class ScreenResolution {
+	public:
 		int32_t xres;
 		int32_t yres;
-		int32_t depth;
 	};
-	std::vector<res> m_resolutions;
+
+	/// All supported screen resolutions.
+	std::vector<ScreenResolution> m_resolutions;
 };
 
 /**
  * Fullscreen Optionsmenu. A modal optionsmenu
  */
 
-struct Fullscreen_Menu_Advanced_Options : public Fullscreen_Menu_Base {
+class Fullscreen_Menu_Advanced_Options : public Fullscreen_Menu_Base {
+public:
 	Fullscreen_Menu_Advanced_Options(Options_Ctrl::Options_Struct opt);
 	Options_Ctrl::Options_Struct get_values();
 	enum {
@@ -147,20 +152,23 @@ struct Fullscreen_Menu_Advanced_Options : public Fullscreen_Menu_Base {
 		om_ok     =   1
 	};
 
+	/// Handle keypresses
+	virtual bool handle_key(bool down, SDL_keysym code) override;
+
 private:
 	uint32_t                    m_vbutw;
 	uint32_t                    m_butw;
 	uint32_t                    m_buth;
 
 	UI::Button     m_cancel, m_apply;
-	UI::SpinBox                 m_sb_speed, m_sb_dis_panel, m_sb_dis_border;
+	UI::SpinBox                 m_sb_dis_panel, m_sb_dis_border;
 	UI::Textarea                m_title;
 	UI::Listselect<std::string> m_ui_font_list;
 	UI::Textarea                m_label_ui_font;
 	UI::Checkbox                m_message_sound;
 	UI::Textarea                m_label_message_sound;
 	UI::Checkbox                m_nozip;
-	UI::Textarea                m_label_nozip, m_label_speed;
+	UI::Textarea                m_label_nozip;
 
 	UI::Textarea                m_label_snap_dis_panel, m_label_snap_dis_border;
 

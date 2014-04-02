@@ -20,8 +20,6 @@
 #ifndef FONT_H
 #define FONT_H
 
-#include <boost/shared_ptr.hpp>
-
 #include <SDL_ttf.h>
 
 #include "io/fileread.h"
@@ -77,7 +75,7 @@ private:
  */
 struct TextStyle {
 	TextStyle() :
-		font(0),
+		font(nullptr),
 		fg(255, 255, 255),
 		bold(false),
 		italics(false),

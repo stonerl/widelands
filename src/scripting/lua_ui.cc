@@ -17,17 +17,15 @@
  *
  */
 
-#include <lua.hpp>
+#include "scripting/lua_ui.h"
 
 #include "gamecontroller.h"
 #include "logic/player.h"
+#include "scripting/c_utils.h"
+#include "scripting/lua_map.h"
+#include "scripting/luna.h"
 #include "upcast.h"
 #include "wui/interactive_player.h"
-
-#include "c_utils.h"
-#include "lua_map.h"
-
-#include "lua_ui.h"
 
 namespace LuaUi {
 
@@ -84,11 +82,11 @@ const PropertyType<L_Panel> L_Panel::Properties[] = {
 	PROP_RW(L_Panel, position_y),
 	PROP_RW(L_Panel, width),
 	PROP_RW(L_Panel, height),
-	{0, 0, 0},
+	{nullptr, nullptr, nullptr},
 };
 const MethodType<L_Panel> L_Panel::Methods[] = {
 	METHOD(L_Panel, get_descendant_position),
-	{0, 0},
+	{nullptr, nullptr},
 };
 
 /*
@@ -337,11 +335,11 @@ const char L_Button::className[] = "Button";
 const MethodType<L_Button> L_Button::Methods[] = {
 	METHOD(L_Button, press),
 	METHOD(L_Button, click),
-	{0, 0},
+	{nullptr, nullptr},
 };
 const PropertyType<L_Button> L_Button::Properties[] = {
 	PROP_RO(L_Button, name),
-	{0, 0, 0},
+	{nullptr, nullptr, nullptr},
 };
 
 /*
@@ -363,7 +361,7 @@ int L_Button::get_name(lua_State * L) {
 		Press and hold this button. This is mainly to visualize a pressing
 		event in tutorials
 */
-int L_Button::press(lua_State * L) {
+int L_Button::press(lua_State * /* L */) {
 	get()->handle_mousein(true);
 	get()->handle_mousepress(SDL_BUTTON_LEFT, 1, 1);
 	return 0;
@@ -374,7 +372,7 @@ int L_Button::press(lua_State * L) {
 		Click this button just as if the user would have moused over and clicked
 		it.
 */
-int L_Button::click(lua_State * L) {
+int L_Button::click(lua_State * /* L */) {
 	get()->handle_mousein(true);
 	get()->handle_mousepress(SDL_BUTTON_LEFT, 1, 1);
 	get()->handle_mouserelease(SDL_BUTTON_LEFT, 1, 1);
@@ -398,12 +396,12 @@ Tab
 const char L_Tab::className[] = "Tab";
 const MethodType<L_Tab> L_Tab::Methods[] = {
 	METHOD(L_Tab, click),
-	{0, 0},
+	{nullptr, nullptr},
 };
 const PropertyType<L_Tab> L_Tab::Properties[] = {
 	PROP_RO(L_Tab, name),
 	PROP_RO(L_Tab, active),
-	{0, 0, 0},
+	{nullptr, nullptr, nullptr},
 };
 
 /*
@@ -434,7 +432,7 @@ int L_Tab::get_active(lua_State * L) {
 
 		Click this tab making it the active one.
 */
-int L_Tab::click(lua_State * L) {
+int L_Tab::click(lua_State * /* L */) {
 	get()->activate();
 	return 0;
 }
@@ -456,11 +454,11 @@ Window
 const char L_Window::className[] = "Window";
 const MethodType<L_Window> L_Window::Methods[] = {
 	METHOD(L_Window, close),
-	{0, 0},
+	{nullptr, nullptr},
 };
 const PropertyType<L_Window> L_Window::Properties[] = {
 	PROP_RO(L_Window, name),
-	{0, 0, 0},
+	{nullptr, nullptr, nullptr},
 };
 
 /*
@@ -483,9 +481,9 @@ int L_Window::get_name(lua_State * L) {
 		Closes this window. This invalidates this Object, do
 		not use it any longer.
 */
-int L_Window::close(lua_State * L) {
+int L_Window::close(lua_State * /* L */) {
 	delete m_panel;
-	m_panel = 0;
+	m_panel = nullptr;
 	return 0;
 }
 
@@ -510,7 +508,7 @@ const MethodType<L_MapView> L_MapView::Methods[] = {
 	METHOD(L_MapView, start_road_building),
 	METHOD(L_MapView, abort_road_building),
 	METHOD(L_MapView, close),
-	{0, 0},
+	{nullptr, nullptr},
 };
 const PropertyType<L_MapView> L_MapView::Properties[] = {
 	PROP_RW(L_MapView, viewpoint_x),
@@ -519,11 +517,17 @@ const PropertyType<L_MapView> L_MapView::Properties[] = {
 	PROP_RW(L_MapView, census),
 	PROP_RW(L_MapView, statistics),
 	PROP_RO(L_MapView, is_building_road),
-	{0, 0, 0},
+	{nullptr, nullptr, nullptr},
 };
 
 L_MapView::L_MapView(lua_State * L) :
 	L_Panel(get_egbase(L).get_ibase()) {
+}
+
+void L_MapView::__unpersist(lua_State* L)
+{
+	Widelands::Game & game = get_game(L);
+	m_panel = game.get_ibase();
 }
 
 
@@ -683,7 +687,7 @@ int L_MapView::start_road_building(lua_State * L) {
 		If he wasn't, this will do nothing.
 */
 // UNTESTED
-int L_MapView::abort_road_building(lua_State * L) {
+int L_MapView::abort_road_building(lua_State * /* L */) {
 	Interactive_Base * me = get();
 	if (me->is_building_road())
 		me->abort_build_road();
@@ -699,7 +703,7 @@ int L_MapView::abort_road_building(lua_State * L) {
 		This is especially useful for automated testing of features and is for
 		example used in the widelands Lua test suite.
 */
-int L_MapView::close(lua_State * l) {
+int L_MapView::close(lua_State * /* l */) {
 	get()->end_modal(0);
 	return 0;
 }
@@ -743,15 +747,18 @@ static int L_get_user_input_allowed(lua_State * L) {
 }
 
 
-const static struct luaL_reg wlui [] = {
+const static struct luaL_Reg wlui [] = {
 	{"set_user_input_allowed", &L_set_user_input_allowed},
 	{"get_user_input_allowed", &L_get_user_input_allowed},
-	{0, 0}
+	{nullptr, nullptr}
 };
 
 void luaopen_wlui(lua_State * L) {
-	luaL_register(L, "wl.ui", wlui);
-	lua_pop(L, 1); // pop the table from the stack
+	lua_getglobal(L, "wl");  // S: wl_table
+	lua_pushstring(L, "ui"); // S: wl_table "ui"
+	luaL_newlib(L, wlui);  // S: wl_table "ui" wl.ui_table
+	lua_settable(L, -3); // S: wl_table
+	lua_pop(L, 1); // S:
 
 	register_class<L_Panel>(L, "ui");
 
@@ -774,4 +781,3 @@ void luaopen_wlui(lua_State * L) {
 
 
 };
-

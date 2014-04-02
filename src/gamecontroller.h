@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2011 by the Widelands Development Team
+ * Copyright (C) 2008-2011, 2013, 2014 by the Widelands Development Team
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -20,13 +20,14 @@
 #ifndef GAMECONTROLLER_H
 #define GAMECONTROLLER_H
 
-#include "logic/widelands.h"
-
 #include <string>
 
+#include "logic/widelands.h"
+
 namespace Widelands {
-struct Game;
-struct PlayerCommand;
+class Game;
+class PlayerCommand;
+enum class PlayerEndResult: uint8_t;
 }
 
 
@@ -39,7 +40,8 @@ struct PlayerCommand;
  * vs. multiplayer vs. replay issues and have a \ref GameController
  * handle all that.
  */
-struct GameController {
+class GameController {
+public:
 	virtual ~GameController() {}
 
 	virtual void think() = 0;
@@ -82,16 +84,17 @@ struct GameController {
 	}
 
 	/**
-	 * Allocate a new \ref GameController suitable for normal singleplayer.
-	 * \param cpls is \c true when computer players should be generated
-	 * \return newly allocated \ref GameController object, must be freed
-	 * by the caller.
+	 * Report a player result once he has left the game. This may be done through lua
+	 * by the win_condition scripts.
+	 * \param player : the player idx;
+	 * \param result : the player result
+	 * \param info : The info string (\see \struct PlayerEndStatus for allowed values)
 	 */
-	static GameController * createSinglePlayer
-		(Widelands::Game &, bool cpls, Widelands::Player_Number local);
-
-	// until now only implemented for nethost and only used for dedicated servers
-	virtual void report_result(uint8_t player, int32_t points, bool win, std::string extra) {}
+	virtual void report_result
+	    (uint8_t /* player */,
+	     Widelands::PlayerEndResult /*result*/,
+	     const std::string & /* info */)
+	{}
 };
 
 #endif

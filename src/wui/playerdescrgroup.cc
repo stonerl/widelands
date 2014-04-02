@@ -17,19 +17,21 @@
  *
  */
 
-#include "playerdescrgroup.h"
+#include "wui/playerdescrgroup.h"
+
+#include <boost/format.hpp>
 
 #include "constants.h"
 #include "gamesettings.h"
+#include "graphic/graphic.h"
 #include "i18n.h"
 #include "logic/player.h"
-#include "profile/profile.h"
 #include "logic/tribe.h"
-#include "wexception.h"
-
+#include "profile/profile.h"
 #include "ui_basic/button.h"
 #include "ui_basic/checkbox.h"
 #include "ui_basic/textarea.h"
+#include "wexception.h"
 
 
 struct PlayerDescriptionGroupImpl {
@@ -58,10 +60,10 @@ d(new PlayerDescriptionGroupImpl)
 	d->plnum = plnum;
 
 	int32_t xplrname = 0;
-	int32_t xplayertype = w * 28 / 125;
-	int32_t xplayerteam = w * 55 / 125;
-	int32_t xplayertribe = w * 60 / 125;
-	int32_t xplayerinit = w * 85 / 125;
+	int32_t xplayertype = w * 35 / 125;
+	int32_t xplayerteam = w * 35 / 125;
+	int32_t xplayertribe = w * 80 / 125;
+	int32_t xplayerinit = w * 55 / 125;
 	d->plr_name = new UI::Textarea(this, xplrname, 0, xplayertype - xplrname, h);
 	d->plr_name->set_textstyle(UI::TextStyle::makebold(font, UI_FONT_CLR_FG));
 	d->btnEnablePlayer = new UI::Checkbox(this, Point(xplayertype - 23, 0));
@@ -69,8 +71,8 @@ d(new PlayerDescriptionGroupImpl)
 		(boost::bind(&PlayerDescriptionGroup::enable_player, this, _1));
 	d->btnPlayerType = new UI::Button
 		(this, "player_type",
-		 xplayertype, 0, xplayerteam - xplayertype - 2, h,
-		 g_gr->get_picture(PicMod_UI, "pics/but1.png"),
+		 xplayertype, 0, xplayertribe - xplayertype - 2, h / 2,
+		 g_gr->images().get("pics/but1.png"),
 		 std::string(), std::string(),
 		 true, false);
 	d->btnPlayerType->sigclicked.connect
@@ -78,8 +80,8 @@ d(new PlayerDescriptionGroupImpl)
 	d->btnPlayerType->set_font(font);
 	d->btnPlayerTeam = new UI::Button
 		(this, "player_team",
-		 xplayerteam, 0, xplayertribe - xplayerteam - 2, h,
-		 g_gr->get_picture(PicMod_UI, "pics/but1.png"),
+		 xplayerteam, h / 2, xplayerinit - xplayerteam - 2, h / 2,
+		 g_gr->images().get("pics/but1.png"),
 		 std::string(), std::string(),
 		 true, false);
 	d->btnPlayerTeam->sigclicked.connect
@@ -87,8 +89,8 @@ d(new PlayerDescriptionGroupImpl)
 	d->btnPlayerTeam->set_font(font);
 	d->btnPlayerTribe = new UI::Button
 		(this, "player_tribe",
-		 xplayertribe, 0, xplayerinit - xplayertribe - 2, h,
-		 g_gr->get_picture(PicMod_UI, "pics/but1.png"),
+		 xplayertribe, 0, w - xplayertribe, h / 2,
+		 g_gr->images().get("pics/but1.png"),
 		 std::string(), std::string(),
 		 true, false);
 	d->btnPlayerTribe->sigclicked.connect
@@ -96,8 +98,8 @@ d(new PlayerDescriptionGroupImpl)
 	d->btnPlayerTribe->set_font(font);
 	d->btnPlayerInit = new UI::Button
 		(this, "player_initialization",
-		 xplayerinit, 0, w - xplayerinit, h,
-		 g_gr->get_picture(PicMod_UI, "pics/but1.png"),
+		 xplayerinit, h / 2, w - xplayerinit, h / 2,
+		 g_gr->images().get("pics/but1.png"),
 		 std::string(), _("Initialization"),
 		 true, false);
 	d->btnPlayerInit->sigclicked.connect
@@ -111,7 +113,7 @@ d(new PlayerDescriptionGroupImpl)
 PlayerDescriptionGroup::~PlayerDescriptionGroup()
 {
 	delete d;
-	d = 0;
+	d = nullptr;
 }
 
 
@@ -120,7 +122,7 @@ PlayerDescriptionGroup::~PlayerDescriptionGroup()
  */
 void PlayerDescriptionGroup::refresh()
 {
-	GameSettings const & settings = d->settings->settings();
+	const GameSettings & settings = d->settings->settings();
 
 	if (d->plnum >= settings.players.size()) {
 		set_visible(false);
@@ -129,7 +131,7 @@ void PlayerDescriptionGroup::refresh()
 
 	set_visible(true);
 
-	PlayerSettings const & player = settings.players[d->plnum];
+	const PlayerSettings & player = settings.players[d->plnum];
 	bool stateaccess = d->settings->canChangePlayerState(d->plnum);
 	bool tribeaccess = d->settings->canChangePlayerTribe(d->plnum);
 	bool const initaccess  = d->settings->canChangePlayerInit(d->plnum);
@@ -169,11 +171,11 @@ void PlayerDescriptionGroup::refresh()
 				if (player.ai.empty())
 					title = _("Computer");
 				else {
-					title = _("AI: ");
 					if (player.random_ai) {
-						title += _("Random");
+						title += _("AI: Random");
 					} else {
-						title += _(player.ai);
+						/** TRANSLATORS %s = AI type, e.g. 'Agressive' */
+						title += (boost::format(_("AI: %s")) % _(player.ai)).str();
 					}
 				}
 			} else { // PlayerSettings::stateHuman
@@ -184,7 +186,7 @@ void PlayerDescriptionGroup::refresh()
 			if (!m_tribenames[player.tribe].size()) {
 				// get translated tribesname
 				Profile prof
-					((tribepath + "/conf").c_str(), 0, "tribe_" + player.tribe);
+					((tribepath + "/conf").c_str(), nullptr, "tribe_" + player.tribe);
 				Section & global = prof.get_safe_section("tribe");
 				m_tribenames[player.tribe] = global.get_safe_string("name");
 			}
@@ -235,7 +237,7 @@ void PlayerDescriptionGroup::refresh()
  */
 void PlayerDescriptionGroup::enable_player(bool on)
 {
-	GameSettings const & settings = d->settings->settings();
+	const GameSettings & settings = d->settings->settings();
 
 	if (d->plnum >= settings.players.size())
 		return;
@@ -260,13 +262,13 @@ void PlayerDescriptionGroup::toggle_playertype()
  */
 void PlayerDescriptionGroup::toggle_playertribe()
 {
-	GameSettings const & settings = d->settings->settings();
+	const GameSettings & settings = d->settings->settings();
 
 	if (d->plnum >= settings.players.size())
 		return;
 
-	PlayerSettings const & player = settings.players.at(d->plnum);
-	std::string const & currenttribe = player.tribe;
+	const PlayerSettings & player = settings.players.at(d->plnum);
+	const std::string & currenttribe = player.tribe;
 	std::string nexttribe = settings.tribes.at(0).name;
 	bool random_tribe = false;
 	uint32_t num_tribes = settings.tribes.size();
@@ -317,12 +319,12 @@ void PlayerDescriptionGroup::toggle_playerteam()
 /// Cycle through available initializations for the player's tribe.
 void PlayerDescriptionGroup::toggle_playerinit()
 {
-	GameSettings const & settings = d->settings->settings();
+	const GameSettings & settings = d->settings->settings();
 
 	if (d->plnum >= settings.players.size())
 		return;
 
-	PlayerSettings const & player = settings.players[d->plnum];
+	const PlayerSettings & player = settings.players[d->plnum];
 	container_iterate_const(std::vector<TribeBasicInfo>, settings.tribes, j)
 		if (j.current->name == player.tribe)
 			return

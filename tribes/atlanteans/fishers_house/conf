@@ -2,8 +2,11 @@ size=small
 output=fish
 
 [buildcost]
-trunk=1
+log=1
 planks=2
+
+[return_on_dismantle]
+planks=1
 
 [working positions]
 fisher=1
@@ -22,4 +25,3 @@ worker=fish
 [idle]
 pics=fisher_i_??.png  # ???
 hotspot=34 42
-playercolor=true

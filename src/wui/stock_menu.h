@@ -21,7 +21,7 @@
 #define STOCK_MENU_H
 
 #include "ui_basic/unique_window.h"
-#include "waresdisplay.h"
+#include "wui/waresdisplay.h"
 
 struct Interactive_Player;
 
@@ -32,7 +32,7 @@ struct Interactive_Player;
 struct Stock_Menu : public UI::UniqueWindow {
 	Stock_Menu(Interactive_Player &, UI::UniqueWindow::Registry &);
 
-	virtual void think();
+	virtual void think() override;
 
 private:
 	Interactive_Player &  m_player;

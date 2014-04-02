@@ -17,30 +17,31 @@
  *
  */
 
-#include "editor_main_menu_load_map.h"
+#include "editor/ui_menus/editor_main_menu_load_map.h"
 
-#include "logic/building.h"
+#include <cstdio>
+
+#include <boost/format.hpp>
+
+#include "editor/editorinteractive.h"
+#include "editor/tools/editor_set_starting_pos_tool.h"
 #include "graphic/graphic.h"
 #include "i18n.h"
 #include "io/filesystem/layered_filesystem.h"
-#include "editor/editorinteractive.h"
-#include "map_io/widelands_map_loader.h"
-#include "wexception.h"
+#include "logic/building.h"
 #include "logic/editor_game_base.h"
-#include "editor/tools/editor_set_starting_pos_tool.h"
-#include "wui/overlay_manager.h"
 #include "logic/world.h"
 #include "map_io/map_loader.h"
+#include "map_io/widelands_map_loader.h"
 #include "profile/profile.h"
-
 #include "ui_basic/button.h"
 #include "ui_basic/editbox.h"
 #include "ui_basic/listselect.h"
 #include "ui_basic/multilinetextarea.h"
 #include "ui_basic/progresswindow.h"
 #include "ui_basic/textarea.h"
-
-#include <cstdio>
+#include "wexception.h"
+#include "wui/overlay_manager.h"
 
 using Widelands::WL_Map_Loader;
 
@@ -66,35 +67,35 @@ Main_Menu_Load_Map::Main_Menu_Load_Map(Editor_Interactive & parent)
 	posx = get_inner_w() / 2 + spacing;
 	posy += 20;
 	new UI::Textarea
-		(this, posx, posy, 150, 20, _("Name: "), UI::Align_CenterLeft);
+		(this, posx, posy, 150, 20, _("Name:"), UI::Align_CenterLeft);
 	m_name =
 		new UI::Textarea
 			(this, posx + 70, posy, 200, 20, "---", UI::Align_CenterLeft);
 	posy += 20 + spacing;
 
 	new UI::Textarea
-		(this, posx, posy, 150, 20, _("Author: "), UI::Align_CenterLeft);
+		(this, posx, posy, 150, 20, _("Author:"), UI::Align_CenterLeft);
 	m_author =
 		new UI::Textarea
 			(this, posx + 70, posy, 200, 20, "---", UI::Align_CenterLeft);
 	posy += 20 + spacing;
 
 	new UI::Textarea
-		(this, posx, posy, 70, 20, _("Size: "), UI::Align_CenterLeft);
+		(this, posx, posy, 70, 20, _("Size:"), UI::Align_CenterLeft);
 	m_size =
 		new UI::Textarea
 			(this, posx + 70, posy, 200, 20, "---", UI::Align_CenterLeft);
 	posy += 20 + spacing;
 
 	new UI::Textarea
-		(this, posx, posy, 70, 20, _("World: "), UI::Align_CenterLeft);
+		(this, posx, posy, 70, 20, _("World:"), UI::Align_CenterLeft);
 	m_world =
 		new UI::Textarea
 			(this, posx + 70, posy, 200, 20, "---", UI::Align_CenterLeft);
 	posy += 20 + spacing;
 
 	new UI::Textarea
-		(this, posx, posy, 70, 20, _("Players: "), UI::Align_CenterLeft);
+		(this, posx, posy, 70, 20, _("Players:"), UI::Align_CenterLeft);
 	m_nrplayers =
 		new UI::Textarea
 			(this, posx + 70, posy, 200, 20, "---", UI::Align_CenterLeft);
@@ -102,7 +103,7 @@ Main_Menu_Load_Map::Main_Menu_Load_Map(Editor_Interactive & parent)
 
 
 	new UI::Textarea
-		(this, posx, posy, 70, 20, _("Descr: "), UI::Align_CenterLeft);
+		(this, posx, posy, 70, 20, _("Descr:"), UI::Align_CenterLeft);
 	m_descr =
 		new UI::Multiline_Textarea
 			(this,
@@ -116,7 +117,7 @@ Main_Menu_Load_Map::Main_Menu_Load_Map(Editor_Interactive & parent)
 	m_ok_btn = new UI::Button
 		(this, "ok",
 		 get_inner_w() / 2 - spacing - 80, posy, 80, 20,
-		 g_gr->get_picture(PicMod_UI, "pics/but0.png"),
+		 g_gr->images().get("pics/but0.png"),
 		 _("OK"),
 		 std::string(),
 		 false);
@@ -125,7 +126,7 @@ Main_Menu_Load_Map::Main_Menu_Load_Map(Editor_Interactive & parent)
 	UI::Button * cancelbtn = new UI::Button
 		(this, "cancel",
 		 posx, posy, 80, 20,
-		 g_gr->get_picture(PicMod_UI, "pics/but1.png"),
+		 g_gr->images().get("pics/but1.png"),
 		 _("Cancel"));
 	cancelbtn->sigclicked.connect(boost::bind(&Main_Menu_Load_Map::die, this));
 
@@ -140,13 +141,9 @@ Main_Menu_Load_Map::Main_Menu_Load_Map(Editor_Interactive & parent)
 
 
 void Main_Menu_Load_Map::clicked_ok() {
-	std::string filename(m_ls->get_selected());
+	const char * const filename(m_ls->get_selected());
 
-	if
-		(g_fs->IsDirectory(filename.c_str())
-		 &&
-		 !WL_Map_Loader::is_widelands_map(filename))
-	{
+	if (g_fs->IsDirectory(filename) && !WL_Map_Loader::is_widelands_map(filename)) {
 		m_curdir = filename;
 		m_ls->clear();
 		m_mapfiles.clear();
@@ -158,7 +155,7 @@ void Main_Menu_Load_Map::clicked_ok() {
 }
 
 /**
- * Called when a item is selected
+ * Called when a entry is selected
  */
 void Main_Menu_Load_Map::selected(uint32_t) {
 	const char * const name = m_ls->get_selected();
@@ -168,15 +165,14 @@ void Main_Menu_Load_Map::selected(uint32_t) {
 	if (!g_fs->IsDirectory(name) || WL_Map_Loader::is_widelands_map(name)) {
 		Widelands::Map map;
 		{
-			Widelands::Map_Loader * const m_ml = map.get_correct_loader(name);
-			m_ml->preload_map(true); //  This has worked before, no problem.
-			delete m_ml;
+			std::unique_ptr<Widelands::Map_Loader> map_loader = map.get_correct_loader(name);
+			map_loader->preload_map(true); //  This has worked before, no problem.
 		}
 
 		// get translated worldsname
 		std::string world(map.get_world_name());
 		std::string worldpath("worlds/" + world);
-		Profile prof((worldpath + "/conf").c_str(), 0, "world_" + world);
+		Profile prof((worldpath + "/conf").c_str(), nullptr, "world_" + world);
 		Section & global = prof.get_safe_section("world");
 		world = global.get_safe_string("name");
 
@@ -205,7 +201,7 @@ void Main_Menu_Load_Map::selected(uint32_t) {
 }
 
 /**
- * An Item has been doubleclicked
+ * An entry has been doubleclicked
  */
 void Main_Menu_Load_Map::double_clicked(uint32_t) {clicked_ok();}
 
@@ -214,19 +210,22 @@ void Main_Menu_Load_Map::double_clicked(uint32_t) {clicked_ok();}
  */
 void Main_Menu_Load_Map::fill_list() {
 	//  Fill it with all files we find.
-	g_fs->FindFiles(m_curdir, "*", &m_mapfiles, 1);
+	m_mapfiles = g_fs->ListDirectory(m_curdir);
 
 	//  First, we add all directories. We manually add the parent directory.
 	if (m_curdir != m_basedir) {
-#ifndef WIN32
+#ifndef _WIN32
 		m_parentdir = m_curdir.substr(0, m_curdir.rfind('/'));
 #else
 		m_parentdir = m_curdir.substr(0, m_curdir.rfind('\\'));
 #endif
+		std::string parent_string =
+				/** TRANSLATORS: Parent directory */
+				(boost::format("\\<%s\\>") % _("parent")).str();
 		m_ls->add
-			(_("<parent>"),
+			(parent_string.c_str(),
 			 m_parentdir.c_str(),
-			 g_gr->get_picture(PicMod_Game, "pics/ls_dir.png"));
+			 g_gr->images().get("pics/ls_dir.png"));
 	}
 
 	const filenameset_t::const_iterator mapfiles_end = m_mapfiles.end();
@@ -238,7 +237,6 @@ void Main_Menu_Load_Map::fill_list() {
 		const char * const name = pname->c_str();
 		if
 			(strcmp(FileSystem::FS_Filename(name), ".")    and
-			 // Upsy, appeared again. ignore
 			 strcmp(FileSystem::FS_Filename(name), "..")   and
 			 g_fs->IsDirectory(name)                       and
 			 not WL_Map_Loader::is_widelands_map(name))
@@ -246,7 +244,7 @@ void Main_Menu_Load_Map::fill_list() {
 		m_ls->add
 			(FileSystem::FS_Filename(name),
 			 name,
-			 g_gr->get_picture(PicMod_Game, "pics/ls_dir.png"));
+			 g_gr->images().get("pics/ls_dir.png"));
 	}
 
 	Widelands::Map map;
@@ -257,19 +255,17 @@ void Main_Menu_Load_Map::fill_list() {
 		 ++pname)
 	{
 		char const * const name = pname->c_str();
-
-		if (Widelands::Map_Loader * const m_ml = map.get_correct_loader(name)) {
+		std::unique_ptr<Widelands::Map_Loader> map_loader = map.get_correct_loader(name);
+		if (map_loader.get() != nullptr) {
 			try {
-				m_ml->preload_map(true);
+				map_loader->preload_map(true);
 				m_ls->add
 					(FileSystem::FS_Filename(name),
 					 name,
-					 g_gr->get_picture
-					 	(PicMod_Game,
-					 	 dynamic_cast<WL_Map_Loader const *>(m_ml) ?
-					 	 "pics/ls_wlmap.png" : "pics/ls_s2map.png"));
-			} catch (_wexception const &) {} //  we simply skip illegal entries
-			delete m_ml;
+					 g_gr->images().get
+						 (dynamic_cast<WL_Map_Loader*>(map_loader.get())
+								? "pics/ls_wlmap.png" : "pics/ls_s2map.png"));
+			} catch (const _wexception &) {} //  we simply skip illegal entries
 		}
 	}
 

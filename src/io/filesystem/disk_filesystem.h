@@ -20,52 +20,48 @@
 #ifndef DISK_FILESYSTEM_H
 #define DISK_FILESYSTEM_H
 
-#include "filesystem.h"
-
-#include <string>
 #include <cstring>
+#include <string>
+
+#include "io/filesystem/filesystem.h"
 
 /// \todo const correctness
-struct RealFSImpl : public FileSystem {
-	RealFSImpl(std::string const & Directory);
+class RealFSImpl : public FileSystem {
+public:
+	RealFSImpl(const std::string & Directory);
 
-	virtual int32_t FindFiles
-		(std::string const & path,
-		 std::string const & pattern,
-		 filenameset_t     * results,
-		 uint32_t            depth = 0);
+	virtual std::set<std::string> ListDirectory(const std::string& path) override;
 
-	virtual bool IsWritable() const;
-	bool FileIsWriteable(std::string const & path);
-	virtual bool FileExists (std::string const & path);
-	virtual bool IsDirectory(std::string const & path);
-	virtual void EnsureDirectoryExists(std::string const & dirname);
-	virtual void MakeDirectory        (std::string const & dirname);
+	virtual bool IsWritable() const override;
+	bool FileIsWriteable(const std::string & path);
+	virtual bool FileExists (const std::string & path) override;
+	virtual bool IsDirectory(const std::string & path) override;
+	virtual void EnsureDirectoryExists(const std::string & dirname) override;
+	virtual void MakeDirectory        (const std::string & dirname) override;
 
-	virtual void * Load(const std::string & fname, size_t & length);
+	virtual void * Load(const std::string & fname, size_t & length) override;
 	virtual void * fastLoad
-		(const std::string & fname, size_t & length, bool & fast);
+		(const std::string & fname, size_t & length, bool & fast) override;
 
 
-	void Write(std::string const & fname, void const * data, int32_t length, bool append);
-	virtual void Write(std::string const & fname, void const * data, int32_t length)
+	void Write(const std::string & fname, void const * data, int32_t length, bool append);
+	virtual void Write(const std::string & fname, void const * data, int32_t length) override
 		{Write(fname, data, length, false);}
 
-	virtual StreamRead  * OpenStreamRead (std::string const & fname);
-	virtual StreamWrite * OpenStreamWrite(std::string const & fname);
+	virtual StreamRead  * OpenStreamRead (const std::string & fname) override;
+	virtual StreamWrite * OpenStreamWrite(const std::string & fname) override;
 
-	virtual FileSystem &   MakeSubFileSystem(std::string const & dirname);
-	virtual FileSystem & CreateSubFileSystem
-		(std::string const & dirname, Type);
-	virtual void Unlink(std::string const & file);
-	virtual void Rename(std::string const & old_name, std::string const & new_name);
+	virtual FileSystem * MakeSubFileSystem(const std::string & dirname) override;
+	virtual FileSystem * CreateSubFileSystem(const std::string & dirname, Type) override;
+	virtual void Unlink(const std::string & file) override;
+	virtual void Rename(const std::string & old_name, const std::string & new_name) override;
 
-	virtual std::string getBasename() {return m_directory;};
-	virtual unsigned long long DiskSpace();
+	virtual std::string getBasename() override {return m_directory;};
+	virtual unsigned long long DiskSpace() override;
 
 private:
-	void m_unlink_directory(std::string const & file);
-	void m_unlink_file     (std::string const & file);
+	void m_unlink_directory(const std::string & file);
+	void m_unlink_file     (const std::string & file);
 
 	std::string m_directory;
 };

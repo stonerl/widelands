@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2012 by the Widelands Development Team
+ * Copyright (C) 2008-2013 by the Widelands Development Team
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -17,22 +17,32 @@
  *
  */
 
-#include "netclient.h"
+#include "network/netclient.h"
+
+#include <boost/algorithm/string/predicate.hpp>
+#include <boost/lexical_cast.hpp>
+#include <config.h>
 
 #include "build_info.h"
 #include "game_io/game_loader.h"
+#include "helper.h"
 #include "i18n.h"
-#include "internet_gaming.h"
 #include "io/fileread.h"
 #include "io/filewrite.h"
 #include "logic/game.h"
+#include "logic/player.h"
 #include "logic/playercommand.h"
+#include "logic/playersmanager.h"
 #include "map_io/widelands_map_loader.h"
-#include "network_gaming_messages.h"
-#include "network_protocol.h"
-#include "network_system.h"
+#include "network/internet_gaming.h"
+#include "network/network_gaming_messages.h"
+#include "network/network_protocol.h"
+#include "network/network_system.h"
 #include "profile/profile.h"
+#include "scripting/lua_table.h"
 #include "scripting/scripting.h"
+#include "ui_basic/messagebox.h"
+#include "ui_basic/progresswindow.h"
 #include "ui_fsmenu/launchMPG.h"
 #include "warning.h"
 #include "wexception.h"
@@ -41,14 +51,6 @@
 #include "wui/interactive_player.h"
 #include "wui/interactive_spectator.h"
 
-#include "ui_basic/messagebox.h"
-#include "ui_basic/progresswindow.h"
-
-#include <boost/lexical_cast.hpp>
-#include <config.h>
-#ifndef HAVE_VARARRAY
-#include <climits>
-#endif
 
 struct NetClientImpl {
 	GameSettings settings;
@@ -94,11 +96,11 @@ struct NetClientImpl {
 };
 
 NetClient::NetClient
-	(IPaddress * const svaddr, std::string const & playername, bool internet)
+	(IPaddress * const svaddr, const std::string & playername, bool internet)
 : d(new NetClientImpl), m_internet(internet), m_dedicated_access(false), m_dedicated_temp_scenario(false)
 {
 	d->sock = SDLNet_TCP_Open(svaddr);
-	if (d->sock == 0)
+	if (d->sock == nullptr)
 		throw warning
 			(_("Could not establish connection to host"),
 			 _
@@ -113,27 +115,23 @@ NetClient::NetClient
 	d->settings.playernum = UserSettings::notConnected();
 	d->settings.usernum = -2;
 	d->localplayername = playername;
-	d->modal = 0;
-	d->game = 0;
+	d->modal = nullptr;
+	d->game = nullptr;
 	d->realspeed = 0;
 	d->desiredspeed = 1000;
-	file = 0;
+	file = nullptr;
 
 	// Temporarily register win condition scripts to get the default
-	LuaInterface * lua = create_LuaInterface();
-	lua->register_scripts(*g_fs, "win_conditions", "scripting/win_conditions");
-	ScriptContainer sc = lua->get_scripts_for("win_conditions");
-	std::vector<std::string> win_conditions;
-	container_iterate_const(ScriptContainer, sc, wc)
-		win_conditions.push_back(wc->first);
-	assert(win_conditions.size());
-	d->settings.win_condition = win_conditions[0];
-	delete lua;
+	std::set<std::string> win_condition_scripts =
+	   filter(g_fs->ListDirectory("scripting/win_conditions"),
+	          [](const std::string& fn) {return boost::ends_with(fn, ".lua");});
+	assert(win_condition_scripts.size());
+	d->settings.win_condition_script = *win_condition_scripts.begin();
 }
 
 NetClient::~NetClient ()
 {
-	if (d->sock != 0)
+	if (d->sock != nullptr)
 		disconnect("CLIENT_LEFT_GAME", "", true, false);
 
 	SDLNet_FreeSocketSet (d->sockset);
@@ -159,16 +157,16 @@ void NetClient::run ()
 		lgm.setChatProvider(*this);
 		d->modal = &lgm;
 		int32_t code = lgm.run();
-		d->modal = 0;
+		d->modal = nullptr;
 		if (code == 1) { // Only possible if server is dedicated - client pressed "start game" button
-			SendPacket s;
-			s.Unsigned8(NETCMD_LAUNCH);
-			s.send(d->sock);
+			SendPacket subs;
+			subs.Unsigned8(NETCMD_LAUNCH);
+			subs.send(d->sock);
 
 			// Reopen the menu - perhaps the start is denied or other problems occur
 			d->modal = &lgm;
 			code = lgm.run();
-			d->modal = 0;
+			d->modal = nullptr;
 		}
 		if (code <= 0) {
 			// if this is an internet game, tell the metaserver that client is back in the lobby.
@@ -181,7 +179,7 @@ void NetClient::run ()
 	d->server_is_waiting = true;
 
 	Widelands::Game game;
-#ifdef DEBUG
+#ifndef NDEBUG
 	game.set_write_syncstream(true);
 #endif
 
@@ -226,17 +224,18 @@ void NetClient::run ()
 			 d->settings.savegame ?
 			 Widelands::Game::Loaded
 			 : d->settings.scenario ?
-			 Widelands::Game::NewMPScenario : Widelands::Game::NewNonScenario);
+			 Widelands::Game::NewMPScenario : Widelands::Game::NewNonScenario,
+			 "", false);
 
 		// if this is an internet game, tell the metaserver that the game is done.
 		if (m_internet)
 			InternetGaming::ref().set_game_done();
-		d->modal = 0;
-		d->game = 0;
+		d->modal = nullptr;
+		d->game = nullptr;
 	} catch (...) {
-		d->modal = 0;
+		d->modal = nullptr;
 		WLApplication::emergency_save(game);
-		d->game = 0;
+		d->game = nullptr;
 		disconnect("CLIENT_CRASHED");
 		throw;
 	}
@@ -301,7 +300,22 @@ std::string NetClient::getGameDescription()
 	return buf;
 }
 
-GameSettings const & NetClient::settings()
+void NetClient::report_result
+	(uint8_t player_nr, Widelands::PlayerEndResult result, const std::string & info)
+{
+	// Send to game
+	Widelands::PlayerEndStatus pes;
+	Widelands::Player* player = d->game->get_player(player_nr);
+	assert(player);
+	pes.player = player->player_number();
+	pes.time = d->game->get_gametime();
+	pes.result = result;
+	pes.info = info;
+	d->game->player_manager()->add_player_end_status(pes);
+}
+
+
+const GameSettings & NetClient::settings()
 {
 	return d->settings;
 }
@@ -383,6 +397,15 @@ bool NetClient::canLaunch()
 		return false;
 	if (d->game)
 		return false;
+
+	// if there is one client that is currently receiving a file, we can not launch.
+	for (uint8_t i = 0; i < d->settings.users.size(); ++i) {
+		if (d->settings.users[i].position == d->settings.users[i].notConnected())
+			continue;
+		if (!d->settings.users[i].ready)
+			return false;
+	}
+
 	// all players must be connected to a controller (human/ai) or be closed.
 	for (size_t i = 0; i < d->settings.players.size(); ++i) {
 		if (d->settings.players.at(i).state == PlayerSettings::stateOpen)
@@ -391,7 +414,11 @@ bool NetClient::canLaunch()
 	return true;
 }
 
-void NetClient::setMap(std::string const & name, std::string const & path, uint32_t players, bool savegame)
+void NetClient::setMap
+	(const std::string & name,
+	 const std::string & path,
+	 uint32_t /* players */,
+	 bool savegame)
 {
 	// only accessible, if server is a dedicated server and access is granted
 	if (!m_dedicated_access)
@@ -410,7 +437,7 @@ void NetClient::setPlayerState(uint8_t, PlayerSettings::State)
 	// client is not allowed to do this
 }
 
-void NetClient::setPlayerAI(uint8_t, std::string const &, bool const random_ai)
+void NetClient::setPlayerAI(uint8_t, const std::string &, bool const /* random_ai */)
 {
 	// client is not allowed to do this
 }
@@ -480,7 +507,7 @@ void NetClient::setPlayerInit(uint8_t number, uint8_t)
 	s.send(d->sock);
 }
 
-void NetClient::setPlayerName(uint8_t, std::string const &)
+void NetClient::setPlayerName(uint8_t, const std::string &)
 {
 	// until now the name is set before joining - if you allow a change in
 	// launchgame-menu, here properly should be a set_name function
@@ -492,11 +519,11 @@ void NetClient::setPlayer(uint8_t, PlayerSettings)
 	// setPlayerNumber(uint8_t) to the host.
 }
 
-std::string NetClient::getWinCondition() {
-	return d->settings.win_condition;
+std::string NetClient::getWinConditionScript() {
+	return d->settings.win_condition_script;
 }
 
-void NetClient::setWinCondition(std::string) {
+void NetClient::setWinConditionScript(std::string) {
 	// Clients are not allowed to change this
 }
 
@@ -562,7 +589,7 @@ bool NetClient::isPaused()
 	return false;
 }
 
-void NetClient::setPaused(bool paused)
+void NetClient::setPaused(bool /* paused */)
 {
 }
 
@@ -598,13 +625,14 @@ void NetClient::recvOneUser
 
 	d->settings.users.at(number).name     = packet.String  ();
 	d->settings.users.at(number).position = packet.Signed32();
+	d->settings.users.at(number).ready    = packet.Unsigned8() == 1;
 	if (static_cast<int32_t>(number) == d->settings.usernum) {
 		d->localplayername = d->settings.users.at(number).name;
 		d->settings.playernum = d->settings.users.at(number).position;
 	}
 }
 
-void NetClient::send(std::string const & msg)
+void NetClient::send(const std::string & msg)
 {
 	SendPacket s;
 	s.Unsigned8(NETCMD_CHAT);
@@ -612,7 +640,7 @@ void NetClient::send(std::string const & msg)
 	s.send(d->sock);
 }
 
-std::vector<ChatMessage> const & NetClient::getMessages() const
+const std::vector<ChatMessage> & NetClient::getMessages() const
 {
 	return d->chatmessages;
 }
@@ -694,6 +722,10 @@ void NetClient::handle_packet(RecvPacket & packet)
 		log
 			("[Client] SETTING_MAP '%s' '%s'\n",
 			 d->settings.mapname.c_str(), d->settings.mapfilename.c_str());
+
+		// New map was set, so we clean up the buffer of a previously requested file
+		if (file)
+			delete file;
 		break;
 	}
 
@@ -727,16 +759,12 @@ void NetClient::handle_packet(RecvPacket & packet)
 				FileRead fr;
 				fr.Open(*g_fs, path.c_str());
 				if (bytes == fr.GetSize()) {
-#ifdef HAVE_VARARRAY
-					char complete[bytes];
-#else
-					std::auto_ptr<char> complete_buf(new char[bytes]);
-					if (!complete_buf.get()) throw wexception("Out of memory");
-					char * complete = complete_buf.get();
-#endif
-					fr.DataComplete(complete, bytes);
-					MD5Checksum<FileRead> md5sum;
-					md5sum.Data(complete, bytes);
+					std::unique_ptr<char[]> complete(new char[bytes]);
+					if (!complete) throw wexception("Out of memory");
+
+					fr.DataComplete(complete.get(), bytes);
+					SimpleMD5Checksum md5sum;
+					md5sum.Data(complete.get(), bytes);
 					md5sum.FinishChecksum();
 					std::string localmd5 = md5sum.GetChecksum().str();
 					if (localmd5 == md5)
@@ -769,6 +797,12 @@ void NetClient::handle_packet(RecvPacket & packet)
 	}
 
 	case NETCMD_FILE_PART: {
+		// Only go on, if we are waiting for a file part at the moment. It can happen, that an "unrequested"
+		// part is send by the server if the map was changed just a moment ago and there was an outstanding
+		// request from the client.
+		if (!file)
+			return; // silently ignore
+
 		uint32_t part = packet.Unsigned32();
 		uint32_t size = packet.Unsigned32();
 
@@ -781,12 +815,9 @@ void NetClient::handle_packet(RecvPacket & packet)
 
 		FilePart fp;
 
-#ifdef HAVE_VARARRAY
-		char buf[size];
-#else
 		char buf[NETFILEPARTSIZE];
 		assert(size <= NETFILEPARTSIZE);
-#endif
+
 		if (packet.Data(buf, size) != size)
 			log("Readproblem. Will try to go on anyways\n");
 		memcpy(fp.part, &buf[0], size);
@@ -812,16 +843,13 @@ void NetClient::handle_packet(RecvPacket & packet)
 			// Check for consistence
 			FileRead fr;
 			fr.Open(*g_fs, file->filename.c_str());
-#ifdef HAVE_VARARRAY
-			char complete[file->bytes];
-#else
-			std::auto_ptr<char> complete_buf(new char[file->bytes]);
-			if (!complete_buf.get()) throw wexception("Out of memory");
-			char * complete = complete_buf.get();
-#endif
-			fr.DataComplete(complete, file->bytes);
-			MD5Checksum<FileRead> md5sum;
-			md5sum.Data(complete, file->bytes);
+
+			std::unique_ptr<char[]> complete(new char[file->bytes]);
+			if (!complete) throw wexception("Out of memory");
+
+			fr.DataComplete(complete.get(), file->bytes);
+			SimpleMD5Checksum md5sum;
+			md5sum.Data(complete.get(), file->bytes);
 			md5sum.FinishChecksum();
 			std::string localmd5 = md5sum.GetChecksum().str();
 			if (localmd5 != file->md5sum) {
@@ -849,7 +877,7 @@ void NetClient::handle_packet(RecvPacket & packet)
 			} else {
 				// Map check - does Widelands recognize the file as map?
 				Widelands::Map map;
-				Widelands::Map_Loader * const ml = map.get_correct_loader(file->filename.c_str());
+				std::unique_ptr<Widelands::Map_Loader> ml = map.get_correct_loader(file->filename);
 				if (!ml)
 					invalid = true;
 			}
@@ -877,21 +905,13 @@ void NetClient::handle_packet(RecvPacket & packet)
 			info.name = packet.String();
 
 			// Get initializations (we have to do this locally, for translations)
-			LuaInterface * lua = create_LuaInterface();
-			std::string path = "tribes/" + info.name;
-			if (g_fs->IsDirectory(path)) {
-				lua->register_scripts
-					(g_fs->MakeSubFileSystem(path), "tribe_" + info.name);
-			}
-
+			LuaInterface lua;
 			for (uint8_t j = packet.Unsigned8(); j; --j) {
-				std::string const name = packet.String();
-				boost::shared_ptr<LuaTable> t = lua->run_script
-					("tribe_" + info.name, name);
+				std::string const initialization_script = packet.String();
+				std::unique_ptr<LuaTable> t = lua.run_script(initialization_script);
 				info.initializations.push_back
-					(TribeBasicInfo::Initialization(name, t->get_string("name")));
+					(TribeBasicInfo::Initialization(initialization_script, t->get_string("name")));
 			}
-
 			d->settings.tribes.push_back(info);
 		}
 		break;
@@ -926,7 +946,7 @@ void NetClient::handle_packet(RecvPacket & packet)
 		break;
 	}
 	case NETCMD_WIN_CONDITION: {
-		d->settings.win_condition = packet.String();
+		d->settings.win_condition_script = packet.String();
 		break;
 	}
 
@@ -971,7 +991,7 @@ void NetClient::handle_packet(RecvPacket & packet)
 	}
 	case NETCMD_CHAT: {
 		ChatMessage c;
-		c.time = time(0);
+		c.time = time(nullptr);
 		c.playern = packet.Signed16();
 		c.sender = packet.String();
 		c.msg = packet.String();
@@ -983,7 +1003,7 @@ void NetClient::handle_packet(RecvPacket & packet)
 	}
 	case NETCMD_SYSTEM_MESSAGE_CODE: {
 		ChatMessage c;
-		c.time = time(0);
+		c.time = time(nullptr);
 		std::string code = packet.String();
 		std::string arg1 = packet.String();
 		std::string arg2 = packet.String();
@@ -1021,7 +1041,7 @@ void NetClient::handle_network ()
 	if (m_internet)
 		InternetGaming::ref().handle_metaserver_communication();
 	try {
-		while (d->sock != 0 && SDLNet_CheckSockets(d->sockset, 0) > 0) {
+		while (d->sock != nullptr && SDLNet_CheckSockets(d->sockset, 0) > 0) {
 			// Perform only one read operation, then process all packets
 			// from this read. This ensures that we process DISCONNECT
 			// packets that are followed immediately by connection close.
@@ -1036,18 +1056,18 @@ void NetClient::handle_network ()
 				handle_packet(packet);
 			}
 		}
-	} catch (DisconnectException const & e) {
+	} catch (const DisconnectException & e) {
 		disconnect(e.what());
-	} catch (ProtocolException const & e) {
+	} catch (const ProtocolException & e) {
 		disconnect("PROTOCOL_EXCEPTION", boost::lexical_cast<std::string>(e.number()));
-	} catch (std::exception const & e) {
+	} catch (const std::exception & e) {
 		disconnect("SOMETHING_WRONG", e.what());
 	}
 }
 
 
 void NetClient::disconnect
-	(std::string const & reason, std::string const & arg, bool const sendreason, bool const showmsg)
+	(const std::string & reason, const std::string & arg, bool const sendreason, bool const showmsg)
 {
 	log("[Client]: disconnect(%s, %s)\n", reason.c_str(), arg.c_str());
 
@@ -1064,7 +1084,7 @@ void NetClient::disconnect
 
 		SDLNet_TCP_DelSocket (d->sockset, d->sock);
 		SDLNet_TCP_Close (d->sock);
-		d->sock = 0;
+		d->sock = nullptr;
 	}
 
 	bool const trysave = showmsg && d->game;
@@ -1092,6 +1112,6 @@ void NetClient::disconnect
 
 	if (d->modal) {
 		d->modal->end_modal(0);
-		d->modal = 0;
+		d->modal = nullptr;
 	}
 }

@@ -2,9 +2,13 @@ size=mine
 output=goldore
 
 [buildcost]
-trunk=7
+log=7
 planks=4
 spidercloth=1
+
+[return_on_dismantle]
+log=3
+planks=2
 
 [working positions]
 miner=3
@@ -22,8 +26,8 @@ smoked_meat=6
 work=_Work
 
 [work]
-return=skipped when economy needs bread and not economy needs goldore
-return=skipped when economy needs smoked_fish and not economy needs goldore
+return=skipped unless economy needs goldore or not economy needs bread
+return=skipped unless economy needs goldore or not economy needs smoked_fish
 consume=smoked_fish,smoked_meat:2 bread:2
 sleep=45000
 animate=working 20000
@@ -39,14 +43,11 @@ produce=goldore
 [idle]
 pics=goldmine_i_??.png
 hotspot=50 56
-playercolor=true
 
 [working]
 pics=goldmine_i_??.png
 hotspot=50 56
-playercolor=true
 
 [empty]
 pics=goldmine_e_??.png
 hotspot=50 56
-playercolor=true

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2007-2010 by the Widelands Development Team
+ * Copyright (C) 2007-2013 by the Widelands Development Team
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -21,20 +21,19 @@
 //  FIXME accepted by distributions)
 #pragma GCC diagnostic ignored "-Wold-style-cast"
 
-#include "logic/wareworker.h"
-#include "logic/widelands_geometry.h"
-
-#include "../iroute.h"
-#include "../itransport_cost_calculator.h"
-#include "../router.h"
-#include "../routing_node.h"
-#include "../flag.h"
-#include "../../container_iterate.h"
-
 #include <exception>
 
-#include <boost/test/unit_test.hpp>
 #include <boost/bind.hpp>
+#include <boost/test/unit_test.hpp>
+
+#include "container_iterate.h"
+#include "economy/flag.h"
+#include "economy/iroute.h"
+#include "economy/itransport_cost_calculator.h"
+#include "economy/router.h"
+#include "economy/routing_node.h"
+#include "logic/wareworker.h"
+#include "logic/widelands_geometry.h"
 
 using namespace Widelands;
 
@@ -57,12 +56,12 @@ public:
 		return _neighbours[idx];
 	}
 
-	virtual Flag & base_flag() { return _flag;}
+	virtual Flag & base_flag() override {return _flag;}
 	void set_waitcost(int32_t const wc) {_waitcost = wc;}
 	int32_t get_waitcost() const {return _waitcost;}
-	Coords get_position() const {return _position;}
+	const Coords & get_position() const override {return _position;}
 
-	void get_neighbours(WareWorker type, RoutingNodeNeighbours &);
+	void get_neighbours(WareWorker type, RoutingNodeNeighbours &) override;
 
 	// test functionality
 	bool all_members_zeroed();
@@ -75,26 +74,26 @@ private:
 	Coords _position;
 	Flag _flag;
 };
-void TestingRoutingNode::get_neighbours(WareWorker type,RoutingNodeNeighbours & n) {
+void TestingRoutingNode::get_neighbours(WareWorker type, RoutingNodeNeighbours & n) {
 	container_iterate_const(Neigbours, _neighbours, i)
 		// second parameter is walktime in ms from this flag to the neighbour.
 		// only depends on slope
-		n.push_back(RoutingNodeNeighbour(*i.current, 1000 *((type==wwWARE)?1+_waitcost:1)));
+		n.push_back(RoutingNodeNeighbour(*i.current, 1000 * ((type == wwWARE)?1 + _waitcost:1)));
 }
 bool TestingRoutingNode::all_members_zeroed() {
 	bool integers_zero =
 		!mpf_cycle &&  !mpf_realcost && !mpf_estimate;
-	bool pointers_zero = (mpf_backlink == 0);
+	bool pointers_zero = (mpf_backlink == nullptr);
 
 	return pointers_zero && integers_zero;
 }
 
 class TestingTransportCostCalculator : public ITransportCostCalculator {
-	int32_t calc_cost_estimate(Coords c1, Coords c2) const {
+	int32_t calc_cost_estimate(Coords c1, Coords c2) const override {
 		// We use an euclidian metric here. It is much easier for
 		// test cases
 		double xd = (c1.x - c2.x);
-		double yd = (c2.y - c2.y);
+		double yd = (c1.y - c2.y);
 		return static_cast<int32_t>((xd * xd + yd * yd) * 1000);
 	}
 };
@@ -102,10 +101,10 @@ class TestingRoute : public IRoute {
 public:
 	typedef std::vector<RoutingNode *> Nodes;
 
-	void init(int32_t) {
+	void init(int32_t) override {
 		nodes.clear();
 	}
-	void insert_as_first(RoutingNode * node) {
+	void insert_as_first(RoutingNode * node) override {
 		nodes.insert(nodes.begin(), node);
 	}
 
@@ -136,10 +135,10 @@ public:
 					chain_begin_found = false;
 					if (*i == *j) {
 						chain_begin_found = true;
-						j++;
+						++j;
 					}
 				} else {
-					j++;
+					++j;
 					if (j == n.end()) {
 						return true;
 					}
@@ -184,7 +183,7 @@ struct TestingNode_DefaultNodes_Fixture {
 		nodes.push_back(d1);
 	}
 	~TestingNode_DefaultNodes_Fixture() {
-		while (nodes.size()) {
+		while (!nodes.empty()) {
 			TestingRoutingNode * n = nodes.back();
 			delete n;
 			nodes.pop_back();
@@ -396,7 +395,7 @@ struct ComplexRouterFixture {
 		nodes.push_back(d0);
 	}
 	~ComplexRouterFixture() {
-		while (nodes.size()) {
+		while (!nodes.empty()) {
 			RoutingNode * n = nodes.back();
 			delete n;
 			nodes.pop_back();
@@ -456,7 +455,7 @@ struct ComplexRouterFixture {
 		new_node_w_neighbour(dnew_2);
 		new_node_w_neighbour(dnew_2);
 		dnew_2 = new_node_w_neighbour(dnew_2);
-		dnew_2 = new_node_w_neighbour(dnew_2);
+		new_node_w_neighbour(dnew_2);
 
 		new_node_w_neighbour(d);
 		new_node_w_neighbour(d_new);
@@ -591,7 +590,7 @@ BOOST_FIXTURE_TEST_CASE(priced_routing, DistanceRoutingFixture) {
 	BOOST_CHECK(route.has_chain(chain));
 
 	// Make the middle node on the short path very expensive
-	d1->set_waitcost(6);
+	d1->set_waitcost(8);
 
 	// Same result without wait
 	rval = r.find_route

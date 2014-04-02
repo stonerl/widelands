@@ -1,5 +1,4 @@
-soundfx=../../../sound/stonecutting/stonecutter
-help=_Cuts raw pieces of granite out of laying stones.
+help=_Cuts raw pieces of granite out of rocks.
 program=cut
 
 [buildcost]
@@ -12,29 +11,25 @@ carrier=1
 2=playFX ../../../sound/stonecutting/stonecutter 192
 3=animation hacking 10000
 4=object shrink
-5=createitem raw_stone
+5=createware raw_stone
 6=return
 
 [idle]
 pics=idle_??.png
 hotspot=8 21
 fps=10
-playercolor=true
 
 [hacking]
 pics=hacking_??.png
 hotspot=8 25
 fps=10
-playercolor=true
 
 [walk]
 dirpics=walk_!!_??.png
 hotspot=9 24
 fps=10
-playercolor=true
 
 [walkload]
 dirpics=walkload_!!_??.png
 hotspot=7 22
 fps=10
-playercolor=true

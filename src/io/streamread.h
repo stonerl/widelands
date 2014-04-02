@@ -20,17 +20,14 @@
 #ifndef STREAMREAD_H
 #define STREAMREAD_H
 
-#include "machdep.h"
-#include "wexception.h"
+#include <cstring>
+#include <string>
 
 #include <boost/noncopyable.hpp>
 
-#include <string>
-#include <cstring>
+#include "machdep.h"
+#include "wexception.h"
 
-#ifdef _MSC_VER
-#define __attribute__(x)
-#endif
 
 /**
  * Abstract base class for stream-like data sources.
@@ -45,7 +42,8 @@
  *
  * Convenience functions are provided for many data types.
  */
-struct StreamRead : boost::noncopyable {
+class StreamRead : boost::noncopyable {
+public:
 	explicit StreamRead() {}
 	virtual ~StreamRead();
 
@@ -55,7 +53,7 @@ struct StreamRead : boost::noncopyable {
 	 * \return the number of bytes that were actually read. Will return 0 at
 	 * end of stream.
 	 */
-	virtual size_t Data(void * const data, size_t bufsize) = 0;
+	virtual size_t Data(void * data, size_t bufsize) = 0;
 
 	/**
 	 * \return \c true if the end of file / end of stream has been reached.
@@ -71,15 +69,14 @@ struct StreamRead : boost::noncopyable {
 	int32_t Signed32();
 	uint32_t Unsigned32();
 	std::string String();
-	__attribute__((noreturn)) virtual char const * CString() {throw;}
+	virtual char const * CString() {throw;}
 
 	///  Base of all exceptions that are caused by errors in the data that is
 	///  read.
 	struct _data_error : public _wexception {
-		_data_error(char const * const fmt, ...) throw () PRINTF_FORMAT(2, 3);
+		_data_error(char const * const fmt, ...) PRINTF_FORMAT(2, 3);
 	};
 #define data_error(...) _data_error(__VA_ARGS__)
 };
 
 #endif
-

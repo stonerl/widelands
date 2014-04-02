@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011 by the Widelands Development Team
+ * Copyright (C) 2011-2013 by the Widelands Development Team
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -21,8 +21,8 @@
 #define ECONOMY_ROUTEASTAR_H
 
 #include "container_iterate.h"
-#include "itransport_cost_calculator.h"
-#include "routing_node.h"
+#include "economy/itransport_cost_calculator.h"
+#include "economy/routing_node.h"
 
 namespace Widelands {
 
@@ -79,7 +79,7 @@ struct RouteAStar : BaseRouteAStar {
 
 	RouteAStar(Router & router, WareWorker type, const Estimator & est = Estimator());
 
-	void push(RoutingNode & node, int32_t cost = 0, RoutingNode * backlink = 0);
+	void push(RoutingNode & node, int32_t cost = 0, RoutingNode * backlink = nullptr);
 	RoutingNode * step();
 
 private:
@@ -123,7 +123,7 @@ template<typename Est_>
 RoutingNode * RouteAStar<Est_>::step()
 {
 	if (m_open.empty())
-		return 0;
+		return nullptr;
 
 	// Keep the neighbours vector around to avoid excessive amounts of memory
 	// allocations and frees.
@@ -171,6 +171,14 @@ struct AStarEstimator {
 private:
 	ITransportCostCalculator & m_calc;
 	Coords m_dest;
+};
+
+/**
+ * This estimator, for use with @ref RouteAStar, always returns zero,
+ * which means that the resulting search is effectively Dijkstra's algorithm.
+ */
+struct AStarZeroEstimator {
+	int32_t operator()(RoutingNode &) const {return 0;}
 };
 
 } // namespace Widelands

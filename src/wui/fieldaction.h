@@ -24,7 +24,7 @@
 
 namespace Widelands {
 class Building;
-struct Player;
+class Player;
 struct PlayerImmovable;
 }
 struct Interactive_Base;
@@ -35,11 +35,5 @@ void show_field_action
 	(Interactive_Base           * parent,
 	 Widelands::Player          * player,
 	 UI::UniqueWindow::Registry * registry);
-
-// building_ui.cc
-void show_bulldoze_confirm
-	(Interactive_Player         & parent,
-	 Widelands::Building        & building,
-	 Widelands::PlayerImmovable * const todestroy);
 
 #endif

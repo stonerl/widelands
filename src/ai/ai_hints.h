@@ -20,9 +20,8 @@
 #ifndef AI_HINTS_H
 #define AI_HINTS_H
 
-#include <boost/noncopyable.hpp>
-
 #include <SDL_types.h>
+#include <boost/noncopyable.hpp>
 
 struct Section;
 
@@ -41,7 +40,7 @@ struct BuildingHints : boost::noncopyable {
 
 	bool         prod_build_material    () const {return build_material;}
 
-	bool         is_trunkproducer       () const {return trunkproducer;}
+	bool         is_logproducer       () const {return logproducer;}
 
 	bool         is_stoneproducer       () const {return stoneproducer;}
 
@@ -58,7 +57,7 @@ private:
 	char  * mines;
 	bool    basic;
 	bool    build_material; // whether the building produces build material
-	bool    trunkproducer;
+	bool    logproducer;
 	bool    stoneproducer;
 	bool    needs_water;
 	bool    recruitment; // whether building recruits special workers

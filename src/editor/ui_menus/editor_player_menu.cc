@@ -17,23 +17,25 @@
  *
  */
 
+#include "editor/ui_menus/editor_player_menu.h"
 
+#include <boost/format.hpp>
+
+#include "editor/editorinteractive.h"
+#include "editor/tools/editor_set_starting_pos_tool.h"
 #include "graphic/graphic.h"
 #include "i18n.h"
 #include "logic/map.h"
 #include "logic/player.h"
 #include "logic/tribe.h"
 #include "logic/warehouse.h"
-#include "wexception.h"
-#include "wui/overlay_manager.h"
-#include "editor/editorinteractive.h"
-#include "editor/tools/editor_set_starting_pos_tool.h"
 #include "ui_basic/editbox.h"
 #include "ui_basic/messagebox.h"
 #include "ui_basic/textarea.h"
+#include "wexception.h"
+#include "wui/overlay_manager.h"
 
-#include "editor_player_menu.h"
-
+#define UNDEFINED_TRIBE_NAME "<undefined>"
 
 Editor_Player_Menu::Editor_Player_Menu
 	(Editor_Interactive & parent, UI::UniqueWindow::Registry & registry)
@@ -43,15 +45,15 @@ Editor_Player_Menu::Editor_Player_Menu
 	m_add_player
 		(this, "add_player",
 		 get_inner_w() - 5 - 20, 5, 20, 20,
-		 g_gr->get_picture(PicMod_UI, "pics/but1.png"),
-		 g_gr->get_picture(PicMod_UI, "pics/scrollbar_up.png"),
+		 g_gr->images().get("pics/but1.png"),
+		 g_gr->images().get("pics/scrollbar_up.png"),
 		 _("Add player"),
 		 parent.egbase().map().get_nrplayers() < MAX_PLAYERS),
 	m_remove_last_player
 		(this, "remove_last_player",
 		 5, 5, 20, 20,
-		 g_gr->get_picture(PicMod_UI, "pics/but1.png"),
-		 g_gr->get_picture(PicMod_UI, "pics/scrollbar_down.png"),
+		 g_gr->images().get("pics/but1.png"),
+		 g_gr->images().get("pics/scrollbar_down.png"),
 		 _("Remove last player"),
 		 1 < parent.egbase().map().get_nrplayers())
 {
@@ -63,7 +65,7 @@ Editor_Player_Menu::Editor_Player_Menu
 	int32_t const width   = 20;
 	int32_t       posy    = 0;
 
-	Widelands::Tribe_Descr::get_all_tribenames(m_tribes);
+	m_tribes = Widelands::Tribe_Descr::get_all_tribenames();
 
 	set_inner_size(375, 135);
 
@@ -80,10 +82,10 @@ Editor_Player_Menu::Editor_Player_Menu
 	m_posy = posy;
 
 	for (Widelands::Player_Number i = 0; i < MAX_PLAYERS; ++i) {
-		m_plr_names          [i] = 0;
-		m_plr_set_pos_buts   [i] = 0;
-		m_plr_set_tribes_buts[i] = 0;
-		m_plr_make_infrastructure_buts[i] = 0;
+		m_plr_names          [i] = nullptr;
+		m_plr_set_pos_buts   [i] = nullptr;
+		m_plr_set_tribes_buts[i] = nullptr;
+		m_plr_make_infrastructure_buts[i] = nullptr;
 	}
 	update();
 
@@ -126,9 +128,9 @@ void Editor_Player_Menu::update() {
 
 	//  Now remove all the unneeded stuff.
 	for (Widelands::Player_Number i = nr_players; i < MAX_PLAYERS; ++i) {
-		delete m_plr_names          [i]; m_plr_names          [i] = 0;
-		delete m_plr_set_pos_buts   [i]; m_plr_set_pos_buts   [i] = 0;
-		delete m_plr_set_tribes_buts[i]; m_plr_set_tribes_buts[i] = 0;
+		delete m_plr_names          [i]; m_plr_names          [i] = nullptr;
+		delete m_plr_set_pos_buts   [i]; m_plr_set_pos_buts   [i] = nullptr;
+		delete m_plr_set_tribes_buts[i]; m_plr_set_tribes_buts[i] = nullptr;
 	}
 	int32_t       posy    = m_posy;
 	int32_t const spacing =  5;
@@ -140,7 +142,7 @@ void Editor_Player_Menu::update() {
 			m_plr_names[p - 1] =
 				new UI::EditBox
 					(this, posx, posy, 140, size,
-					 g_gr->get_picture(PicMod_UI, "pics/but0.png"));
+					 g_gr->images().get("pics/but0.png"));
 			m_plr_names[p - 1]->changed.connect
 				(boost::bind(&Editor_Player_Menu::name_changed, this, p - 1));
 			posx += 140 + spacing;
@@ -152,13 +154,13 @@ void Editor_Player_Menu::update() {
 				new UI::Button
 					(this, "tribe",
 					 posx, posy, 140, size,
-					 g_gr->get_picture(PicMod_UI, "pics/but0.png"),
-					 std::string());
+					 g_gr->images().get("pics/but0.png"),
+					 "");
 			m_plr_set_tribes_buts[p - 1]->sigclicked.connect
 				(boost::bind(&Editor_Player_Menu::player_tribe_clicked, boost::ref(*this), p - 1));
 			posx += 140 + spacing;
 		}
-		if (map.get_scenario_player_tribe(p) != "<undefined>")
+		if (map.get_scenario_player_tribe(p) != UNDEFINED_TRIBE_NAME)
 			m_plr_set_tribes_buts[p - 1]->set_title
 				(map.get_scenario_player_tribe(p).c_str());
 		else {
@@ -176,17 +178,16 @@ void Editor_Player_Menu::update() {
 				new UI::Button
 					(this, "starting_pos",
 					 posx, posy, size, size,
-					 g_gr->get_picture(PicMod_UI, "pics/but0.png"),
-					 g_gr->get_no_picture(),
-					 std::string());
+					 g_gr->images().get("pics/but0.png"),
+					 nullptr,
+					 "");
 			m_plr_set_pos_buts[p - 1]->sigclicked.connect
 				(boost::bind(&Editor_Player_Menu::set_starting_pos_clicked, boost::ref(*this), p));
-			posx += size + spacing;
 		}
 		char text[] = "pics/fsel_editor_set_player_00_pos.png";
 		text[28] += p / 10;
 		text[29] += p % 10;
-		m_plr_set_pos_buts[p - 1]->set_pic(g_gr->get_picture(PicMod_Game, text));
+		m_plr_set_pos_buts[p - 1]->set_pic(g_gr->images().get(text));
 		posy += size + spacing;
 	}
 	set_inner_size(get_inner_w(), posy + spacing);
@@ -201,10 +202,12 @@ void Editor_Player_Menu::clicked_add_player() {
 	map.set_nrplayers(nr_players);
 	{ //  register new default name for this players
 		assert(nr_players <= 99); //  2 decimal digits
-		std::string name = _("Player ");
+		std::string number = "";
 		if (char const nr_players_10 = nr_players / 10)
-			name += '0' + nr_players_10;
-		name += '0' + nr_players % 10;
+			number += '0' + nr_players_10;
+		number += '0' + nr_players % 10;
+		/** TRANSLATORS: Default player name, e.g. Player 1 */
+		std::string name = (boost::format(_("Player %s")) % number).str();
 		map.set_scenario_player_name(nr_players, name);
 	}
 	map.set_scenario_player_tribe(nr_players, m_tribes[0]);
@@ -230,14 +233,14 @@ void Editor_Player_Menu::clicked_remove_last_player() {
 			picsname[19] += old_nr_players / 10;
 			picsname[20] += old_nr_players % 10;
 			map.overlay_manager().remove_overlay
-				(sp, g_gr->get_picture(PicMod_Game, picsname));
+				(sp, g_gr->images().get(picsname));
 		}
 	}
 	map.set_nrplayers(nr_players);
 	m_remove_last_player.set_enabled(1 < nr_players);
 
 	update();
-	// SirVer TODO: Take steps when the player is referenced in some place. Not
+	// SirVer TODO: Take steps when the player is referenced someplace. Not
 	// SirVer TODO: currently possible in the editor though.
 }
 
@@ -291,7 +294,7 @@ called when a button is clicked
 //                 //         (&menu,
 //                 //          _("Error!"),
 //                 //          _
-//                 //                 ("Can not remove player. It is referenced in some place. Remove all"
+//                 //                 ("Cannot remove player. It is referenced in some place. Remove all"
 //                 //                  " buildings and bobs that depend on this player and try again."),
 //                 //          UI::WLMessageBox::OK);
 //                 // mmb.run();
@@ -322,7 +325,7 @@ void Editor_Player_Menu::player_tribe_clicked(uint8_t n) {
 			(&menu,
 			 _("Error!"),
 			 _
-			 	("Can not remove player. It is referenced in some place. Remove all"
+			 	("Cannot remove player. It is referenced someplace. Remove all"
 			 	 " buildings and bobs that depend on this player and try again."),
 			 UI::WLMessageBox::OK);
 		mmb.run();
@@ -352,7 +355,7 @@ void Editor_Player_Menu::set_starting_pos_clicked(uint8_t n) {
 	//  Register callback function to make sure that only valid locations are
 	//  selected.
 	map.overlay_manager().register_overlay_callback_function
-		(&Editor_Tool_Set_Starting_Pos_Callback, &map);
+		(boost::bind(&Editor_Tool_Set_Starting_Pos_Callback, _1, boost::ref(map)));
 	map.recalc_whole_map();
 	update();
 }
@@ -431,15 +434,12 @@ void Editor_Player_Menu::make_infrastructure_clicked(uint8_t n) {
 		picsname += static_cast<char>((n % 10) + 0x30);
 		picsname += "_starting_pos.png";
 		overlay_manager.remove_overlay
-			(start_pos, g_gr->get_picture(PicMod_Game,  picsname));
+			(start_pos, g_gr->images().get(picsname));
 	}
 
 	parent.select_tool(parent.tools.make_infrastructure, Editor_Tool::First);
 	parent.tools.make_infrastructure.set_player(n);
-	overlay_manager.register_overlay_callback_function
-		(&Editor_Make_Infrastructure_Tool_Callback,
-		 static_cast<void *>(&egbase),
-		 n);
+	overlay_manager.register_overlay_callback_function(
+	   boost::bind(&Editor_Make_Infrastructure_Tool_Callback, _1, boost::ref(egbase), n));
 	map.recalc_whole_map();
 }
-

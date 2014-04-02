@@ -20,19 +20,19 @@
 #ifndef TRANSFER_H
 #define TRANSFER_H
 
-#include "route.h"
+#include "economy/route.h"
 
 namespace Widelands {
-struct Game;
+class Game;
 struct PlayerImmovable;
-struct Request;
+class Request;
 class WareInstance;
-struct Map_Map_Object_Loader;
+class Map_Map_Object_Loader;
 struct Map_Map_Object_Saver;
 class Worker;
 
 /**
- * Whenever an item or worker is transferred to fulfill a Request,
+ * Whenever an ware or worker is transferred to fulfill a Request,
  * a Transfer is allocated to describe this transfer.
  *
  * Transfers are always created and destroyed by a Request instance.
@@ -44,7 +44,7 @@ class Worker;
  * or ware was destroyed).
  */
 struct Transfer {
-	friend struct Request;
+	friend class Request;
 
 	Transfer(Game &, Request &, WareInstance &);
 	Transfer(Game &, Request &, Worker       &);
@@ -79,13 +79,11 @@ private:
 	Game & m_game;
 	Request * m_request;
 	OPtr<PlayerImmovable> m_destination;
-	WareInstance * m_item;    ///< non-null if ware is an item
-	Worker * m_worker;  ///< non-null if ware is a worker
+	WareInstance * m_ware;    ///< non-null iff this is transferring a ware
+	Worker * m_worker;  ///< non-null iff this is transferring a worker
 	Route m_route;
 };
 
 }
 
 #endif
-
-

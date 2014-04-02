@@ -17,7 +17,9 @@
  *
  */
 
-#include "widelands_map_roaddata_data_packet.h"
+#include "map_io/widelands_map_roaddata_data_packet.h"
+
+#include <map>
 
 #include "economy/flag.h"
 #include "economy/request.h"
@@ -28,13 +30,11 @@
 #include "logic/map.h"
 #include "logic/player.h"
 #include "logic/tribe.h"
-#include "upcast.h"
 #include "logic/widelands_fileread.h"
 #include "logic/widelands_filewrite.h"
-#include "widelands_map_map_object_loader.h"
-#include "widelands_map_map_object_saver.h"
-
-#include <map>
+#include "map_io/widelands_map_map_object_loader.h"
+#include "map_io/widelands_map_map_object_saver.h"
+#include "upcast.h"
 
 namespace Widelands {
 
@@ -45,7 +45,6 @@ void Map_Roaddata_Data_Packet::Read
 	 Editor_Game_Base      &       egbase,
 	 bool                    const skip,
 	 Map_Map_Object_Loader &       mol)
-throw (_wexception)
 {
 	if (skip)
 		return;
@@ -56,7 +55,7 @@ throw (_wexception)
 	try {
 		uint16_t const packet_version = fr.Unsigned16();
 		if (1 <= packet_version and packet_version <= CURRENT_PACKET_VERSION) {
-			Map   const &       map        = egbase.map();
+			const Map   &       map        = egbase.map();
 			Player_Number const nr_players = map.get_nrplayers();
 			for (;;) {
 				if (2 <= packet_version and fr.EndOfFile())
@@ -84,7 +83,7 @@ throw (_wexception)
 						uint32_t const flag_0_serial = fr.Unsigned32();
 						try {
 							road.m_flags[0] = &mol.get<Flag>(flag_0_serial);
-						} catch (_wexception const & e) {
+						} catch (const _wexception & e) {
 							throw game_data_error
 								("flag 0 (%u): %s", flag_0_serial, e.what());
 						}
@@ -93,7 +92,7 @@ throw (_wexception)
 						uint32_t const flag_1_serial = fr.Unsigned32();
 						try {
 							road.m_flags[1] = &mol.get<Flag>(flag_1_serial);
-						} catch (_wexception const & e) {
+						} catch (const _wexception & e) {
 							throw game_data_error
 								("flag 1 (%u): %s", flag_1_serial, e.what());
 						}
@@ -110,7 +109,7 @@ throw (_wexception)
 					for (Path::Step_Vector::size_type i = nr_steps; i; --i)
 						try {
 							p.append(egbase.map(), fr.Direction8());
-						} catch (_wexception const & e) {
+						} catch (const _wexception & e) {
 							throw game_data_error
 								("step #%lu: %s",
 								 static_cast<long unsigned int>(nr_steps - i),
@@ -126,29 +125,29 @@ throw (_wexception)
 
 					uint32_t const count = fr.Unsigned32();
 					if (not count)
-						throw game_data_error(_("no carrier slot"));
+						throw game_data_error("no carrier slot");
 					if (packet_version <= 2 and 1 < count)
 						throw game_data_error
-							(_
-							 	("expected 1 but found %u carrier slots in road saved "
-							 	 "with packet version 2 (old)"),
+							(
+						 	 "expected 1 but found %u carrier slots in road saved "
+						 	 "with packet version 2 (old)",
 							 count);
 
 					for (uint32_t i = 0; i < count; ++i) {
-						Carrier * carrier = 0;
-						Request * carrier_request = 0;
+						Carrier * carrier = nullptr;
+						Request * carrier_request = nullptr;
 
 
 						if (uint32_t const carrier_serial = fr.Unsigned32())
 							try {
 								//log("Read carrier serial %u", carrier_serial);
 								carrier = &mol.get<Carrier>(carrier_serial);
-							} catch (_wexception const & e) {
+							} catch (const _wexception & e) {
 								throw game_data_error
 									("carrier (%u): %s", carrier_serial, e.what());
 							}
 						else {
-							carrier = 0;
+							carrier = nullptr;
 							//log("No carrier in this slot");
 						}
 
@@ -165,7 +164,7 @@ throw (_wexception)
 							 		 wwWORKER))
 							->Read(fr, ref_cast<Game, Editor_Game_Base>(egbase), mol);
 						} else {
-							carrier_request = 0;
+							carrier_request = nullptr;
 							//log("No request in this slot");
 						}
 						uint8_t const carrier_type =
@@ -198,29 +197,28 @@ throw (_wexception)
 					}
 
 					mol.mark_object_as_loaded(road);
-				} catch (_wexception const & e) {
-					throw game_data_error(_("road %u: %s"), serial, e.what());
+				} catch (const _wexception & e) {
+					throw game_data_error("road %u: %s", serial, e.what());
 				}
 			}
 		} else
 			throw game_data_error
-				(_("unknown/unhandled version %u"), packet_version);
-	} catch (_wexception const & e) {
-		throw game_data_error(_("roaddata: %s"), e.what());
+				("unknown/unhandled version %u", packet_version);
+	} catch (const _wexception & e) {
+		throw game_data_error("roaddata: %s", e.what());
 	}
 }
 
 
 void Map_Roaddata_Data_Packet::Write
 	(FileSystem & fs, Editor_Game_Base & egbase, Map_Map_Object_Saver & mos)
-throw (_wexception)
 {
 	FileWrite fw;
 
 	fw.Unsigned16(CURRENT_PACKET_VERSION);
 
-	Map   const & map        = egbase.map();
-	Field const & fields_end = map[map.max_index()];
+	const Map   & map        = egbase.map();
+	const Field & fields_end = map[map.max_index()];
 	for (Field const * field = &map[0]; field < &fields_end; ++field)
 		if (upcast(Road const, r, field->get_immovable()))
 			if (not mos.is_object_saved(*r)) {

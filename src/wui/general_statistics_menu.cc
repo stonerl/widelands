@@ -17,24 +17,23 @@
  *
  */
 
-#include "general_statistics_menu.h"
-
+#include "wui/general_statistics_menu.h"
 
 #include "graphic/graphic.h"
 #include "graphic/rendertarget.h"
 #include "i18n.h"
-#include "interactive_player.h"
 #include "logic/editor_game_base.h"
 #include "logic/game.h"
 #include "logic/player.h"
 #include "logic/tribe.h"
 #include "logic/warelist.h"
+#include "scripting/lua_table.h"
 #include "scripting/scripting.h"
-
 #include "ui_basic/button.h"
 #include "ui_basic/checkbox.h"
-#include "ui_basic/textarea.h"
 #include "ui_basic/slider.h"
+#include "ui_basic/textarea.h"
+#include "wui/interactive_player.h"
 
 using namespace Widelands;
 
@@ -72,7 +71,7 @@ m_selected_information(0)
 
 	// Is there a hook dataset?
 	m_ndatasets = NR_BASE_DATASETS;
-	boost::shared_ptr<LuaTable> hook = game.lua().get_hook("custom_statistic");
+	std::unique_ptr<LuaTable> hook = game.lua().get_hook("custom_statistic");
 	std::string cs_name, cs_pic;
 	if (hook) {
 		cs_name = hook->get_string("name");
@@ -139,7 +138,7 @@ m_selected_information(0)
 
 	uint32_t plr_in_game = 0;
 	Player_Number const nr_players = game.map().get_nrplayers();
-	iterate_players_existing_const(p, nr_players, game, player) ++plr_in_game;
+	iterate_players_existing_novar(p, nr_players, game) ++plr_in_game;
 
 	iterate_players_existing_const(p, nr_players, game, player) {
 		char buffer[36];
@@ -148,8 +147,8 @@ m_selected_information(0)
 			*new UI::Button
 				(hbox1, "playerbutton",
 				 0, 0, 25, 25,
-				 g_gr->get_picture(PicMod_UI, "pics/but4.png"),
-				 g_gr->get_picture(PicMod_Game, buffer),
+				 g_gr->images().get("pics/but4.png"),
+				 g_gr->images().get(buffer),
 				 player->get_name().c_str());
 		cb.sigclicked.connect
 			(boost::bind(&General_Statistics_Menu::cb_changed_to, this, p));
@@ -159,7 +158,7 @@ m_selected_information(0)
 
 		hbox1->add(&cb, UI::Box::AlignLeft, false, true);
 	} else //  player nr p does not exist
-		m_cbs[p - 1] = 0;
+		m_cbs[p - 1] = nullptr;
 
 	m_box.add(hbox1, UI::Box::AlignTop, true);
 
@@ -170,7 +169,7 @@ m_selected_information(0)
 	m_radiogroup.add_button
 		(hbox2,
 		 Point(0, 0),
-		 g_gr->get_picture(PicMod_Game, "pics/genstats_landsize.png"),
+		 g_gr->images().get("pics/genstats_landsize.png"),
 		 _("Land"),
 		 &btn);
 	hbox2->add(btn, UI::Box::AlignLeft, false, true);
@@ -178,7 +177,7 @@ m_selected_information(0)
 	m_radiogroup.add_button
 		(hbox2,
 		 Point(0, 0),
-		 g_gr->get_picture(PicMod_Game, "pics/genstats_nrworkers.png"),
+		 g_gr->images().get("pics/genstats_nrworkers.png"),
 		 _("Workers"),
 		 &btn);
 	hbox2->add(btn, UI::Box::AlignLeft, false, true);
@@ -186,7 +185,7 @@ m_selected_information(0)
 	m_radiogroup.add_button
 		(hbox2,
 		 Point(0, 0),
-		 g_gr->get_picture(PicMod_Game, "pics/genstats_nrbuildings.png"),
+		 g_gr->images().get("pics/genstats_nrbuildings.png"),
 		 _("Buildings"),
 		 &btn);
 	hbox2->add(btn, UI::Box::AlignLeft, false, true);
@@ -194,7 +193,7 @@ m_selected_information(0)
 	m_radiogroup.add_button
 		(hbox2,
 		 Point(0, 0),
-		 g_gr->get_picture(PicMod_Game, "pics/genstats_nrwares.png"),
+		 g_gr->images().get("pics/genstats_nrwares.png"),
 		 _("Wares"),
 		 &btn);
 	hbox2->add(btn, UI::Box::AlignLeft, false, true);
@@ -202,7 +201,7 @@ m_selected_information(0)
 	m_radiogroup.add_button
 		(hbox2,
 		 Point(0, 0),
-		 g_gr->get_picture(PicMod_Game, "pics/genstats_productivity.png"),
+		 g_gr->images().get("pics/genstats_productivity.png"),
 		 _("Productivity"),
 		 &btn);
 	hbox2->add(btn, UI::Box::AlignLeft, false, true);
@@ -210,7 +209,7 @@ m_selected_information(0)
 	m_radiogroup.add_button
 		(hbox2,
 		 Point(0, 0),
-		 g_gr->get_picture(PicMod_Game, "pics/genstats_casualties.png"),
+		 g_gr->images().get("pics/genstats_casualties.png"),
 		 _("Casualties"),
 		 &btn);
 	hbox2->add(btn, UI::Box::AlignLeft, false, true);
@@ -218,7 +217,7 @@ m_selected_information(0)
 	m_radiogroup.add_button
 		(hbox2,
 		 Point(0, 0),
-		 g_gr->get_picture(PicMod_Game, "pics/genstats_kills.png"),
+		 g_gr->images().get("pics/genstats_kills.png"),
 		 _("Kills"),
 		 &btn);
 	hbox2->add(btn, UI::Box::AlignLeft, false, true);
@@ -226,7 +225,7 @@ m_selected_information(0)
 	m_radiogroup.add_button
 		(hbox2,
 		 Point(0, 0),
-		 g_gr->get_picture(PicMod_Game, "pics/genstats_msites_lost.png"),
+		 g_gr->images().get("pics/genstats_msites_lost.png"),
 		 _("Military buildings lost"),
 		 &btn);
 	hbox2->add(btn, UI::Box::AlignLeft, false, true);
@@ -234,7 +233,7 @@ m_selected_information(0)
 	m_radiogroup.add_button
 		(hbox2,
 		 Point(0, 0),
-		 g_gr->get_picture(PicMod_Game, "pics/genstats_msites_defeated.png"),
+		 g_gr->images().get("pics/genstats_msites_defeated.png"),
 		 _("Military buildings defeated"),
 		 &btn);
 	hbox2->add(btn, UI::Box::AlignLeft, false, true);
@@ -242,7 +241,7 @@ m_selected_information(0)
 	m_radiogroup.add_button
 		(hbox2,
 		 Point(0, 0),
-		 g_gr->get_picture(PicMod_Game, "pics/genstats_civil_blds_lost.png"),
+		 g_gr->images().get("pics/genstats_civil_blds_lost.png"),
 		 _("Civilian buildings lost"),
 		 &btn);
 	hbox2->add(btn, UI::Box::AlignLeft, false, true);
@@ -250,7 +249,7 @@ m_selected_information(0)
 	m_radiogroup.add_button
 		(hbox2,
 		 Point(0, 0),
-		 g_gr->get_picture(PicMod_Game, "pics/genstats_militarystrength.png"),
+		 g_gr->images().get("pics/genstats_militarystrength.png"),
 		 _("Military"),
 		 &btn);
 	hbox2->add(btn, UI::Box::AlignLeft, false, true);
@@ -259,7 +258,7 @@ m_selected_information(0)
 		m_radiogroup.add_button
 			(hbox2,
 			 Point(0, 0),
-			 g_gr->get_picture(PicMod_Game, cs_pic),
+			 g_gr->images().get(cs_pic),
 			 cs_name.c_str(),
 			 &btn);
 		hbox2->add(btn, UI::Box::AlignLeft, false, true);
@@ -274,7 +273,7 @@ m_selected_information(0)
 	m_box.add
 		(new WUIPlot_Area_Slider
 			(&m_box, m_plot, 0, 0, 100, 45,
-			 g_gr->get_picture(PicMod_UI, "pics/but1.png"))
+			 g_gr->images().get("pics/but1.png"))
 		, UI::Box::AlignTop
 		, true);
 
@@ -287,7 +286,7 @@ General_Statistics_Menu::~General_Statistics_Menu() {
 		m_my_registry->selected_information = m_selected_information;
 		m_my_registry->time = m_plot.get_time();
 		Player_Number const nr_players = game.map().get_nrplayers();
-		iterate_players_existing_const(p, nr_players, game, player) {
+		iterate_players_existing_novar(p, nr_players, game) {
 			m_my_registry->selected_players[p - 1] = m_cbs[p - 1]->get_perm_pressed();
 		}
 	}

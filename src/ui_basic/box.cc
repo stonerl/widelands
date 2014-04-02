@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2003, 2006-2011 by the Widelands Development Team
+ * Copyright (C) 2003, 2006-2011, 2013 by the Widelands Development Team
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -17,15 +17,15 @@
  *
  */
 
-#include "box.h"
-
-#include "graphic/graphic.h"
-#include "wexception.h"
-
-#include "scrollbar.h"
+#include "ui_basic/box.h"
 
 #include <algorithm>
+
 #include <boost/bind.hpp>
+
+#include "graphic/graphic.h"
+#include "ui_basic/scrollbar.h"
+#include "wexception.h"
 
 namespace UI {
 /**
@@ -43,7 +43,7 @@ Box::Box
 	m_max_y      (max_y ? max_y : g_gr->get_yres()),
 
 	m_scrolling(false),
-	m_scrollbar(0),
+	m_scrollbar(nullptr),
 	m_orientation(orientation),
 	m_mindesiredbreadth(0),
 	m_inner_spacing(inner_spacing)
@@ -100,7 +100,7 @@ void Box::update_desired_size()
 			maxbreadth = breadth;
 	}
 
-	if (m_items.size())
+	if (!m_items.empty())
 		totaldepth += (m_items.size() - 1) * m_inner_spacing;
 
 	if (m_orientation == Horizontal) {
@@ -130,8 +130,6 @@ void Box::update_desired_size()
  */
 void Box::layout()
 {
-	uint32_t totalbreadth = m_orientation == Horizontal ? get_inner_w() : get_inner_h();
-
 	// First pass: compute the depth and adjust whether we have a scrollbar
 	uint32_t totaldepth = 0;
 
@@ -142,18 +140,16 @@ void Box::layout()
 		totaldepth += depth;
 	}
 
-	if (m_items.size())
+	if (!m_items.empty())
 		totaldepth += (m_items.size() - 1) * m_inner_spacing;
 
 	bool needscrollbar = false;
 	if (m_orientation == Horizontal) {
 		if (totaldepth > m_max_x && m_scrolling) {
-			totalbreadth -= Scrollbar::Size;
 			needscrollbar = true;
 		}
 	} else {
 		if (totaldepth > m_max_y && m_scrolling) {
-			totalbreadth -= Scrollbar::Size;
 			needscrollbar = true;
 		}
 	}
@@ -189,7 +185,7 @@ void Box::layout()
 		m_scrollbar->set_pagesize(pagesize);
 	} else {
 		delete m_scrollbar;
-		m_scrollbar = 0;
+		m_scrollbar = nullptr;
 	}
 
 	// Second pass: Count number of infinite spaces
@@ -324,7 +320,7 @@ void Box::get_item_desired_size
 {
 	assert(idx < m_items.size());
 
-	Item const & it = m_items[idx];
+	const Item & it = m_items[idx];
 
 	switch (it.type) {
 	case Item::ItemPanel:
@@ -354,7 +350,7 @@ void Box::get_item_size
 {
 	assert(idx < m_items.size());
 
-	Item const & it = m_items[idx];
+	const Item & it = m_items[idx];
 
 	get_item_desired_size(idx, depth, breadth);
 	depth += it.assigned_var_depth;
@@ -367,7 +363,7 @@ void Box::set_item_size(uint32_t idx, uint32_t depth, uint32_t breadth)
 {
 	assert(idx < m_items.size());
 
-	Item const & it = m_items[idx];
+	const Item & it = m_items[idx];
 
 	if (it.type == Item::ItemPanel) {
 		if (m_orientation == Horizontal)
@@ -386,7 +382,7 @@ void Box::set_item_pos(uint32_t idx, int32_t pos)
 {
 	assert(idx < m_items.size());
 
-	Item const & it = m_items[idx];
+	const Item & it = m_items[idx];
 
 	switch (it.type) {
 	case Item::ItemPanel: {
@@ -420,7 +416,10 @@ void Box::set_item_pos(uint32_t idx, int32_t pos)
 		break;
 	}
 
-	case Item::ItemSpace:; //  no need to do anything
+	case Item::ItemSpace:
+		break; //  no need to do anything
+	default:
+		assert(false);
 	};
 }
 

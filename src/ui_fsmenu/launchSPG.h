@@ -20,21 +20,19 @@
 #ifndef FULLSCREEN_MENU_LAUNCHSPG_H
 #define FULLSCREEN_MENU_LAUNCHSPG_H
 
-#include "base.h"
-
-#include "ui_basic/button.h"
-#include "ui_basic/textarea.h"
-#include "ui_basic/multilinetextarea.h"
-#include "ui_basic/listselect.h"
-
 #include <string>
 
+#include "ui_fsmenu/base.h"
+#include "ui_basic/button.h"
+#include "ui_basic/listselect.h"
+#include "ui_basic/multilinetextarea.h"
+#include "ui_basic/textarea.h"
+
 struct ChatProvider;
-struct GameChatPanel;
-struct GameController;
+class GameController;
 struct GameSettingsProvider;
 struct PlayerDescriptionGroup;
-struct LuaInterface;
+class LuaInterface;
 
 /**
  * Fullscreen menu for setting map and mapsettings for single and multi player
@@ -52,11 +50,11 @@ struct LuaInterface;
  */
 struct Fullscreen_Menu_LaunchSPG : public Fullscreen_Menu_Base {
 	Fullscreen_Menu_LaunchSPG
-		(GameSettingsProvider *, GameController * = 0, bool autolaunch = false);
+		(GameSettingsProvider *, GameController * = nullptr, bool autolaunch = false);
 	~Fullscreen_Menu_LaunchSPG();
 
-	void start();
-	void think();
+	void start() override;
+	void think() override;
 
 	void refresh();
 
@@ -88,7 +86,7 @@ private:
 	std::string               m_player_save_tribe[MAX_PLAYERS];
 	int8_t                    m_nr_players;
 	bool                      m_is_scenario;
-	std::vector<std::string>  m_win_conditions;
+	std::vector<std::string>  m_win_condition_scripts;
 	uint8_t                   m_cur_wincondition;
 };
 

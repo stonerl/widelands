@@ -20,21 +20,21 @@
 #ifndef SOUND_HANDLER_H
 #define SOUND_HANDLER_H
 
-#include "io/fileread.h"
-#include "fxset.h"
-#include "logic/widelands_geometry.h"
-#include "random.h"
-
+#include <cstring>
 #include <map>
 #include <string>
-#include <cstring>
 #include <vector>
 
 #ifndef _MSC_VER
 #include <unistd.h>
 #endif
 
-namespace Widelands {struct Editor_Game_Base;}
+#include "sound/fxset.h"
+#include "io/fileread.h"
+#include "logic/widelands_geometry.h"
+#include "random.h"
+
+namespace Widelands {class Editor_Game_Base;}
 struct Songset;
 struct SDL_mutex;
 
@@ -176,27 +176,26 @@ public:
 	void read_config();
 	void load_system_sounds();
 
-	void load_fx
-		(std::string const & dir,
-		 std::string const & basename,
-		 bool                recursive = false);
+	void load_fx_if_needed
+		(const std::string & dir,
+		 const std::string & filename,
+		 const std::string & fx_name);
 	void play_fx
-		(std::string const & fx_name,
+		(const std::string & fx_name,
 		 Widelands::Coords   map_position,
 		 uint8_t             priority = PRIO_ALLOW_MULTIPLE + PRIO_MEDIUM);
 	void play_fx
-		(std::string const & fx_name,
+		(const std::string & fx_name,
 		 int32_t             stereo_position,
 		 uint8_t             priority = PRIO_ALLOW_MULTIPLE + PRIO_MEDIUM);
 
 	void register_song
-		(std::string const & dir,
-		 std::string const & basename,
-		 bool                recursive = false);
-	void start_music(std::string const & songset_name, int32_t fadein_ms = 0);
+		(const std::string & dir,
+		 const std::string & basename);
+	void start_music(const std::string & songset_name, int32_t fadein_ms = 0);
 	void stop_music(int32_t fadeout_ms = 0);
 	void change_music
-		(std::string const & songset_name = std::string(),
+		(const std::string & songset_name = std::string(),
 		 int32_t             fadeout_ms   = 0,
 		 int32_t             fadein_ms    = 0);
 
@@ -204,10 +203,10 @@ public:
 	static void fx_finished_callback(int32_t channel);
 	void handle_channel_finished(uint32_t channel);
 
-	bool get_disable_music() const throw ();
-	bool get_disable_fx   () const throw ();
-	int32_t  get_music_volume () const throw ();
-	int32_t  get_fx_volume    () const throw ();
+	bool get_disable_music() const;
+	bool get_disable_fx   () const;
+	int32_t  get_music_volume () const;
+	int32_t  get_fx_volume    () const;
 	void set_disable_music(bool disable);
 	void set_disable_fx   (bool disable);
 	void set_music_volume (int32_t volume);
@@ -217,7 +216,7 @@ public:
 	 * Return the max value for volume settings. We use a function to hide
 	 * SDL_mixer constants outside of sound_handler.
 	 */
-	int32_t get_max_volume() const throw () {return MIX_MAX_VOLUME;}
+	int32_t get_max_volume() const {return MIX_MAX_VOLUME;}
 
 	/** The game logic where we can get a mapping from logical to screen
 	 * coordinates and vice vers
@@ -240,10 +239,10 @@ public:
 
 protected:
 	Mix_Chunk * RWopsify_MixLoadWAV(FileRead &);
-	void load_one_fx(const char * filename, std::string const & fx_name);
+	void load_one_fx(const char * filename, const std::string & fx_name);
 	int32_t stereo_position(Widelands::Coords position);
 	bool play_or_not
-		(std::string const & fx_name,
+		(const std::string & fx_name,
 		 int32_t             stereo_position,
 		 uint8_t             priority);
 

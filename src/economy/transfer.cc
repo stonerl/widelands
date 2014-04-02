@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2004, 2006-2009 by the Widelands Development Team
+ * Copyright (C) 2004, 2006-2013 by the Widelands Development Team
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -17,24 +17,22 @@
  *
  */
 
-#include "transfer.h"
+#include "economy/transfer.h"
 
-// Package includes
-#include "economy.h"
-#include "flag.h"
-#include "portdock.h"
-#include "road.h"
-#include "ware_instance.h"
-
+#include "economy/economy.h"
+#include "economy/flag.h"
+#include "economy/portdock.h"
+#include "economy/request.h"
+#include "economy/road.h"
+#include "economy/ware_instance.h"
 #include "logic/game.h"
 #include "logic/immovable.h"
 #include "logic/player.h"
-#include "request.h"
 #include "logic/warehouse.h"
 #include "logic/worker.h"
-#include "upcast.h"
-#include "map_io/widelands_map_map_object_saver.h"
 #include "map_io/widelands_map_map_object_loader.h"
+#include "map_io/widelands_map_map_object_saver.h"
+#include "upcast.h"
 
 namespace Widelands {
 
@@ -42,17 +40,17 @@ Transfer::Transfer(Game & game, Request & req, WareInstance & it) :
 	m_game(game),
 	m_request(&req),
 	m_destination(&req.target()),
-	m_item(&it),
-	m_worker(0)
+	m_ware(&it),
+	m_worker(nullptr)
 {
-	m_item->set_transfer(game, *this);
+	m_ware->set_transfer(game, *this);
 }
 
 Transfer::Transfer(Game & game, Request & req, Worker & w) :
 	m_game(game),
 	m_request(&req),
 	m_destination(&req.target()),
-	m_item(0),
+	m_ware(nullptr),
 	m_worker(&w)
 {
 	m_worker->start_task_transfer(game, this);
@@ -64,9 +62,9 @@ Transfer::Transfer(Game & game, Request & req, Worker & w) :
  */
 Transfer::Transfer(Game & game, WareInstance & w) :
 	m_game(game),
-	m_request(0),
-	m_item(&w),
-	m_worker(0)
+	m_request(nullptr),
+	m_ware(&w),
+	m_worker(nullptr)
 {
 }
 
@@ -76,8 +74,8 @@ Transfer::Transfer(Game & game, WareInstance & w) :
  */
 Transfer::Transfer(Game & game, Worker & w) :
 	m_game(game),
-	m_request(0),
-	m_item(0),
+	m_request(nullptr),
+	m_ware(nullptr),
 	m_worker(&w)
 {
 }
@@ -88,11 +86,11 @@ Transfer::Transfer(Game & game, Worker & w) :
 Transfer::~Transfer()
 {
 	if (m_worker) {
-		assert(!m_item);
+		assert(!m_ware);
 
 		m_worker->cancel_task_transfer(m_game);
-	} else if (m_item) {
-		m_item->cancel_transfer(m_game);
+	} else if (m_ware) {
+		m_ware->cancel_transfer(m_game);
 	}
 
 }
@@ -145,7 +143,7 @@ PlayerImmovable * Transfer::get_next_step
 	if (!location || !location->get_economy()) {
 		tlog("no location or economy -> fail\n");
 		success = false;
-		return 0;
+		return nullptr;
 	}
 
 	PlayerImmovable * destination =
@@ -153,13 +151,13 @@ PlayerImmovable * Transfer::get_next_step
 	if (!destination || destination->get_economy() != location->get_economy()) {
 		tlog("destination disappeared or economy mismatch -> fail\n");
 		success = false;
-		return 0;
+		return nullptr;
 	}
 
 	success = true;
 
 	if (location == destination)
-		return 0;
+		return nullptr;
 
 	Flag & locflag  = location->base_flag();
 	Flag & destflag = destination->base_flag();
@@ -168,8 +166,12 @@ PlayerImmovable * Transfer::get_next_step
 		return &locflag == location ? destination : &locflag;
 
 	// Brute force: recalculate the best route every time
-	if (!locflag.get_economy()->find_route(locflag, destflag, &m_route, m_item ? wwWARE : wwWORKER))
-		throw wexception("Transfer::get_next_step: inconsistent economy");
+	if (!locflag.get_economy()->find_route(locflag, destflag, &m_route, m_ware ? wwWARE : wwWORKER)) {
+		tlog("destination appears to have become split from current location -> fail\n");
+		Economy::check_split(locflag, destflag);
+		success = false;
+		return nullptr;
+	}
 
 	if (m_route.get_nrsteps() >= 1)
 		if (upcast(Road const, road, location))
@@ -183,18 +185,6 @@ PlayerImmovable * Transfer::get_next_step
 				 ==
 				 &m_route.get_flag(m_game, m_route.get_nrsteps() - 1))
 				m_route.truncate(m_route.get_nrsteps() - 1);
-
-#if 1
-	if (m_item && (m_item->serial() == 1265)) {
-		log
-			("Item %u ready at location %u (flag %u) for destination %u\n",
-			 m_item->serial(), location->serial(), locflag.serial(), destination->serial());
-		for (int i = 0; i <= m_route.get_nrsteps() && i < 5; ++i) {
-			log("  %i: flag %u\n", i, m_route.get_flag(m_game, i).serial());
-		}
-		log("---\n");
-	}
-#endif
 
 	// Reroute into PortDocks or the associated warehouse when appropriate
 	if (m_route.get_nrsteps() >= 1) {
@@ -211,12 +201,12 @@ PlayerImmovable * Transfer::get_next_step
 				return pd->get_dock(nextflag);
 			if (location == wh)
 				return pd;
-			if (location == &curflag || m_item)
+			if (location == &curflag || m_ware)
 				return wh;
 			return &curflag;
 		}
 
-		if (m_item && location == &curflag && m_route.get_nrsteps() >= 2) {
+		if (m_ware && location == &curflag && m_route.get_nrsteps() >= 2) {
 			Flag & nextnextflag(m_route.get_flag(m_game, 2));
 			if (!nextflag.get_road(nextnextflag)) {
 				upcast(Warehouse, wh, nextflag.get_building());
@@ -231,8 +221,8 @@ PlayerImmovable * Transfer::get_next_step
 	if (dynamic_cast<Flag const *>(location)) {
 		assert(&m_route.get_flag(m_game, 0) == location);
 
-		// special rule to get items into buildings
-		if (m_item and m_route.get_nrsteps() == 1)
+		// special rule to get wares into buildings
+		if (m_ware and m_route.get_nrsteps() == 1)
 			if (dynamic_cast<Building const *>(destination)) {
 				assert(&m_route.get_flag(m_game, 1) == &destflag);
 
@@ -260,18 +250,14 @@ void Transfer::has_finished()
 		m_request->transfer_finish(m_game, *this);
 	} else {
 		PlayerImmovable * destination = m_destination.get(m_game);
-		if (!destination)
-			throw wexception
-				("Transfer: claims to have finished successfully, "
-				 "but destination is gone");
-
+		assert(destination);
 		if (m_worker) {
 			destination->receive_worker(m_game, *m_worker);
-			m_worker = 0;
+			m_worker = nullptr;
 		} else {
-			destination->receive_ware(m_game, m_item->descr_index());
-			m_item->destroy(m_game);
-			m_item = 0;
+			destination->receive_ware(m_game, m_ware->descr_index());
+			m_ware->destroy(m_game);
+			m_ware = nullptr;
 		}
 
 		delete this;
@@ -305,9 +291,9 @@ void Transfer::tlog(char const * const fmt, ...)
 	if (m_worker) {
 		id = 'W';
 		serial = m_worker->serial();
-	} else if (m_item) {
+	} else if (m_ware) {
 		id = 'I';
-		serial = m_item->serial();
+		serial = m_ware->serial();
 	} else {
 		id = '?';
 		serial = 0;

@@ -20,26 +20,24 @@
 #ifndef EDITORINTERACTIVE_H
 #define EDITORINTERACTIVE_H
 
+#include "editor/tools/editor_history.h"
+#include "editor/tools/editor_increase_height_tool.h"
+#include "editor/tools/editor_increase_resources_tool.h"
+#include "editor/tools/editor_info_tool.h"
+#include "editor/tools/editor_make_infrastructure_tool.h"
+#include "editor/tools/editor_noise_height_tool.h"
+#include "editor/tools/editor_place_bob_tool.h"
+#include "editor/tools/editor_place_immovable_tool.h"
+#include "editor/tools/editor_set_origin_tool.h"
+#include "editor/tools/editor_set_port_space_tool.h"
+#include "editor/tools/editor_set_starting_pos_tool.h"
+#include "editor/tools/editor_set_terrain_tool.h"
 #include "ui_basic/button.h"
 #include "ui_basic/unique_window.h"
 #include "wui/interactive_base.h"
 
-#include "tools/editor_increase_height_tool.h"
-#include "tools/editor_increase_resources_tool.h"
-#include "tools/editor_info_tool.h"
-#include "tools/editor_make_infrastructure_tool.h"
-#include "tools/editor_noise_height_tool.h"
-#include "tools/editor_place_bob_tool.h"
-#include "tools/editor_place_immovable_tool.h"
-#include "tools/editor_set_origin_tool.h"
-#include "tools/editor_set_port_space_tool.h"
-#include "tools/editor_set_starting_pos_tool.h"
-#include "tools/editor_set_terrain_tool.h"
-#include "tools/editor_history.h"
-
-
 class Editor;
-struct Editor_Tool;
+class Editor_Tool;
 
 /**
  * This is the EditorInteractive. It is like the InteractivePlayer class,
@@ -48,25 +46,29 @@ struct Editor_Tool;
 struct Editor_Interactive : public Interactive_Base {
 	friend struct Editor_Tool_Menu;
 
-	static void run_editor(std::string const & filename);
+	// Runs the Editor via the commandline --editor flag. Will load 'filename' as a
+	// map and run 'script_to_run' directly after all initialization is done.
+	static void run_editor(const std::string & filename, const std::string& script_to_run);
 
 private:
 	Editor_Interactive(Widelands::Editor_Game_Base &);
 
 public:
 	void register_overlays();
-	void load(std::string const & filename);
+	void load(const std::string & filename);
 
 	// leaf functions from base class
-	void start();
-	void think();
+	void start() override;
+	void think() override;
 
 	void map_clicked(bool draw = false);
-	virtual void set_sel_pos(Widelands::Node_and_Triangle<>);
+	virtual void set_sel_pos(Widelands::Node_and_Triangle<>) override;
 	void set_sel_radius_and_update_menu(uint32_t);
 
-	//  gets called when a keyboard event occurs
-	bool handle_key(bool down, SDL_keysym);
+	//  Handle UI elements.
+	bool handle_key(bool down, SDL_keysym) override;
+	bool handle_mousepress(Uint8 btn, int32_t x, int32_t y) override;
+	bool handle_mouserelease(Uint8 btn, int32_t x, int32_t y) override;
 
 	struct Tools {
 		Tools()
@@ -81,7 +83,7 @@ public:
 			set_port_space(unset_port_space)
 
 		{}
-		Editor_Tool & current() const throw () {return *current_pointer;}
+		Editor_Tool & current() const {return *current_pointer;}
 		typedef std::vector<Editor_Tool *> Tool_Vector;
 		typedef Tool_Vector::size_type Index;
 		//Tool_Vector                     tools;
@@ -109,14 +111,14 @@ public:
 
 	void select_tool(Editor_Tool &, Editor_Tool::Tool_Index);
 
-	Widelands::Player * get_player() const throw () {return 0;}
+	Widelands::Player * get_player() const override {return nullptr;}
 
 	// action functions
 	void exit();
 
 	//  reference functions
-	void   reference_player_tribe(Widelands::Player_Number, void const *);
-	void unreference_player_tribe(Widelands::Player_Number, void const *);
+	void   reference_player_tribe(Widelands::Player_Number, void const * const) override;
+	void unreference_player_tribe(Widelands::Player_Number, void const * const);
 	bool is_player_tribe_referenced(Widelands::Player_Number);
 	void set_need_save(bool const t) {m_need_save = t;}
 
@@ -140,6 +142,7 @@ private:
 	std::vector<Player_References> m_player_tribe_references;
 
 	int32_t m_realtime;
+	bool m_left_mouse_button_is_down;
 
 	Editor_History m_history;
 

@@ -20,7 +20,7 @@
 #ifndef EDITOR_NOISE_HEIGHT_TOOL_H
 #define EDITOR_NOISE_HEIGHT_TOOL_H
 
-#include "editor_set_height_tool.h"
+#include "editor/tools/editor_set_height_tool.h"
 
 /// Set the height of a node to a random value within a defined interval.
 struct Editor_Noise_Height_Tool : public Editor_Tool {
@@ -36,15 +36,15 @@ struct Editor_Noise_Height_Tool : public Editor_Tool {
 
 	int32_t handle_click_impl
 		(Widelands::Map & map, Widelands::Node_and_Triangle<> center,
-		 Editor_Interactive & parent, Editor_Action_Args & args);
+		 Editor_Interactive & parent, Editor_Action_Args & args) override;
 
 	int32_t handle_undo_impl
 		(Widelands::Map & map, Widelands::Node_and_Triangle<> center,
-		 Editor_Interactive & parent, Editor_Action_Args & args);
+		 Editor_Interactive & parent, Editor_Action_Args & args) override;
 
-	Editor_Action_Args format_args_impl(Editor_Interactive & parent);
+	Editor_Action_Args format_args_impl(Editor_Interactive & parent) override;
 
-	char const * get_sel_impl() const {
+	char const * get_sel_impl() const override {
 		return "pics/fsel_editor_noise_height.png";
 	}
 
@@ -55,7 +55,7 @@ struct Editor_Noise_Height_Tool : public Editor_Tool {
 		m_interval = i;
 	}
 
-	Editor_Set_Height_Tool & set_tool() const throw () {return m_set_tool;}
+	Editor_Set_Height_Tool & set_tool() const {return m_set_tool;}
 
 private:
 	Editor_Set_Height_Tool & m_set_tool;

@@ -17,15 +17,16 @@
  *
  */
 
-#include "cmd_luacoroutine.h"
+#include "logic/cmd_luacoroutine.h"
 
-#include "game.h"
-#include "game_data_error.h"
+#include "gamecontroller.h"
+#include "log.h"
+#include "logic/game.h"
+#include "logic/game_data_error.h"
+#include "logic/player.h"
+#include "scripting/lua_coroutine.h"
 #include "scripting/scripting.h"
 #include "upcast.h"
-#include "log.h"
-#include <gamecontroller.h>
-#include "player.h"
 
 namespace Widelands {
 
@@ -35,8 +36,10 @@ void Cmd_LuaCoroutine::execute (Game & game) {
 		int rv = m_cr->resume(&sleeptime);
 		if (rv == LuaCoroutine::YIELDED) {
 			game.enqueue_command(new Widelands::Cmd_LuaCoroutine(sleeptime, m_cr));
+			m_cr = nullptr;  // Remove our ownership so we don't delete.
 		} else if (rv == LuaCoroutine::DONE) {
 			delete m_cr;
+			m_cr = nullptr;
 		}
 	} catch (LuaError & e) {
 		log("Error in Lua Coroutine\n");
@@ -46,14 +49,14 @@ void Cmd_LuaCoroutine::execute (Game & game) {
 			Widelands::Message & msg =
 				*new Widelands::Message
 				("Game Logic", game.get_gametime(),
-				 -1, "Lua Coroutine Failed", e.what());
+				 Forever(), "Lua Coroutine Failed", e.what());
 			game.player(i).add_message(game, msg, true);
 		}
 		game.gameController()->setDesiredSpeed(0);
 	}
 }
 
-#define CMD_LUACOROUTINE_VERSION 1
+#define CMD_LUACOROUTINE_VERSION 2
 void Cmd_LuaCoroutine::Read
 	(FileRead & fr, Editor_Game_Base & egbase, Map_Map_Object_Loader & mol)
 {
@@ -70,9 +73,9 @@ void Cmd_LuaCoroutine::Read
 			m_cr = lgi->read_coroutine(fr, mol, fr.Unsigned32());
 		} else
 			throw game_data_error
-				(_("unknown/unhandled version %u"), packet_version);
-	} catch (_wexception const & e) {
-		throw game_data_error(_("lua function: %s"), e.what());
+				("unknown/unhandled version %u", packet_version);
+	} catch (const _wexception & e) {
+		throw game_data_error("lua function: %s", e.what());
 	}
 }
 void Cmd_LuaCoroutine::Write

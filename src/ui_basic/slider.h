@@ -19,10 +19,10 @@
 #ifndef UI_SLIDER_H
 #define UI_SLIDER_H
 
-#include <boost/signal.hpp>
+#include <boost/signals2.hpp>
 
-#include "panel.h"
 #include "graphic/font.h"
+#include "ui_basic/panel.h"
 
 namespace UI {
 
@@ -42,14 +42,14 @@ protected:
 		(Panel * parent,
 		 int32_t x, int32_t y, uint32_t w, uint32_t h,
 		 int32_t min_value, int32_t max_value, int32_t value,
-		 PictureID background_picture_id,
+		 const Image* background_picture_id,
 		 const std::string & tooltip_text,
 		 uint32_t cursor_size,
 		 bool enabled,
 		 int32_t x_gap, int32_t y_gap, int32_t bar_size);
 
 public:
-	bool is_snap_target() const {return true;}
+	bool is_snap_target() const override {return true;}
 
 	int32_t get_value() const {return m_value;}
 	int32_t get_max_value() const {return m_max_value;}
@@ -63,7 +63,7 @@ public:
 
 
 protected:
-	void layout();
+	void layout() override;
 	void calc_cursor_pos();
 
 	//  drawing
@@ -74,8 +74,8 @@ protected:
 		(RenderTarget &, int32_t x, int32_t y, int32_t w, int32_t h);
 
 	//  mouse events
-	bool handle_mouserelease(Uint8 btn, int32_t, int32_t);
-	void handle_mousein(bool inside);
+	bool handle_mouserelease(Uint8 btn, int32_t, int32_t) override;
+	void handle_mousein(bool inside) override;
 	void cursor_moved(int32_t pointer, int32_t x, int32_t y);
 	void cursor_pressed(int32_t pointer);
 	void bar_pressed(int32_t pointer, int32_t ofs);
@@ -85,8 +85,8 @@ private :
 	void set_highlighted(bool highlighted);
 
 public:
-	boost::signal<void ()> changed;
-	boost::signal<void (int32_t)> changedto;
+	boost::signals2::signal<void ()> changed;
+	boost::signals2::signal<void (int32_t)> changedto;
 
 private:
 	int32_t m_min_value;          //  cursor values
@@ -98,7 +98,7 @@ private:
 	bool m_pressed;           //  the cursor is pressed
 	bool m_enabled;           //  enabled widget
 
-	PictureID m_pic_background;    //  background texture (picture ID)
+	const Image* m_pic_background;    //  background texture (picture ID)
 
 protected:
 	int32_t m_x_gap;              //  draw positions
@@ -118,7 +118,7 @@ struct HorizontalSlider : public Slider {
 		(Panel * const parent,
 		 const int32_t x, const int32_t y, const uint32_t w, const uint32_t h,
 		 const int32_t min_value, const int32_t max_value, const int32_t value,
-		 const PictureID background_picture_id,
+		 const Image* background_picture_id,
 		 const std::string & tooltip_text = std::string(),
 		 const uint32_t cursor_size = 20,
 		 const bool enabled = true)
@@ -137,10 +137,10 @@ struct HorizontalSlider : public Slider {
 	{}
 
 protected:
-	void draw(RenderTarget & dst);
-	bool handle_mousemove (Uint8 btn, int32_t x, int32_t y, int32_t, int32_t);
-	bool handle_mousepress(Uint8 btn, int32_t x, int32_t y);
-	void layout();
+	void draw(RenderTarget & dst) override;
+	bool handle_mousemove (Uint8 btn, int32_t x, int32_t y, int32_t, int32_t) override;
+	bool handle_mousepress(Uint8 btn, int32_t x, int32_t y) override;
+	void layout() override;
 };
 
 
@@ -153,7 +153,7 @@ struct VerticalSlider : public Slider {
 		(Panel * const parent,
 		 const int32_t x, const int32_t y, const uint32_t w, const uint32_t h,
 		 const int32_t min_value, const int32_t max_value, const int32_t value,
-		 const PictureID background_picture_id,
+		 const Image* background_picture_id,
 		 const uint32_t cursor_size = 20,
 		 const std::string & tooltip_text = std::string(),
 		 const bool enabled = true)
@@ -172,10 +172,10 @@ struct VerticalSlider : public Slider {
 	{}
 
 protected:
-	void draw(RenderTarget & dst);
-	bool handle_mousemove (Uint8 btn, int32_t x, int32_t y, int32_t, int32_t);
-	bool handle_mousepress(Uint8 btn, int32_t x, int32_t y);
-	void layout();
+	void draw(RenderTarget & dst) override;
+	bool handle_mousemove (Uint8 btn, int32_t x, int32_t y, int32_t, int32_t) override;
+	bool handle_mousepress(Uint8 btn, int32_t x, int32_t y) override;
+	void layout() override;
 };
 
 /**
@@ -188,19 +188,19 @@ struct DiscreteSlider : public Panel {
 		 const int32_t x, const int32_t y, const uint32_t w, const uint32_t h,
 		 const std::vector<std::string> labels_in,
 		 uint32_t m_value,
-		 const PictureID background_picture_id,
+		 const Image* background_picture_id,
 		 const std::string & tooltip_text = std::string(),
 		 const uint32_t cursor_size = 20,
 		 const bool enabled = true);
 
 	void set_labels(std::vector<std::string>);
 
-	boost::signal<void ()> changed;
-	boost::signal<void (int32_t)> changedto;
+	boost::signals2::signal<void ()> changed;
+	boost::signals2::signal<void (int32_t)> changedto;
 
 protected:
-	virtual void draw(RenderTarget & dst);
-	virtual void layout();
+	virtual void draw(RenderTarget & dst) override;
+	virtual void layout() override;
 
 	HorizontalSlider slider;
 

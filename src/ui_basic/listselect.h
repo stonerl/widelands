@@ -21,16 +21,15 @@
 #ifndef UI_LISTSELECT_H
 #define UI_LISTSELECT_H
 
-#include <boost/signal.hpp>
+#include <deque>
+#include <limits>
+
+#include <boost/signals2.hpp>
 
 #include "align.h"
-#include "panel.h"
-#include "scrollbar.h"
-
-#include "compile_assert.h"
-
-#include <limits>
-#include <deque>
+#include "ui_basic/panel.h"
+#include "rgbcolor.h"
+#include "ui_basic/scrollbar.h"
 
 namespace UI {
 struct Scrollbar;
@@ -52,9 +51,9 @@ struct BaseListselect : public Panel {
 		 bool show_check = false);
 	~BaseListselect();
 
-	boost::signal<void (uint32_t)> selected;
-	boost::signal<void (uint32_t)> clicked;
-	boost::signal<void (uint32_t)> double_clicked;
+	boost::signals2::signal<void (uint32_t)> selected;
+	boost::signals2::signal<void (uint32_t)> clicked;
+	boost::signals2::signal<void (uint32_t)> double_clicked;
 
 	void clear();
 	void sort
@@ -63,22 +62,21 @@ struct BaseListselect : public Panel {
 	void add
 		(const char * const name,
 		 uint32_t value,
-		 const PictureID picid = g_gr->get_no_picture(),
+		 const Image* pic = nullptr,
 		 const bool select_this = false,
-		 std::string const & tooltip_text = std::string());
+		 const std::string & tooltip_text = std::string());
 	void add_front
 		(const char * const name,
-		 const PictureID picid = g_gr->get_no_picture(),
+		 const Image* pic = nullptr,
 		 const bool select_this = false,
-		 std::string const & tooltip_text = std::string());
+		 const std::string & tooltip_text = std::string());
 	void remove(uint32_t);
 	void remove(const char * name);
 
 	void switch_entries(uint32_t, uint32_t);
 
-	void set_entry_color(uint32_t, RGBColor) throw ();
-	void set_align(Align);
-	void set_font(std::string const & fontname, int32_t const fontsize) {
+	void set_entry_color(uint32_t, RGBColor);
+	void set_font(const std::string & fontname, int32_t const fontsize) {
 		m_fontname = fontname;
 		m_fontsize = fontsize;
 	}
@@ -86,40 +84,40 @@ struct BaseListselect : public Panel {
 	uint32_t size () const {return m_entry_records.size ();}
 	bool     empty() const {return m_entry_records.empty();}
 
-	uint32_t operator[](const uint32_t i) const throw ()
+	uint32_t operator[](const uint32_t i) const
 	{
 		assert(i < size());
 		return m_entry_records[i]->m_entry;
 	}
 
-	static uint32_t no_selection_index() throw ()
+	static uint32_t no_selection_index()
 	{
 		return std::numeric_limits<uint32_t>::max();
 	}
 
-	uint32_t selection_index() const throw ()
+	uint32_t selection_index() const
 	{
 		return m_selection;
 	}
 
 	void select(uint32_t i);
-	bool has_selection() const throw ();
+	bool has_selection() const;
 
 	struct No_Selection {};
-	uint32_t get_selected() const throw (No_Selection);
-	void remove_selected() throw (No_Selection);
+	uint32_t get_selected() const;
+	void remove_selected();
 
 	///  Return the total height (text + spacing) occupied by a single line.
-	uint32_t get_lineheight() const throw ();
+	uint32_t get_lineheight() const;
 
-	uint32_t get_eff_w     () const throw ();
+	uint32_t get_eff_w     () const;
 
 	// Drawing and event handling
-	void draw(RenderTarget &);
-	bool handle_mousepress  (Uint8 btn,   int32_t x, int32_t y);
-	bool handle_mouserelease(Uint8 btn,   int32_t x, int32_t y);
-	bool handle_mousemove   (Uint8 state, int32_t x, int32_t y, int32_t xdiff, int32_t ydiff);
-	bool handle_key(bool down, SDL_keysym);
+	void draw(RenderTarget &) override;
+	bool handle_mousepress  (Uint8 btn,   int32_t x, int32_t y) override;
+	bool handle_mouserelease(Uint8 btn,   int32_t x, int32_t y) override;
+	bool handle_mousemove   (Uint8 state, int32_t x, int32_t y, int32_t xdiff, int32_t ydiff) override;
+	bool handle_key(bool down, SDL_keysym) override;
 
 private:
 	static const int32_t DOUBLE_CLICK_INTERVAL = 500; // half a second
@@ -133,7 +131,7 @@ private:
 		uint32_t m_entry;
 		bool use_clr;
 		RGBColor clr;
-		PictureID picid;
+		const Image* pic;
 		std::string name;
 		std::string tooltip;
 	};
@@ -149,7 +147,7 @@ private:
 	int32_t m_last_click_time;
 	uint32_t m_last_selection;  // for double clicks
 	bool m_show_check; //  show a green arrow left of selected element
-	PictureID m_check_picid;
+	const Image* m_check_pic;
 
 	std::string m_fontname;
 	uint32_t    m_fontsize;
@@ -170,30 +168,30 @@ struct Listselect : public BaseListselect {
 	void add
 		(const char * const name,
 		 Entry value,
-		 const PictureID picid = g_gr->get_no_picture(),
+		 const Image* pic = nullptr,
 		 const bool select_this = false,
-		 std::string const & tooltip_text = std::string())
+		 const std::string & tooltip_text = std::string())
 	{
 		m_entry_cache.push_back(value);
-		BaseListselect::add(name, m_entry_cache.size() - 1, picid, select_this, tooltip_text);
+		BaseListselect::add(name, m_entry_cache.size() - 1, pic, select_this, tooltip_text);
 	}
 	void add_front
 		(const char * const name,
 		 Entry value,
-		 const PictureID picid = g_gr->get_no_picture(),
+		 const Image* pic = nullptr,
 		 const bool select_this = false,
-		 std::string const & tooltip_text = std::string())
+		 const std::string & tooltip_text = std::string())
 	{
 		m_entry_cache.push_front(value);
-		BaseListselect::add_front(name, picid, select_this, tooltip_text);
+		BaseListselect::add_front(name, pic, select_this, tooltip_text);
 	}
 
-	Entry const & operator[](uint32_t const i) const throw ()
+	const Entry & operator[](uint32_t const i) const
 	{
 		return m_entry_cache[BaseListselect::operator[](i)];
 	}
 
-	Entry const & get_selected() const
+	const Entry & get_selected() const
 	{
 		return m_entry_cache[BaseListselect::get_selected()];
 	}
@@ -225,23 +223,23 @@ struct Listselect<Entry &> : public Listselect<Entry *> {
 	void add
 		(const char * const name,
 		 Entry      &       value,
-		 const PictureID picid = g_gr->get_no_picture(),
+		 const Image* pic = nullptr,
 		 const bool select_this = false,
-		 std::string const & tooltip_text = std::string())
+		 const std::string & tooltip_text = std::string())
 	{
-		Base::add(name, &value, picid, select_this, tooltip_text);
+		Base::add(name, &value, pic, select_this, tooltip_text);
 	}
 	void add_front
 		(const char * const name,
 		 Entry      &       value,
-		 const PictureID picid = g_gr->get_no_picture(),
+		 const Image* pic = nullptr,
 		 const bool select_this = false,
-		 std::string const & tooltip_text = std::string())
+		 const std::string & tooltip_text = std::string())
 	{
-		Base::add_front(name, &value, picid, select_this, tooltip_text);
+		Base::add_front(name, &value, pic, select_this, tooltip_text);
 	}
 
-	Entry & operator[](uint32_t const i) const throw ()
+	Entry & operator[](uint32_t const i) const
 	{
 		return *Base::operator[](i);
 	}

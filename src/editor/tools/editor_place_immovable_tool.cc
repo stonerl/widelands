@@ -17,17 +17,16 @@
  *
  */
 
-#include "editor_place_immovable_tool.h"
+#include "editor/tools/editor_place_immovable_tool.h"
 
-#include "logic/editor_game_base.h"
+#include <string>
+
 #include "editor/editorinteractive.h"
+#include "logic/editor_game_base.h"
 #include "logic/field.h"
 #include "logic/immovable.h"
 #include "logic/mapregion.h"
-
 #include "upcast.h"
-
-#include <string>
 
 /**
  * Choses an object to place randomly from all enabled
@@ -67,9 +66,9 @@ int32_t Editor_Place_Immovable_Tool::handle_click_impl
 			if
 			(not mr.location().field->get_immovable()
 			        and
-			        mr.location().field->nodecaps() & Widelands::MOVECAPS_WALK)
-				egbase.create_immovable(mr.location(), *i, 0);
-			i++;
+			        (mr.location().field->nodecaps() & Widelands::MOVECAPS_WALK))
+				egbase.create_immovable(mr.location(), *i, nullptr);
+			++i;
 		} while (mr.advance(map));
 	}
 	return radius + 2;
@@ -97,9 +96,9 @@ int32_t Editor_Place_Immovable_Tool::handle_undo_impl
 			immovable->remove(egbase);
 		}
 		if (!i->empty())
-			egbase.create_immovable(mr.location(), *i, 0);
+			egbase.create_immovable(mr.location(), *i, nullptr);
 
-		i++;
+		++i;
 	} while (mr.advance(map));
 	return radius + 2;
 }

@@ -17,14 +17,13 @@
  *
  */
 
-#include "widelands_map_allowed_building_types_data_packet.h"
+#include "map_io/widelands_map_allowed_building_types_data_packet.h"
 
 #include "logic/game.h"
 #include "logic/game_data_error.h"
 #include "logic/player.h"
-#include "profile/profile.h"
 #include "logic/tribe.h"
-
+#include "profile/profile.h"
 #include "upcast.h"
 
 namespace Widelands {
@@ -36,17 +35,16 @@ void Map_Allowed_Building_Types_Data_Packet::Read
 	 Editor_Game_Base      &       egbase,
 	 bool                    const skip,
 	 Map_Map_Object_Loader &)
-throw (_wexception)
 {
 	if (skip)
 		return;
 
 	Profile prof;
 	try {
-		prof.read("allowed_building_types", 0, fs);
-	} catch (_wexception const &) {
+		prof.read("allowed_building_types", nullptr, fs);
+	} catch (const _wexception &) {
 		try {
-			prof.read("allowed_buildings", 0, fs);
+			prof.read("allowed_buildings", nullptr, fs);
 		} catch (...) {
 			return;
 		}
@@ -62,7 +60,7 @@ throw (_wexception)
 
 			//  Now read all players and buildings.
 			iterate_players_existing(p, nr_players, egbase, player) {
-				Tribe_Descr const & tribe = player->tribe();
+				const Tribe_Descr & tribe = player->tribe();
 				//  All building types default to false in the game (not in the
 				//  editor).
 				if (game)
@@ -76,7 +74,7 @@ throw (_wexception)
 					Section & s = prof.get_safe_section(buffer);
 
 					bool allowed;
-					while (const char * const name = s.get_next_bool(0, &allowed)) {
+					while (const char * const name = s.get_next_bool(nullptr, &allowed)) {
 						if (Building_Index const index = tribe.building_index(name))
 							player->allow_building_type(index, allowed);
 						else
@@ -84,23 +82,22 @@ throw (_wexception)
 								("tribe %s does not define building type \"%s\"",
 								 tribe.name().c_str(), name);
 					}
-				} catch (_wexception const & e) {
+				} catch (const _wexception & e) {
 					throw game_data_error
 						("player %u (%s): %s", p, tribe.name().c_str(), e.what());
 				}
 			}
 		} else
 			throw game_data_error
-				(_("unknown/unhandled version %i"), packet_version);
-	} catch (_wexception const & e) {
-		throw game_data_error(_("allowed buildings: %s"), e.what());
+				("unknown/unhandled version %i", packet_version);
+	} catch (const _wexception & e) {
+		throw game_data_error("allowed buildings: %s", e.what());
 	}
 }
 
 
 void Map_Allowed_Building_Types_Data_Packet::Write
 	(FileSystem & fs, Editor_Game_Base & egbase, Map_Map_Object_Saver &)
-throw (_wexception)
 {
 	Profile prof;
 	prof.create_section("global").set_int

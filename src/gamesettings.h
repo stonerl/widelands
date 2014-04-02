@@ -20,12 +20,15 @@
 #ifndef GAMESETTINGS_H
 #define GAMESETTINGS_H
 
-#include "TribeBasicInfo.h"
-
 #include <string>
 #include <vector>
 
+#include "TribeBasicInfo.h"
 #include "logic/widelands.h"
+
+namespace Widelands {
+enum class PlayerEndResult : uint8_t;
+}
 
 struct PlayerSettings {
 	enum State {
@@ -55,9 +58,9 @@ struct UserSettings {
 
 	uint8_t     position;
 	std::string name;
-	bool        winner;
-	uint32_t    points;
+	Widelands::PlayerEndResult     result;
 	std::string win_condition_string;
+	bool        ready; // until now only used as a check for whether user is currently receiving a file or not
 };
 
 struct DedicatedMapInfos {
@@ -73,7 +76,13 @@ struct DedicatedMapInfos {
  * Think of it as the Model in MVC.
  */
 struct GameSettings {
-	GameSettings() : savegame(false) {}
+	GameSettings() :
+		playernum(0),
+		usernum(0),
+		scenario(false),
+		multiplayer(false),
+		savegame(false)
+	{}
 
 	/// Number of player position
 	int16_t playernum;
@@ -84,8 +93,8 @@ struct GameSettings {
 	std::string mapname;
 	std::string mapfilename;
 
-	/// Win condition to use
-	std::string win_condition;
+	/// Lua file defining the win condition to use.
+	std::string win_condition_script;
 
 	/// Is map a scenario
 	bool scenario;
@@ -123,7 +132,7 @@ struct GameSettings {
 struct GameSettingsProvider {
 	virtual ~GameSettingsProvider() {}
 
-	virtual GameSettings const & settings() = 0;
+	virtual const GameSettings & settings() = 0;
 
 	virtual void setScenario(bool set) = 0;
 	virtual bool canChangeMap() = 0;
@@ -135,28 +144,28 @@ struct GameSettingsProvider {
 	virtual bool canLaunch() = 0;
 
 	virtual void setMap
-		(std::string const & mapname,
-		 std::string const & mapfilename,
+		(const std::string & mapname,
+		 const std::string & mapfilename,
 		 uint32_t maxplayers,
 		 bool                savegame = false)
 		= 0;
 	virtual void setPlayerState    (uint8_t number, PlayerSettings::State) = 0;
-	virtual void setPlayerAI       (uint8_t number, std::string const &, bool const random_ai = false) = 0;
+	virtual void setPlayerAI       (uint8_t number, const std::string &, bool const random_ai = false) = 0;
 	virtual void nextPlayerState   (uint8_t number) = 0;
-	virtual void setPlayerTribe    (uint8_t number, std::string const &, bool const random_tribe = false) = 0;
+	virtual void setPlayerTribe    (uint8_t number, const std::string &, bool const random_tribe = false) = 0;
 	virtual void setPlayerInit     (uint8_t number, uint8_t index) = 0;
-	virtual void setPlayerName     (uint8_t number, std::string const &) = 0;
+	virtual void setPlayerName     (uint8_t number, const std::string &) = 0;
 	virtual void setPlayer         (uint8_t number, PlayerSettings) = 0;
 	virtual void setPlayerNumber   (uint8_t number) = 0;
 	virtual void setPlayerTeam     (uint8_t number, Widelands::TeamNumber team) = 0;
 	virtual void setPlayerCloseable(uint8_t number, bool closeable) = 0;
 	virtual void setPlayerShared   (uint8_t number, uint8_t shared) = 0;
-	virtual void setWinCondition   (std::string wc) = 0;
+	virtual void setWinConditionScript   (std::string wc) = 0;
 	virtual void nextWinCondition      () = 0;
-	virtual std::string getWinCondition() = 0;
+	virtual std::string getWinConditionScript() = 0;
 
 	struct No_Tribe {};
-	std::string const & getPlayersTribe() {
+	const std::string & getPlayersTribe() {
 		if (UserSettings::highestPlayernum() < settings().playernum)
 			throw No_Tribe();
 		return settings().players[settings().playernum].tribe;

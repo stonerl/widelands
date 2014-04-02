@@ -20,7 +20,7 @@
 #ifndef MINIMAP_H
 #define MINIMAP_H
 
-#include <boost/signal.hpp>
+#include <boost/signals2.hpp>
 
 #include "ui_basic/button.h"
 #include "ui_basic/unique_window.h"
@@ -36,7 +36,7 @@ struct MiniMap : public UI::UniqueWindow {
 
 	MiniMap(Interactive_Base & parent, Registry *);
 
-	boost::signal<void (int32_t, int32_t)> warpview;
+	boost::signals2::signal<void (int32_t, int32_t)> warpview;
 
 	void set_view_pos(int32_t const x, int32_t const y) {
 		m_view.set_view_pos(x, y);
@@ -66,10 +66,10 @@ private:
 
 		void set_view_pos(int32_t x, int32_t y);
 
-		void draw(RenderTarget &);
+		void draw(RenderTarget &) override;
 
-		bool handle_mousepress  (Uint8 btn, int32_t x, int32_t y);
-		bool handle_mouserelease(Uint8 btn, int32_t x, int32_t y);
+		bool handle_mousepress  (Uint8 btn, int32_t x, int32_t y) override;
+		bool handle_mouserelease(Uint8 btn, int32_t x, int32_t y) override;
 
 		void set_zoom(int32_t z);
 
@@ -77,7 +77,7 @@ private:
 	private:
 		Interactive_Base & m_ibase;
 		int32_t                m_viewx, m_viewy;
-		PictureID              m_pic_map_spot;
+		const Image* m_pic_map_spot;
 	public:
 		int8_t * m_flags;
 	};

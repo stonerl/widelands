@@ -21,10 +21,9 @@
 #define UI_MULTILINE_TEXTAREA_H
 
 #include "align.h"
-#include "panel.h"
-#include "scrollbar.h"
-
-#include <boost/scoped_ptr.hpp>
+#include "ui_basic/panel.h"
+#include "rgbcolor.h"
+#include "ui_basic/scrollbar.h"
 
 namespace UI {
 struct Scrollbar;
@@ -47,24 +46,23 @@ struct Multiline_Textarea : public Panel {
 		 const bool always_show_scrollbar = false);
 	~Multiline_Textarea();
 
-	std::string const & get_text() const {return m_text;}
+	const std::string & get_text() const {return m_text;}
 	ScrollMode get_scrollmode() const {return m_scrollmode;}
 
-	void set_text(std::string const &);
-	void set_align(Align);
+	void set_text(const std::string &);
 	void set_scrollmode(ScrollMode mode);
 
 	void set_font(std::string name, int32_t size, RGBColor fg);
 
-	uint32_t scrollbar_w() const throw () {return 24;}
-	uint32_t get_eff_w() const throw () {return get_w() - scrollbar_w();}
+	uint32_t scrollbar_w() const {return 24;}
+	uint32_t get_eff_w() const {return get_w() - scrollbar_w();}
 
 	void set_color(RGBColor fg) {m_fcolor = fg;}
 
 	// Drawing and event handlers
-	void draw(RenderTarget &);
+	void draw(RenderTarget &) override;
 
-	bool handle_mousepress  (Uint8 btn, int32_t x, int32_t y);
+	bool handle_mousepress  (Uint8 btn, int32_t x, int32_t y) override;
 
 	const char *  get_font_name() {return m_fontname.c_str();}
 	int32_t       get_font_size() {return m_fontsize;}
@@ -73,7 +71,7 @@ struct Multiline_Textarea : public Panel {
 private:
 	struct Impl;
 
-	boost::scoped_ptr<Impl> m;
+	std::unique_ptr<Impl> m;
 
 	void recompute();
 	void scrollpos_changed(int32_t pixels);
@@ -83,7 +81,7 @@ private:
 	ScrollMode  m_scrollmode;
 
 protected:
-	virtual void layout();
+	virtual void layout() override;
 
 	Align        m_align;
 	std::string  m_fontname;

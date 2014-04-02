@@ -17,23 +17,23 @@
  *
  */
 
-#include "widelands_map_flagdata_data_packet.h"
+#include "map_io/widelands_map_flagdata_data_packet.h"
 
-#include "logic/building.h"
+#include <map>
+
 #include "economy/flag.h"
 #include "economy/request.h"
 #include "economy/ware_instance.h"
+#include "logic/building.h"
 #include "logic/game.h"
 #include "logic/map.h"
 #include "logic/player.h"
-#include "upcast.h"
 #include "logic/widelands_fileread.h"
 #include "logic/widelands_filewrite.h"
-#include "widelands_map_map_object_loader.h"
-#include "widelands_map_map_object_saver.h"
 #include "logic/worker.h"
-
-#include <map>
+#include "map_io/widelands_map_map_object_loader.h"
+#include "map_io/widelands_map_map_object_saver.h"
+#include "upcast.h"
 
 namespace Widelands {
 
@@ -44,7 +44,6 @@ void Map_Flagdata_Data_Packet::Read
 	 Editor_Game_Base      &       egbase,
 	 bool                    const skip,
 	 Map_Map_Object_Loader &       mol)
-throw (_wexception)
 {
 	if (skip)
 		return;
@@ -55,7 +54,7 @@ throw (_wexception)
 	try {
 		uint16_t const packet_version = fr.Unsigned16();
 		if (1 <= packet_version and packet_version <= CURRENT_PACKET_VERSION) {
-			Map const  & map    = egbase.map();
+			const Map  & map    = egbase.map();
 			Extent const extent = map.extent();
 			for (;;) {
 				if (2 <= packet_version and fr.EndOfFile())
@@ -82,12 +81,12 @@ throw (_wexception)
 						{
 							if (mf != &flag)
 								throw game_data_error
-									(_("wrong flag (%u) at given position (%i, %i)"),
+									("wrong flag (%u) at given position (%i, %i)",
 									 mf->serial(),
 									 flag.m_position.x, flag.m_position.y);
 						} else
 							throw game_data_error
-								(_("no flag at given position (%i, %i)"),
+								("no flag at given position (%i, %i)",
 								 flag.m_position.x, flag.m_position.y);
 					}
 					flag.m_animstart = fr.Unsigned16();
@@ -102,61 +101,61 @@ throw (_wexception)
 					if (packet_version < 3) {
 						if (uint32_t const building_serial = fr.Unsigned32())
 							try {
-								Building const & building =
+								const Building & building =
 									mol.get<Building>(building_serial);
 								if (flag.m_building != &building)
 									throw game_data_error
-										(_
-										 	("has building %u at (%i, %i), which is not "
-										 	 "at the top left node"),
+										(
+									 	 "has building %u at (%i, %i), which is not "
+									 	 "at the top left node",
 										 building_serial,
 										 building.get_position().x,
 										 building.get_position().y);
-							} catch (_wexception const & e) {
+							} catch (const _wexception & e) {
 								throw game_data_error
-									(_("building (%u): %s"), building_serial, e.what());
+									("building (%u): %s", building_serial, e.what());
 							}
 						else
-							flag.m_building = 0;
+							flag.m_building = nullptr;
 					}
 
 					//  Roads are set somewhere else.
 
 					// Compatibility stuff: Read 6 bytes of attic stuff
-					// that is no longer used (was m_items_pending)
+					// that is no longer used (was m_wares_pending)
 					for (uint32_t i = 0; i < 6; ++i)
 						fr.Unsigned32();
 
-					flag.m_item_capacity = fr.Unsigned32();
+					flag.m_ware_capacity = fr.Unsigned32();
 
 					{
-						uint32_t const items_filled = fr.Unsigned32();
-						flag.m_item_filled = items_filled;
-						for (uint32_t i = 0; i < items_filled; ++i) {
-							flag.m_items[i].pending = fr.Unsigned8();
+						uint32_t const wares_filled = fr.Unsigned32();
+						flag.m_ware_filled = wares_filled;
+						for (uint32_t i = 0; i < wares_filled; ++i) {
+							flag.m_wares[i].pending = fr.Unsigned8();
 							if (packet_version < 4)
-								flag.m_items[i].priority = 0;
+								flag.m_wares[i].priority = 0;
 							else
-								flag.m_items[i].priority = fr.Signed32();
-							uint32_t const item_serial = fr.Unsigned32();
+								flag.m_wares[i].priority = fr.Signed32();
+							uint32_t const ware_serial = fr.Unsigned32();
 							try {
-								flag.m_items[i].item =
-									&mol.get<WareInstance>(item_serial);
+								flag.m_wares[i].ware =
+									&mol.get<WareInstance>(ware_serial);
 
 								if (uint32_t const nextstep_serial = fr.Unsigned32()) {
 									try {
-										flag.m_items[i].nextstep =
+										flag.m_wares[i].nextstep =
 											&mol.get<PlayerImmovable>(nextstep_serial);
-									} catch (_wexception const & e) {
+									} catch (const _wexception & e) {
 										throw game_data_error
 											("next step (%u): %s",
 											 nextstep_serial, e.what());
 									}
 								} else
-									flag.m_items[i].nextstep = 0;
-							} catch (_wexception const & e) {
+									flag.m_wares[i].nextstep = nullptr;
+							} catch (const _wexception & e) {
 								throw game_data_error
-									("item #%u (%u): %s", i, item_serial, e.what());
+									("ware #%u (%u): %s", i, ware_serial, e.what());
 							}
 						}
 
@@ -164,13 +163,13 @@ throw (_wexception)
 							try {
 								flag.m_always_call_for_flag =
 									&mol.get<Flag>(always_call_serial);
-							} catch (_wexception const & e) {
+							} catch (const _wexception & e) {
 								throw game_data_error
 									("always_call (%u): %s",
 									 always_call_serial, e.what());
 							}
 						else
-							flag.m_always_call_for_flag = 0;
+							flag.m_always_call_for_flag = nullptr;
 
 						//  workers waiting
 						uint16_t const nr_workers = fr.Unsigned16();
@@ -183,7 +182,7 @@ throw (_wexception)
 								//  (with his stack of tasks) has been fully loaded.
 								flag.m_capacity_wait.push_back
 									(&mol.get<Worker>(worker_serial));
-							} catch (_wexception const & e) {
+							} catch (const _wexception & e) {
 								throw game_data_error
 									("worker #%u (%u): %s", i, worker_serial, e.what());
 							}
@@ -204,7 +203,7 @@ throw (_wexception)
 								f.request->Read
 									(fr, ref_cast<Game, Editor_Game_Base>(egbase), mol);
 							} else {
-								f.request = 0;
+								f.request = nullptr;
 							}
 							f.program = fr.CString();
 							flag.m_flag_jobs.push_back(f);
@@ -212,28 +211,28 @@ throw (_wexception)
 
 						mol.mark_object_as_loaded(flag);
 					}
-				} catch (_wexception const & e) {
-					throw game_data_error(_("%u: %s"), serial, e.what());
+				} catch (const _wexception & e) {
+					throw game_data_error("%u: %s", serial, e.what());
 				}
 			}
 		} else
 			throw game_data_error
-				(_("unknown/unhandled version %u"), packet_version);
-	} catch (_wexception const & e) {
-		throw game_data_error(_("flagdata: %s"), e.what());
+				("unknown/unhandled version %u", packet_version);
+	} catch (const _wexception & e) {
+		throw game_data_error("flagdata: %s", e.what());
 	}
 }
 
 
 void Map_Flagdata_Data_Packet::Write
 	(FileSystem & fs, Editor_Game_Base & egbase, Map_Map_Object_Saver & mos)
-	throw (_wexception)
+
 {
 	FileWrite fw;
 
 	fw.Unsigned16(CURRENT_PACKET_VERSION);
 
-	Map const & map = egbase.map();
+	const Map & map = egbase.map();
 	const Field & fields_end = map[map.max_index()];
 	for (Field * field = &map[0]; field < &fields_end; ++field)
 		if (upcast(Flag const, flag, field->get_immovable())) {
@@ -250,22 +249,22 @@ void Map_Flagdata_Data_Packet::Write
 			//  Roads are not saved, they are set on load.
 
 			// Compatibility stuff: Write 6 bytes of attic stuff that is
-			// no longer used (was m_items_pending)
+			// no longer used (was m_wares_pending)
 			for (uint32_t i = 0; i < 6; ++i)
 				fw.Unsigned32(0);
 
-			fw.Unsigned32(flag->m_item_capacity);
+			fw.Unsigned32(flag->m_ware_capacity);
 
-			fw.Unsigned32(flag->m_item_filled);
+			fw.Unsigned32(flag->m_ware_filled);
 
-			for (int32_t i = 0; i < flag->m_item_filled; ++i) {
-				fw.Unsigned8(flag->m_items[i].pending);
-				fw.Signed32(flag->m_items[i].priority);
-				assert(mos.is_object_known(*flag->m_items[i].item));
-				fw.Unsigned32(mos.get_object_file_index(*flag->m_items[i].item));
+			for (int32_t i = 0; i < flag->m_ware_filled; ++i) {
+				fw.Unsigned8(flag->m_wares[i].pending);
+				fw.Signed32(flag->m_wares[i].priority);
+				assert(mos.is_object_known(*flag->m_wares[i].ware));
+				fw.Unsigned32(mos.get_object_file_index(*flag->m_wares[i].ware));
 				if
 					(PlayerImmovable const * const nextstep =
-					 	flag->m_items[i].nextstep.get(egbase))
+					 	flag->m_wares[i].nextstep.get(egbase))
 					fw.Unsigned32(mos.get_object_file_index(*nextstep));
 				else
 					fw.Unsigned32(0);
@@ -279,7 +278,7 @@ void Map_Flagdata_Data_Packet::Write
 				fw.Unsigned32(0);
 
 			//  worker waiting for capacity
-			Flag::CapacityWaitQueue const & capacity_wait =
+			const Flag::CapacityWaitQueue & capacity_wait =
 				flag->m_capacity_wait;
 			fw.Unsigned16(capacity_wait.size());
 			container_iterate_const(Flag::CapacityWaitQueue, capacity_wait, i) {
@@ -295,7 +294,7 @@ void Map_Flagdata_Data_Packet::Write
 				assert(mos.is_object_known(*obj));
 				fw.Unsigned32(mos.get_object_file_index(*obj));
 			}
-			Flag::FlagJobs const & flag_jobs = flag->m_flag_jobs;
+			const Flag::FlagJobs & flag_jobs = flag->m_flag_jobs;
 			fw.Unsigned16(flag_jobs.size());
 			container_iterate_const(Flag::FlagJobs, flag_jobs, i) {
 				if (i.current->request) {

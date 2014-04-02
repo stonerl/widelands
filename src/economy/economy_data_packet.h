@@ -24,9 +24,9 @@
 #include "logic/widelands_filewrite.h"
 
 namespace Widelands {
-struct Economy;
-struct Game;
-struct Map_Map_Object_Loader;
+class Economy;
+class Game;
+class Map_Map_Object_Loader;
 struct Map_Map_Object_Saver;
 
 class EconomyDataPacket {
@@ -43,5 +43,3 @@ class EconomyDataPacket {
 }
 
 #endif
-
-

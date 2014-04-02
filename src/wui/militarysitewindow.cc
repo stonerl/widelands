@@ -17,11 +17,12 @@
  *
  */
 
-#include "buildingwindow.h"
+#include "graphic/graphic.h"
 #include "logic/militarysite.h"
-#include "soldiercapacitycontrol.h"
-#include "soldierlist.h"
 #include "ui_basic/tabpanel.h"
+#include "wui/buildingwindow.h"
+#include "wui/soldiercapacitycontrol.h"
+#include "wui/soldierlist.h"
 
 using Widelands::MilitarySite;
 
@@ -41,7 +42,7 @@ struct MilitarySite_Window : public Building_Window {
 	}
 
 protected:
-	virtual void create_capsbuttons(UI::Box * buttons);
+	virtual void create_capsbuttons(UI::Box * buttons) override;
 };
 
 
@@ -53,7 +54,7 @@ MilitarySite_Window::MilitarySite_Window
 Building_Window(parent, ms, registry)
 {
 	get_tabs()->add
-		("soldiers", g_gr->get_picture(PicMod_Game, pic_tab_military),
+		("soldiers", g_gr->images().get(pic_tab_military),
 		 create_soldier_list(*get_tabs(), parent, militarysite()),
 		 _("Soldiers"));
 }

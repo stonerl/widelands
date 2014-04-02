@@ -1,8 +1,11 @@
 size=small
 
 [buildcost]
-trunk=2
+log=2
 stone=1
+
+[return_on_dismantle]
+log=1
 
 [working positions]
 scout=1
@@ -28,9 +31,7 @@ worker=scout
 [idle]
 pics=scouts_house_i_??.png  # ???
 hotspot=41 44
-playercolor=true
 
 [build]
 pics=scouts_house_b_??.png  # ???
 hotspot=41 44
-playercolor=true

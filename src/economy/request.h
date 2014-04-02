@@ -21,19 +21,19 @@
 #define REQUEST_H
 
 #include "logic/requirements.h"
-#include "trackptr.h"
 #include "logic/wareworker.h"
 #include "logic/widelands.h"
 #include "logic/widelands_fileread.h"
 #include "logic/widelands_filewrite.h"
+#include "trackptr.h"
 
 namespace Widelands {
 
-struct Economy;
-struct Editor_Game_Base;
+class Economy;
+class Editor_Game_Base;
 struct Flag;
-struct Game;
-struct Map_Map_Object_Loader;
+class Game;
+class Map_Map_Object_Loader;
 struct Map_Map_Object_Saver;
 struct PlayerImmovable;
 class RequestList;
@@ -57,8 +57,9 @@ class ConstructionSite;
  * left, a transfer may be initiated.
  * The required time has no meaning for idle requests.
  */
-struct Request : public Trackable {
-	friend struct Economy;
+class Request : public Trackable {
+public:
+	friend class Economy;
 	friend class RequestList;
 
 	typedef void (*callback_t)
@@ -67,13 +68,13 @@ struct Request : public Trackable {
 	Request(PlayerImmovable & target, Ware_Index, callback_t, WareWorker);
 	~Request();
 
-	PlayerImmovable & target() const throw () {return m_target;}
+	PlayerImmovable & target() const {return m_target;}
 	Ware_Index get_index() const {return m_index;}
 	WareWorker get_type() const {return m_type;}
 	uint32_t get_count() const {return m_count;}
 	uint32_t get_open_count() const {return m_count - m_transfers.size();}
 	bool is_open() const {return m_transfers.size() < m_count;}
-	Economy * get_economy() const throw () {return m_economy;}
+	Economy * get_economy() const {return m_economy;}
 	int32_t get_required_time() const;
 	int32_t get_last_request_time() const {return m_last_request_time;}
 	int32_t get_priority(int32_t cost) const;
@@ -99,8 +100,8 @@ struct Request : public Trackable {
 	void transfer_finish(Game &, Transfer &);
 	void transfer_fail  (Game &, Transfer &);
 
-	void set_requirements (Requirements const & r) {m_requirements = r;}
-	Requirements const & get_requirements () const {return m_requirements;}
+	void set_requirements (const Requirements & r) {m_requirements = r;}
+	const Requirements & get_requirements () const {return m_requirements;}
 
 private:
 	int32_t get_base_required_time(Editor_Game_Base &, uint32_t nr) const;
@@ -131,7 +132,7 @@ private:
 
 	//  when do we need the first ware (can be in the past)
 	int32_t           m_required_time;
-	int32_t           m_required_interval; //  time between items
+	int32_t           m_required_interval; //  time between wares
 	int32_t           m_last_request_time;
 
 	TransferList      m_transfers;         //  maximum size is m_count

@@ -17,20 +17,19 @@
  *
  */
 
-#include "cmd_queue.h"
+#include "logic/cmd_queue.h"
 
 #include "io/filewrite.h"
-#include "game.h"
-#include "game_data_error.h"
-#include "instances.h"
+#include "logic/game.h"
+#include "logic/game_data_error.h"
+#include "logic/instances.h"
+#include "logic/player.h"
+#include "logic/playercommand.h"
+#include "logic/widelands_fileread.h"
+#include "logic/worker.h"
 #include "machdep.h"
-#include "player.h"
-#include "playercommand.h"
-#include "wexception.h"
-#include "widelands_fileread.h"
-#include "worker.h"
-
 #include "upcast.h"
+#include "wexception.h"
 
 namespace Widelands {
 
@@ -99,13 +98,6 @@ void Cmd_Queue::enqueue (Command * const cmd)
 	++ m_ncmds;
 }
 
-/**
- * Run all commands scheduled for the next interval milliseconds, and update the
- * internal time as well.
- * the game_time_var represents the current game time, which we update and with
- * which we must mess around (to run all queued cmd.s) and which we update (add
- * the interval)
- */
 int32_t Cmd_Queue::run_queue(int32_t const interval, int32_t & game_time_var) {
 	int32_t const final = game_time_var + interval;
 	int32_t cnt = 0;
@@ -113,7 +105,7 @@ int32_t Cmd_Queue::run_queue(int32_t const interval, int32_t & game_time_var) {
 	while (game_time_var < final) {
 		std::priority_queue<cmditem> & current_cmds = m_cmds[game_time_var % CMD_QUEUE_BUCKET_SIZE];
 
-		while (current_cmds.size()) {
+		while (!current_cmds.empty()) {
 			Command & c = *current_cmds.top().cmd;
 			if (game_time_var < c.duetime())
 				break;
@@ -186,12 +178,12 @@ void GameLogicCommand::Read
 			int32_t const gametime = egbase.get_gametime();
 			if (duetime() < gametime)
 				throw game_data_error
-					(_("duetime (%i) < gametime (%i)"), duetime(), gametime);
+					("duetime (%i) < gametime (%i)", duetime(), gametime);
 		} else
 			throw game_data_error
-				(_("unknown/unhandled version %u"), packet_version);
-	} catch (_wexception const & e) {
-		throw game_data_error(_("game logic: %s"), e.what());
+				("unknown/unhandled version %u", packet_version);
+	} catch (const _wexception & e) {
+		throw game_data_error("game logic: %s", e.what());
 	}
 }
 

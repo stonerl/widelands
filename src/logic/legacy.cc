@@ -17,12 +17,12 @@
  *
  */
 
-#include "legacy.h"
+#include "logic/legacy.h"
 
-#include "editor_game_base.h"
-#include "game_data_error.h"
-#include "immovable.h"
-#include "tribe.h"
+#include "logic/editor_game_base.h"
+#include "logic/game_data_error.h"
+#include "logic/immovable.h"
+#include "logic/tribe.h"
 
 namespace Widelands {
 
@@ -31,13 +31,13 @@ namespace Legacy {
 //  These tables are needed for compatibility with requests written in version
 //  <= 3.
 static char const * const barbarian_ware_types[] = {
-	"axe",
-	"bakingtray",
-	"battleaxe",
+	"ax",
+	"bread_paddle",
+	"battleax",
 	"beer",
 	"blackwood",
-	"broadaxe",
-	"bronzeaxe",
+	"broadax",
+	"bronzeax",
 	"cloth",
 	"coal",
 	"fire_tongs",
@@ -45,7 +45,7 @@ static char const * const barbarian_ware_types[] = {
 	"fishing_rod",
 	"flax",
 	"gold",
-	"goldstone",
+	"goldore",
 	"grout",
 	"hammer",
 	"helm",
@@ -61,14 +61,14 @@ static char const * const barbarian_ware_types[] = {
 	"ration",
 	"raw_stone",
 	"scythe",
-	"sharpaxe",
+	"sharpax",
 	"shovel",
 	"snack",
 	"strongbeer",
 	"thatchreed",
-	"trunk",
-	"warhelmet",
-	"warriorsaxe",
+	"log",
+	"warhelm",
+	"warriorsax",
 	"water",
 	"wheat"
 };
@@ -81,7 +81,7 @@ static char const * const barbarian_worker_types[] = {
 	"carrier",
 	"chief-miner",
 	"farmer",
-	"ferner",
+	"gardener",
 	"fisher",
 	"gamekeeper",
 	"geologist",
@@ -103,13 +103,13 @@ static char const * const barbarian_worker_types[] = {
 };
 static char const * const empire_ware_types[] = {
 	"advanced_lance",
-	"armour",
-	"axe",
-	"bakingtray",
+	"armor",
+	"ax",
+	"bread_paddle",
 	"basket",
 	"beer",
 	"bread",
-	"chain_armour",
+	"chain_armor",
 	"cloth",
 	"coal",
 	"fire_tongs",
@@ -117,7 +117,7 @@ static char const * const empire_ware_types[] = {
 	"fishing_rod",
 	"flour",
 	"gold",
-	"goldstone",
+	"goldore",
 	"grape",
 	"hammer",
 	"heavy_lance",
@@ -132,13 +132,13 @@ static char const * const empire_ware_types[] = {
 	"meal",
 	"meat",
 	"pick",
-	"plate_armour",
+	"plate_armor",
 	"ration",
 	"saw",
 	"scythe",
 	"shovel",
 	"stone",
-	"trunk",
+	"log",
 	"war_lance",
 	"water",
 	"wheat",
@@ -148,7 +148,7 @@ static char const * const empire_ware_types[] = {
 	"wool",
 };
 static char const * const empire_worker_types[] = {
-	"armoursmith",
+	"armorsmith",
 	"baker",
 	"brewer",
 	"builder",
@@ -177,7 +177,7 @@ static char const * const empire_worker_types[] = {
 };
 static char const * const atlantean_ware_types[] = {
 	"advanced_shield",
-	"bakingtray",
+	"bread_paddle",
 	"blackroot",
 	"blackrootflour",
 	"bread",
@@ -218,11 +218,11 @@ static char const * const atlantean_ware_types[] = {
 	"steel_trident",
 	"stone",
 	"tabard",
-	"trunk",
+	"log",
 	"water"
 };
 static char const * const atlantean_worker_types[] = {
-	"armoursmith",
+	"armorsmith",
 	"baker",
 	"blackroot_farmer",
 	"builder",
@@ -250,8 +250,8 @@ static char const * const atlantean_worker_types[] = {
 };
 
 Ware_Index ware_index
-	(Tribe_Descr const &       tribe,
-	 std::string const &       name,
+	(const Tribe_Descr &       tribe,
+	 const std::string &       name,
 	 char        const * const relation,
 	 uint32_t            const legacy_index)
 {
@@ -295,8 +295,8 @@ Ware_Index ware_index
 }
 
 Ware_Index safe_ware_index
-	(Tribe_Descr const &       tribe,
-	 std::string const &       name,
+	(const Tribe_Descr &       tribe,
+	 const std::string &       name,
 	 char        const * const relation,
 	 uint32_t            const legacy_index)
 {
@@ -309,8 +309,8 @@ Ware_Index safe_ware_index
 }
 
 Ware_Index worker_index
-	(Tribe_Descr const &       tribe,
-	 std::string const &       name,
+	(const Tribe_Descr &       tribe,
+	 const std::string &       name,
 	 char        const * const relation,
 	 uint32_t            const legacy_index)
 {
@@ -360,12 +360,12 @@ Map_Object_Descr g_FakeAttackController_Descr
 struct FakeAttackController : public BaseImmovable {
 	FakeAttackController() : BaseImmovable(g_FakeAttackController_Descr) {}
 
-	virtual int32_t get_type() const throw () {return BATTLE;}
-	virtual int32_t get_size() const throw () {return SMALL;}
-	virtual bool get_passable() const throw () {return true;}
-	virtual void draw (Editor_Game_Base const &, RenderTarget &, FCoords, Point)
+	virtual int32_t get_type() const override {return BATTLE;}
+	virtual int32_t get_size() const override {return SMALL;}
+	virtual bool get_passable() const override {return true;}
+	virtual void draw (const Editor_Game_Base &, RenderTarget &, const FCoords&, const Point&) override
 	{}
-	virtual PositionList get_positions (const Editor_Game_Base &) const throw ()
+	virtual PositionList get_positions (const Editor_Game_Base &) const override
 	{
 		// This violates what I had in mind for get_positions, but since this is
 		// attic code and get_positions was added long after this code was gone
@@ -376,7 +376,7 @@ struct FakeAttackController : public BaseImmovable {
 
 
 	struct Loader : public BaseImmovable::Loader {
-		virtual void load(FileRead & fr, uint8_t const version) {
+		virtual void load(FileRead & fr, uint8_t const /* version */) {
 			BaseImmovable::Loader::load(fr);
 
 			try {
@@ -402,14 +402,14 @@ struct FakeAttackController : public BaseImmovable {
 				uint32_t numInMs = fr.Unsigned32();
 				for (uint32_t j = 0; j < numInMs; ++j)
 					fr.Unsigned32();
-			} catch (_wexception const & e) {
+			} catch (const _wexception & e) {
 				throw wexception
 					("Error in legacy AttackController: binary/mapobjects:%s",
 					 e.what());
 			}
 		}
 
-		virtual void load_finish() {
+		virtual void load_finish() override {
 			get_object()->remove(egbase());
 		}
 	};
@@ -419,17 +419,17 @@ struct FakeAttackController : public BaseImmovable {
 Map_Object::Loader * loadAttackController
 	(Editor_Game_Base & egbase, Map_Map_Object_Loader & mol, FileRead & fr)
 {
-	std::auto_ptr<FakeAttackController::Loader> loader
+	std::unique_ptr<FakeAttackController::Loader> loader
 		(new FakeAttackController::Loader);
 
 	try {
 		uint8_t const version = fr.Unsigned8();
 		if (version != 1)
-			throw game_data_error(_("unknown/unhandled version %u"), version);
+			throw game_data_error("unknown/unhandled version %u", version);
 
 		loader->init(egbase, mol, *new FakeAttackController);
 		loader->load(fr, version);
-	} catch (std::exception const & e) {
+	} catch (const std::exception & e) {
 		throw wexception("Loading legacy AttackController: %s", e.what());
 	}
 
@@ -442,12 +442,12 @@ Map_Object_Descr g_FakeBattle_Descr("battle", "Battle");
 struct FakeBattle : public BaseImmovable {
 	FakeBattle() : BaseImmovable(g_FakeBattle_Descr) {}
 
-	virtual int32_t get_type() const throw () {return BATTLE;}
-	virtual int32_t get_size() const throw () {return SMALL;}
-	virtual bool get_passable() const throw () {return true;}
-	virtual void draw (Editor_Game_Base const &, RenderTarget &, FCoords, Point)
+	virtual int32_t get_type() const override {return BATTLE;}
+	virtual int32_t get_size() const override {return SMALL;}
+	virtual bool get_passable() const override {return true;}
+	virtual void draw (const Editor_Game_Base &, RenderTarget &, const FCoords&, const Point&) override
 	{}
-	virtual PositionList get_positions (const Editor_Game_Base &) const throw ()
+	virtual PositionList get_positions (const Editor_Game_Base &) const override
 	{
 		// This violates what I had in mind for get_positions, but since this is
 		// attic code and get_positions was added long after this code was gone
@@ -457,7 +457,7 @@ struct FakeBattle : public BaseImmovable {
 	}
 
 	struct Loader : public BaseImmovable::Loader {
-		virtual void load(FileRead & fr, uint8_t const version) {
+		virtual void load(FileRead & fr, uint8_t const /* version */) {
 			BaseImmovable::Loader::load(fr);
 
 			fr.Unsigned32();
@@ -467,14 +467,14 @@ struct FakeBattle : public BaseImmovable {
 			fr.Unsigned32();
 		}
 
-		virtual void load_finish() {get_object()->remove(egbase());}
+		virtual void load_finish() override {get_object()->remove(egbase());}
 	};
 };
 
 Map_Object::Loader * loadBattle
 	(Editor_Game_Base & egbase, Map_Map_Object_Loader & mol, FileRead & fr)
 {
-	std::auto_ptr<FakeBattle::Loader> loader(new FakeBattle::Loader);
+	std::unique_ptr<FakeBattle::Loader> loader(new FakeBattle::Loader);
 
 	try {
 		// Header has been peeled away by caller
@@ -483,7 +483,7 @@ Map_Object::Loader * loadBattle
 			loader->init(egbase, mol, *new FakeBattle);
 			loader->load(fr, version);
 		} else
-			throw game_data_error(_("unknown/unhandled version %u"), version);
+			throw game_data_error("unknown/unhandled version %u", version);
 	} catch (const std::exception & e) {
 		throw wexception("Loading legacy Battle: %s", e.what());
 	}

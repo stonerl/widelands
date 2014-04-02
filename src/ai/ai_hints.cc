@@ -17,11 +17,11 @@
  *
  */
 
-#include "ai_hints.h"
-
-#include "profile/profile.h"
+#include "ai/ai_hints.h"
 
 #include <cstring>
+
+#include "profile/profile.h"
 
 
 BuildingHints::~BuildingHints ()
@@ -31,11 +31,11 @@ BuildingHints::~BuildingHints ()
 }
 
 BuildingHints::BuildingHints (Section * const section) :
-	renews_map_resource(0),
-	mines              (0),
+	renews_map_resource(nullptr),
+	mines              (nullptr),
 	basic              (section ? section->get_bool("is_basic")         : false),
 	build_material     (section ? section->get_bool("build_material")   : true),
-	trunkproducer      (section ? section->get_bool("trunkproducer")    : false),
+	logproducer      (section ? section->get_bool("logproducer")    : false),
 	stoneproducer      (section ? section->get_bool("stoneproducer")    : false),
 	needs_water        (section ? section->get_bool("needs_water")      : false),
 	recruitment        (section ? section->get_bool("recruitment")      : false),

@@ -20,15 +20,14 @@
 #ifndef GAME_OBJECTIVE_MENU_H
 #define GAME_OBJECTIVE_MENU_H
 
+#include "wui/interactive_player.h"
+#include "ui_basic/button.h"
 #include "ui_basic/listselect.h"
 #include "ui_basic/multilinetextarea.h"
 #include "ui_basic/unique_window.h"
-#include "ui_basic/button.h"
-
-#include "interactive_player.h"
 
 namespace Widelands {
-struct Game;
+class Game;
 struct Objective;
 }
 struct Interactive_Player;
@@ -36,7 +35,7 @@ struct Interactive_Player;
 ///  Shows the not already fulfilled objectives.
 struct GameObjectivesMenu : public UI::UniqueWindow {
 	GameObjectivesMenu(Interactive_Player &, UI::UniqueWindow::Registry &);
-	void think();
+	void think() override;
 
 private:
 	Interactive_Player & iplayer() const;

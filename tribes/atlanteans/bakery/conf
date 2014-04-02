@@ -5,9 +5,13 @@ output=bread
 build_material=false
 
 [buildcost]
-trunk=2
+log=2
 planks=2
 stone=3
+
+[return_on_dismantle]
+planks=1
+stone=2
 
 [working positions]
 baker=1
@@ -30,10 +34,8 @@ produce=bread:2
 [idle]
 pics=bakery_i_??.png  # ???
 hotspot=52 63
-playercolor=true
 
 [working]
 pics=bakery_b_??.png  # ???
 hotspot=52 75
-playercolor=true
 fps=20

@@ -41,7 +41,7 @@ end
 -- =======================================================================
 
 -- RST
--- .. function:: check_player_defeated(plrs, heading, msg)
+-- .. function:: check_player_defeated(plrs, heading, msg, wc_name, wc_ver)
 --
 --    Checks whether one of the players in the list was defeated and if yes,
 --    removes that player from the list and sends him/her a message.
@@ -49,16 +49,19 @@ end
 --    :arg plrs:    List of Players to be checked
 --    :arg heading: Heading of the message the defeated player will get
 --    :arg msg:     Message the defeated player will get
---    :arg wc_name: Name of the win condition
+--    :arg wc_name: Name of the win condition. If not nil, meth:`wl.game.Game.report_result`
+--       will be called.
 --    :arg wc_ver:  Version of the win condition
 --
 --    :returns: :const:`nil`
 function check_player_defeated(plrs, heading, msg, wc_name, wc_ver)
    for idx,p in ipairs(plrs) do
       if p.defeated then
-         p:send_message(heading, msg, { popup = true })
+         p:send_message(heading, msg)
          p.see_all = 1
-         wl.game.report_result(p, false, 0, make_extra_data(p, wc_name, wc_ver))
+         if (wc_name and wc_ver) then
+            wl.game.report_result(p, 0, make_extra_data(p, wc_name, wc_ver))
+         end
          table.remove(plrs, idx)
          break
       end
@@ -105,10 +108,20 @@ function broadcast(plrs, header, msg, goptions)
    end
 end
 
-function broadcast_win(plrs, header, msg, goptions, wc_name, wc_ver)
+function broadcast_win(plrs, header, msg, goptions, wc_name, wc_ver, gextra)
    local options = goptions or {}
+   local extra = gextra or {}
    for idx, p in ipairs(plrs) do
        p:send_message(header, msg, options)
-       wl.game.report_result(p, true, 0, make_extra_data(p, wc_name, wc_ver))
+       wl.game.report_result(p, 1, make_extra_data(p, wc_name, wc_ver, extra))
+   end
+end
+
+function broadcast_lost(plrs, header, msg, goptions, wc_name, wc_ver, gextra)
+   local options = goptions or {}
+   local extra = gextra or {}
+   for idx, p in ipairs(plrs) do
+       p:send_message(header, msg, options)
+       wl.game.report_result(p, 0, make_extra_data(p, wc_name, wc_ver, extra))
    end
 end

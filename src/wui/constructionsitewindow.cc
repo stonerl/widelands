@@ -18,10 +18,11 @@
  */
 
 
-#include "buildingwindow.h"
+#include "wui/buildingwindow.h"
 
-#include "waresqueuedisplay.h"
+#include "wui/waresqueuedisplay.h"
 
+#include "graphic/graphic.h"
 #include "logic/constructionsite.h"
 #include "ui_basic/progressbar.h"
 #include "ui_basic/tabpanel.h"
@@ -37,7 +38,7 @@ struct ConstructionSite_Window : public Building_Window {
 		 Widelands::ConstructionSite &,
 		 UI::Window *                & registry);
 
-	virtual void think();
+	virtual void think() override;
 
 private:
 	UI::Progress_Bar * m_progress;
@@ -71,7 +72,7 @@ ConstructionSite_Window::ConstructionSite_Window
 			 UI::Box::AlignLeft);
 
 
-	get_tabs()->add("wares", g_gr->get_picture(PicMod_UI, pic_tab_wares), &box, _("Building materials"));
+	get_tabs()->add("wares", g_gr->images().get(pic_tab_wares), &box, _("Building materials"));
 }
 
 
@@ -84,7 +85,7 @@ void ConstructionSite_Window::think()
 {
 	Building_Window::think();
 
-	Widelands::ConstructionSite const & cs =
+	const Widelands::ConstructionSite & cs =
 		ref_cast<Widelands::ConstructionSite, Widelands::Building>(building());
 
 	m_progress->set_state(cs.get_built_per64k());

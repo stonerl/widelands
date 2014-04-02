@@ -17,20 +17,20 @@
  *
  */
 
-#include "editor_noise_height_tool.h"
+#include "editor/tools/editor_noise_height_tool.h"
 
-#include "editor_increase_height_tool.h"
-#include "editor_decrease_height_tool.h"
-#include "editor_set_height_tool.h"
-#include "logic/mapregion.h"
-#include "logic/field.h"
 #include "editor/editorinteractive.h"
+#include "editor/tools/editor_decrease_height_tool.h"
+#include "editor/tools/editor_increase_height_tool.h"
+#include "editor/tools/editor_set_height_tool.h"
+#include "logic/field.h"
+#include "logic/mapregion.h"
 
 /// Sets the heights to random values. Changes surrounding nodes if necessary.
 int32_t Editor_Noise_Height_Tool::handle_click_impl
 	(Widelands::Map           &           map,
 	Widelands::Node_and_Triangle<> const center,
-	Editor_Interactive         &         parent,
+	Editor_Interactive         &         /* parent */,
 	Editor_Action_Args & args)
 {
 	if (args.origHights.empty()) {

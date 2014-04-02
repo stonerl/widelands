@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2002-2004, 2006-2011 by the Widelands Development Team
+ * Copyright (C) 2002-2004, 2006-2011, 2013 by the Widelands Development Team
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -17,36 +17,37 @@
  *
  */
 
-#include "fieldaction.h"
+#include "wui/fieldaction.h"
 
-#include "attack_box.h"
-#include "logic/attackable.h"
-#include "logic/cmd_queue.h"
 #include "economy/economy.h"
 #include "economy/flag.h"
 #include "economy/road.h"
-#include "game_debug_ui.h"
 #include "graphic/graphic.h"
+#include "graphic/image_transformations.h"
 #include "i18n.h"
-#include "interactive_player.h"
+#include "logic/attackable.h"
+#include "logic/cmd_queue.h"
 #include "logic/maphollowregion.h"
 #include "logic/militarysite.h"
-#include "overlay_manager.h"
 #include "logic/player.h"
 #include "logic/soldier.h"
 #include "logic/tribe.h"
 #include "logic/warehouse.h"
-#include "military_box.h"
-#include "watchwindow.h"
-
 #include "ui_basic/box.h"
 #include "ui_basic/button.h"
 #include "ui_basic/icongrid.h"
 #include "ui_basic/tabpanel.h"
 #include "ui_basic/textarea.h"
 #include "ui_basic/unique_window.h"
-
 #include "upcast.h"
+#include "wui/actionconfirm.h"
+#include "wui/attack_box.h"
+#include "wui/game_debug_ui.h"
+#include "wui/interactive_player.h"
+#include "wui/military_box.h"
+#include "wui/overlay_manager.h"
+#include "wui/waresdisplay.h"
+#include "wui/watchwindow.h"
 
 namespace Widelands {struct Building_Descr;}
 using Widelands::Building;
@@ -59,15 +60,16 @@ using Widelands::Game;
 
 // The BuildGrid presents a selection of buildable buildings
 struct BuildGrid : public UI::Icon_Grid {
-	BuildGrid
-		(UI::Panel                    * parent,
-		 Widelands::Tribe_Descr const & tribe,
-		 const int32_t x, const int32_t y,
-		 int32_t cols);
+	BuildGrid(UI::Panel* parent,
+	          const RGBColor& player_color,
+	          const Widelands::Tribe_Descr& tribe,
+	          int32_t x,
+	          int32_t y,
+	          int32_t cols);
 
-	boost::signal<void (Widelands::Building_Index::value_t)> buildclicked;
-	boost::signal<void (Widelands::Building_Index::value_t)> buildmouseout;
-	boost::signal<void (Widelands::Building_Index::value_t)> buildmousein;
+	boost::signals2::signal<void(Widelands::Building_Index::value_t)> buildclicked;
+	boost::signals2::signal<void(Widelands::Building_Index::value_t)> buildmouseout;
+	boost::signals2::signal<void(Widelands::Building_Index::value_t)> buildmousein;
 
 	void add(Widelands::Building_Index::value_t);
 
@@ -77,38 +79,42 @@ private:
 	void mouseinslot(int32_t idx);
 
 private:
-	Widelands::Tribe_Descr const & m_tribe;
+	const RGBColor player_color_;
+	const Widelands::Tribe_Descr& tribe_;
 };
 
-
-BuildGrid::BuildGrid
-	(UI::Panel                    * parent,
-	 Widelands::Tribe_Descr const & tribe,
-	 int32_t const x, int32_t const y,
-	 int32_t                        cols)
-:
-	UI::Icon_Grid
-		(parent, x, y, BG_CELL_WIDTH, BG_CELL_HEIGHT, cols),
-	m_tribe(tribe)
+BuildGrid::BuildGrid(
+		UI::Panel* parent, const RGBColor& player_color, const Widelands::Tribe_Descr& tribe,
+		int32_t x, int32_t y, int32_t cols) :
+	UI::Icon_Grid(parent, x, y, BG_CELL_WIDTH, BG_CELL_HEIGHT, cols),
+	player_color_(player_color),
+	tribe_(tribe)
 {
 	clicked.connect(boost::bind(&BuildGrid::clickslot, this, _1));
 	mouseout.connect(boost::bind(&BuildGrid::mouseoutslot, this, _1));
 	mousein.connect(boost::bind(&BuildGrid::mouseinslot, this, _1));
 }
 
-
 /*
 ===============
 Add a new building to the list of buildable buildings
 ===============
 */
-void BuildGrid::add(Widelands::Building_Index::value_t const id)
+void BuildGrid::add(Widelands::Building_Index::value_t id)
 {
-	Widelands::Building_Descr const & descr =
-		*m_tribe.get_building_descr(Widelands::Building_Index(id));
+	const Widelands::Building_Descr & descr =
+		*tribe_.get_building_descr(Widelands::Building_Index(id));
+	const Image& anim_frame = g_gr->animations().get_animation(descr.get_animation("idle"))
+		.representative_image(player_color_);
+	const uint16_t image_w = anim_frame.width();
+	const uint16_t image_h = anim_frame.height();
+	double ratio = BUILDMENU_IMAGE_SIZE / std::max(image_w, image_h);
+	const Image* menu_image = ImageTransformations::resize(&anim_frame, image_w * ratio, image_h * ratio);
 	UI::Icon_Grid::add
-		(descr.name(), descr.get_buildicon(),
-		 reinterpret_cast<void *>(id), descr.descname());
+		(descr.name(), menu_image,
+		 reinterpret_cast<void *>(id),
+		 descr.descname() + "<br><font size=11>" + _("Construction costs:") + "</font><br>" +
+			waremap_to_richtext(tribe_, descr.buildcost()));
 }
 
 
@@ -120,7 +126,7 @@ The icon with the given index has been clicked. Figure out which building it
 belongs to and trigger signal buildclicked.
 ===============
 */
-void BuildGrid::clickslot(int32_t const idx)
+void BuildGrid::clickslot(int32_t idx)
 {
 	buildclicked(static_cast<int32_t>(reinterpret_cast<intptr_t>(get_data(idx))));
 }
@@ -162,7 +168,8 @@ FieldActionWindow IMPLEMENTATION
 
 ==============================================================================
 */
-struct FieldActionWindow : public UI::UniqueWindow {
+class FieldActionWindow : public UI::UniqueWindow {
+public:
 	FieldActionWindow
 		(Interactive_Base           * ibase,
 		 Widelands::Player          * plr,
@@ -173,11 +180,11 @@ struct FieldActionWindow : public UI::UniqueWindow {
 		return ref_cast<Interactive_Base, UI::Panel>(*get_parent());
 	}
 
-	virtual void think();
+	virtual void think() override;
 
 	void init();
 	void add_buttons_auto();
-	void add_buttons_build(int32_t buildcaps);
+	void add_buttons_build(int32_t buildcaps, const RGBColor& player_color);
 	void add_buttons_road(bool flag);
 	void add_buttons_attack();
 
@@ -205,13 +212,13 @@ private:
 		(const std::string & name,
 		 const char * picname,
 		 UI::Panel * panel,
-		 const std::string & tooltip_text = std::string());
+		 const std::string & tooltip_text = "");
 	UI::Button & add_button
 		(UI::Box *,
-		 char const * name,
-		 char const * picname,
+		 const char * name,
+		 const char * picname,
 		 void (FieldActionWindow::*fn)(),
-		 std::string const & tooltip_text,
+		 const std::string & tooltip_text,
 		 bool repeating = false);
 	void okdialog();
 
@@ -225,45 +232,44 @@ private:
 	bool m_fastclick; // if true, put the mouse over first button in first tab
 	uint32_t m_best_tab;
 	Overlay_Manager::Job_Id m_workarea_preview_job_id;
-	PictureID workarea_cumulative_picid[NUMBER_OF_WORKAREA_PICS];
 
 	/// Variables to use with attack dialog.
 	AttackBox * m_attack_box;
 };
 
-static char const * const pic_tab_buildroad  = "pics/menu_tab_buildroad.png";
-static char const * const pic_tab_watch      = "pics/menu_tab_watch.png";
-static char const * const pic_tab_military   = "pics/menu_tab_military.png";
-static char const * const pic_tab_buildhouse[] = {
+static const char * const pic_tab_buildroad  = "pics/menu_tab_buildroad.png";
+static const char * const pic_tab_watch      = "pics/menu_tab_watch.png";
+static const char * const pic_tab_military   = "pics/menu_tab_military.png";
+static const char * const pic_tab_buildhouse[] = {
 	"pics/menu_tab_buildsmall.png",
 	"pics/menu_tab_buildmedium.png",
 	"pics/menu_tab_buildbig.png",
 	"pics/menu_tab_buildport.png"
 };
 static const std::string tooltip_tab_build[] = {
-	_("Build small buildings"),
-	_("Build medium buildings"),
-	_("Build large buildings"),
-	_("Build port buildings")
+	_("Build small building"),
+	_("Build medium building"),
+	_("Build large building"),
+	_("Build port building")
 };
 static const std::string name_tab_build[] = {"small", "medium", "big", "port"};
 
 
-static char const * const pic_tab_buildmine  = "pics/menu_tab_buildmine.png";
+static const char * const pic_tab_buildmine  = "pics/menu_tab_buildmine.png";
 
-static char const * const pic_buildroad      = "pics/menu_build_way.png";
-static char const * const pic_remroad        = "pics/menu_rem_way.png";
-static char const * const pic_buildflag      = "pics/menu_build_flag.png";
-static char const * const pic_ripflag        = "pics/menu_rip_flag.png";
-static char const * const pic_watchfield     = "pics/menu_watch_field.png";
-static char const * const pic_showcensus     = "pics/menu_show_census.png";
-static char const * const pic_showstatistics = "pics/menu_show_statistics.png";
-static char const * const pic_debug          = "pics/menu_debug.png";
-static char const * const pic_abort          = "pics/menu_abort.png";
-static char const * const pic_geologist      = "pics/menu_geologist.png";
+static const char * const pic_buildroad      = "pics/menu_build_way.png";
+static const char * const pic_remroad        = "pics/menu_rem_way.png";
+static const char * const pic_buildflag      = "pics/menu_build_flag.png";
+static const char * const pic_ripflag        = "pics/menu_rip_flag.png";
+static const char * const pic_watchfield     = "pics/menu_watch_field.png";
+static const char * const pic_showcensus     = "pics/menu_show_census.png";
+static const char * const pic_showstatistics = "pics/menu_show_statistics.png";
+static const char * const pic_debug          = "pics/menu_debug.png";
+static const char * const pic_abort          = "pics/menu_abort.png";
+static const char * const pic_geologist      = "pics/menu_geologist.png";
 
-static char const * const pic_tab_attack     = "pics/menu_tab_attack.png";
-static char const * const pic_attack         = "pics/menu_attack.png";
+static const char * const pic_tab_attack     = "pics/menu_tab_attack.png";
+static const char * const pic_attack         = "pics/menu_attack.png";
 
 
 /*
@@ -281,22 +287,16 @@ FieldActionWindow::FieldActionWindow
 	m_map(&ib->egbase().map()),
 	m_overlay_manager(*m_map->get_overlay_manager()),
 	m_node(ib->get_sel_pos().node, &(*m_map)[ib->get_sel_pos().node]),
-	m_tabpanel(this, 0, 0, g_gr->get_picture(PicMod_UI, "pics/but1.png")),
+	m_tabpanel(this, 0, 0, g_gr->images().get("pics/but1.png")),
 	m_fastclick(true),
 	m_best_tab(0),
 	m_workarea_preview_job_id(Overlay_Manager::Job_Id::Null()),
-	m_attack_box(0)
+	m_attack_box(nullptr)
 {
 	ib->set_sel_freeze(true);
 
-	set_center_panel(&m_tabpanel);
 
-	char filename[] = "pics/workarea0cumulative.png";
-	compile_assert(NUMBER_OF_WORKAREA_PICS <= 9);
-	for (Workarea_Info::size_type i = 0; i < NUMBER_OF_WORKAREA_PICS; ++i) {
-		++filename[13];
-		workarea_cumulative_picid[i] = g_gr->get_picture(PicMod_Game, filename);
-	}
+	set_center_panel(&m_tabpanel);
 }
 
 
@@ -345,17 +345,17 @@ Add the buttons you normally get when clicking on a field.
 */
 void FieldActionWindow::add_buttons_auto()
 {
-	UI::Box * buildbox = 0;
+	UI::Box * buildbox = nullptr;
 	UI::Box & watchbox = *new UI::Box(&m_tabpanel, 0, 0, UI::Box::Horizontal);
 
 	// Add road-building actions
 	upcast(Interactive_GameBase, igbase, &ibase());
 
-	Widelands::Player_Number const owner = m_node.field->get_owned_by();
+	const Widelands::Player_Number owner = m_node.field->get_owned_by();
 
 	if (not igbase or igbase->can_see(owner)) {
 		Widelands::BaseImmovable * const imm = m_map->get_immovable(m_node);
-		bool const can_act = igbase ? igbase->can_act(owner) : true;
+		const bool can_act = igbase ? igbase->can_act(owner) : true;
 
 		// The box with road-building buttons
 		buildbox = new UI::Box(&m_tabpanel, 0, 0, UI::Box::Horizontal);
@@ -374,7 +374,7 @@ void FieldActionWindow::add_buttons_auto()
 				if
 					(!building
 					 ||
-					 building->get_playercaps() & Building::PCap_Bulldoze)
+					 (building->get_playercaps() & Building::PCap_Bulldoze))
 					add_button
 						(buildbox, "rip_flag",
 						 pic_ripflag,
@@ -396,14 +396,14 @@ void FieldActionWindow::add_buttons_auto()
 						 _("Send geologist to explore site"));
 			}
 		} else {
-			int32_t const buildcaps = m_plr ? m_plr->get_buildcaps(m_node) : 0;
+			const int32_t buildcaps = m_plr ? m_plr->get_buildcaps(m_node) : 0;
 
 			// Add house building
-			if
-				((buildcaps & Widelands::BUILDCAPS_SIZEMASK)
-				 ||
-				 (buildcaps & Widelands::BUILDCAPS_MINE))
-				add_buttons_build(buildcaps);
+			if ((buildcaps & Widelands::BUILDCAPS_SIZEMASK) ||
+			    (buildcaps & Widelands::BUILDCAPS_MINE)) {
+				assert(igbase->get_player());
+				add_buttons_build(buildcaps, igbase->get_player()->get_playercolor());
+			}
 
 			// Add build actions
 			if ((m_fastclick = buildcaps & Widelands::BUILDCAPS_FLAG))
@@ -411,9 +411,9 @@ void FieldActionWindow::add_buttons_auto()
 					(buildbox, "build_flag",
 					 pic_buildflag,
 					 &FieldActionWindow::act_buildflag,
-					 _("Put a flag"));
+					 _("Place a flag"));
 
-			if (can_act && dynamic_cast<Widelands::Road const *>(imm))
+			if (can_act && dynamic_cast<const Widelands::Road *>(imm))
 				add_button
 					(buildbox, "destroy_road",
 					 pic_remroad,
@@ -431,7 +431,7 @@ void FieldActionWindow::add_buttons_auto()
 
 	//  Watch actions, only when game (no use in editor) same for statistics.
 	//  census is ok
-	if (dynamic_cast<Game const *>(&ibase().egbase())) {
+	if (dynamic_cast<const Game *>(&ibase().egbase())) {
 		add_button
 			(&watchbox, "watch",
 			 pic_watchfield,
@@ -457,11 +457,11 @@ void FieldActionWindow::add_buttons_auto()
 			 _("Debug window"));
 
 	MilitaryBox * militarybox =
-		m_plr ? new MilitaryBox(&m_tabpanel, m_plr, 0, 0) : 0;
+		m_plr ? new MilitaryBox(&m_tabpanel, m_plr, 0, 0) : nullptr;
 
 	// Add tabs
 	if (buildbox && buildbox->get_nritems())
-		add_tab("roads", pic_tab_buildroad, buildbox, _("Build roads"));
+		add_tab("roads", pic_tab_buildroad, buildbox, _("Build road"));
 
 	add_tab("watch", pic_tab_watch, &watchbox, _("Watch"));
 
@@ -511,29 +511,29 @@ void FieldActionWindow::add_buttons_attack ()
 Add buttons for house building.
 ===============
 */
-void FieldActionWindow::add_buttons_build(int32_t const buildcaps)
+void FieldActionWindow::add_buttons_build(int32_t buildcaps, const RGBColor& player_color)
 {
 	if (not m_plr)
 		return;
-	BuildGrid * bbg_house[4] = {0, 0, 0, 0};
-	BuildGrid * bbg_mine = 0;
+	BuildGrid * bbg_house[4] = {nullptr, nullptr, nullptr, nullptr};
+	BuildGrid * bbg_mine = nullptr;
 
-	Widelands::Tribe_Descr const & tribe = m_plr->tribe();
+	const Widelands::Tribe_Descr & tribe = m_plr->tribe();
 
 	m_fastclick = false;
 
-	Widelands::Building_Index const nr_buildings = tribe.get_nrbuildings();
+	const Widelands::Building_Index nr_buildings = tribe.get_nrbuildings();
 	for
 		(Widelands::Building_Index id = Widelands::Building_Index::First();
 		 id < nr_buildings;
 		 ++id)
 	{
-		Widelands::Building_Descr const & descr = *tribe.get_building_descr(id);
+		const Widelands::Building_Descr & descr = *tribe.get_building_descr(id);
 		BuildGrid * * ppgrid;
 
 		//  Some building types cannot be built (i.e. construction site) and not
 		//  allowed buildings.
-		if (dynamic_cast<Game const *>(&ibase().egbase())) {
+		if (dynamic_cast<const Game *>(&ibase().egbase())) {
 			if (!descr.is_buildable() || !m_plr->is_building_type_allowed(id))
 				continue;
 		} else if (!descr.is_buildable() && !descr.is_enhanced())
@@ -561,7 +561,7 @@ void FieldActionWindow::add_buttons_build(int32_t const buildcaps)
 
 		// Allocate the tab's grid if necessary
 		if (!*ppgrid) {
-			*ppgrid = new BuildGrid(&m_tabpanel, tribe, 0, 0, 5);
+			*ppgrid = new BuildGrid(&m_tabpanel, player_color, tribe, 0, 0, 5);
 			(*ppgrid)->buildclicked.connect(boost::bind(&FieldActionWindow::act_build, this, _1));
 			(*ppgrid)->buildmouseout.connect
 				(boost::bind(&FieldActionWindow::building_icon_mouse_out, this, _1));
@@ -595,7 +595,7 @@ void FieldActionWindow::add_buttons_build(int32_t const buildcaps)
 Buttons used during road building: Set flag here and Abort
 ===============
 */
-void FieldActionWindow::add_buttons_road(bool const flag)
+void FieldActionWindow::add_buttons_road(bool flag)
 {
 	UI::Box & buildbox = *new UI::Box(&m_tabpanel, 0, 0, UI::Box::Horizontal);
 
@@ -619,29 +619,29 @@ Convenience function: Adds a new tab to the main tab panel
 ===============
 */
 uint32_t FieldActionWindow::add_tab
-	(std::string const & name, char const * picname,
-	 UI::Panel * panel, std::string const & tooltip_text)
+	(const std::string & name, const char * picname,
+	 UI::Panel * panel, const std::string & tooltip_text)
 {
 	return
 		m_tabpanel.add
-			(name, g_gr->get_picture(PicMod_Game, picname), panel, tooltip_text);
+			(name, g_gr->images().get(picname), panel, tooltip_text);
 }
 
 
 UI::Button & FieldActionWindow::add_button
 	(UI::Box           * const box,
-	 char        const * const name,
-	 char        const * const picname,
+	 const char        * const name,
+	 const char        * const picname,
 	 void (FieldActionWindow::*fn)(),
-	 std::string const & tooltip_text,
-	 bool                const repeating)
+	 const std::string & tooltip_text,
+	 bool                repeating)
 {
 	UI::Button & button =
 		*new UI::Button
 			(box, name,
 			 0, 0, 34, 34,
-			 g_gr->get_picture(PicMod_UI, "pics/but2.png"),
-			 g_gr->get_picture(PicMod_Game, picname),
+			 g_gr->images().get("pics/but2.png"),
+			 g_gr->images().get(picname),
 			 tooltip_text);
 	button.sigclicked.connect(boost::bind(fn, this));
 	button.set_repeating(repeating);
@@ -734,7 +734,7 @@ void FieldActionWindow::act_buildflag()
 
 void FieldActionWindow::act_configure_economy()
 {
-	if (upcast(Widelands::Flag const, flag, m_node.field->get_immovable()))
+	if (upcast(const Widelands::Flag, flag, m_node.field->get_immovable()))
 		flag->get_economy()->show_options_window();
 }
 
@@ -750,11 +750,18 @@ void FieldActionWindow::act_ripflag()
 	Widelands::Editor_Game_Base & egbase = ibase().egbase();
 	if (upcast(Widelands::Flag, flag, m_node.field->get_immovable())) {
 		if (Building * const building = flag->get_building()) {
-			if (building->get_playercaps() & Building::PCap_Bulldoze)
-				show_bulldoze_confirm
-					(ref_cast<Interactive_Player, Interactive_Base>(ibase()),
-					 *building,
-					 flag);
+			if (building->get_playercaps() & Building::PCap_Bulldoze) {
+				if (get_key_state(SDLK_LCTRL) or get_key_state(SDLK_RCTRL)) {
+					ref_cast<Game, Editor_Game_Base>(egbase).send_player_bulldoze
+						(*flag, get_key_state(SDLK_LCTRL) or get_key_state(SDLK_RCTRL));
+				}
+				else {
+					show_bulldoze_confirm
+						(ref_cast<Interactive_Player, Interactive_Base>(ibase()),
+						 *building,
+						 flag);
+				}
+			}
 		} else {
 			ref_cast<Game, Editor_Game_Base>(egbase).send_player_bulldoze
 					(*flag, get_key_state(SDLK_LCTRL) or get_key_state(SDLK_RCTRL));
@@ -813,7 +820,7 @@ void FieldActionWindow::act_removeroad()
 Start construction of the building with the give description index
 ===============
 */
-void FieldActionWindow::act_build(Widelands::Building_Index::value_t const idx)
+void FieldActionWindow::act_build(Widelands::Building_Index::value_t idx)
 {
 	Widelands::Game & game = ref_cast<Game, Editor_Game_Base>(ibase().egbase());
 	game.send_player_build
@@ -839,47 +846,13 @@ void FieldActionWindow::building_icon_mouse_out
 
 
 void FieldActionWindow::building_icon_mouse_in
-	(Widelands::Building_Index::value_t const idx)
+	(const Widelands::Building_Index::value_t idx)
 {
 	if (ibase().m_show_workarea_preview and not m_workarea_preview_job_id) {
-		m_workarea_preview_job_id = m_overlay_manager.get_a_job_id();
-		Widelands::HollowArea<> hollow_area(Widelands::Area<>(m_node, 0), 0);
 		const Workarea_Info & workarea_info =
 			m_plr->tribe().get_building_descr(Widelands::Building_Index(idx))
 			->m_workarea_info;
-		Workarea_Info::const_iterator it = workarea_info.begin();
-		for
-			(Workarea_Info::size_type i =
-			 	std::min(workarea_info.size(), NUMBER_OF_WORKAREA_PICS);
-			 i;
-			 ++it)
-		{
-			--i;
-			hollow_area.radius = it->first;
-			assert(hollow_area.radius);
-			assert(hollow_area.hole_radius < hollow_area.radius);
-			Widelands::MapHollowRegion<> mr(*m_map, hollow_area);
-			do
-				m_overlay_manager.register_overlay
-					(mr.location(),
-					 workarea_cumulative_picid[i],
-					 0,
-					 Point::invalid(),
-					 m_workarea_preview_job_id);
-			while (mr.advance(*m_map));
-			hollow_area.hole_radius = hollow_area.radius;
-		}
-
-#if 0
-		//  This is debug output.
-		//  Improvement suggestion: add to sign explanation window instead.
-		container_iterate_const(Workarea_Info, workarea_info, i) {
-			log("Radius: %i\n", i.current->first);
-			container_iterate_const(std::set<std::string>, i.current->second, j)
-				log("        %s\n", j.current->c_str());
-		}
-#endif
-
+		m_workarea_preview_job_id = ibase().show_work_area(workarea_info, m_node);
 	}
 }
 
@@ -913,7 +886,7 @@ void FieldActionWindow::act_attack ()
 		if (m_attack_box->soldiers() > 0)
 			game.send_player_enemyflagaction
 				(building->base_flag(),
-				 ref_cast<Interactive_Player const, Interactive_Base const>
+				 ref_cast<const Interactive_Player, const Interactive_Base>
 				 	(ibase())
 				 .player_number(),
 				 m_attack_box->soldiers(), //  number of soldiers
@@ -946,10 +919,10 @@ void show_field_action
 		return w.init();
 	}
 
-	Widelands::Map const & map = player->egbase().map();
+	const Widelands::Map & map = player->egbase().map();
 
 	// we're building a road right now
-	Widelands::FCoords const target =
+	const Widelands::FCoords target =
 		map.get_fcoords(ibase->get_sel_pos().node);
 
 	// if user clicked on the same field again, build a flag
@@ -958,7 +931,7 @@ void show_field_action
 		w.add_buttons_road
 			(target != ibase->get_build_road_start()
 			 and
-			 player->get_buildcaps(target) & Widelands::BUILDCAPS_FLAG);
+			 (player->get_buildcaps(target) & Widelands::BUILDCAPS_FLAG));
 		return w.init();
 	}
 
@@ -972,12 +945,12 @@ void show_field_action
 
 	// did he click on a flag or a road where a flag can be built?
 
-	if (upcast(Widelands::PlayerImmovable const, i, map.get_immovable(target)))
+	if (upcast(const Widelands::PlayerImmovable, i, map.get_immovable(target)))
 	{
 		bool finish = false;
-		if      (dynamic_cast<Widelands::Flag const *>(i))
+		if      (dynamic_cast<const Widelands::Flag *>(i))
 			finish = true;
-		else if (dynamic_cast<Widelands::Road const *>(i))
+		else if (dynamic_cast<const Widelands::Road *>(i))
 			if (player->get_buildcaps(target) & Widelands::BUILDCAPS_FLAG) {
 				ref_cast<Game, Editor_Game_Base>(player->egbase())
 					.send_player_build_flag(player->player_number(), target);

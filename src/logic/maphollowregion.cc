@@ -17,12 +17,12 @@
  *
  */
 
-#include "maphollowregion.h"
+#include "logic/maphollowregion.h"
 
 namespace Widelands {
 
 template <> MapHollowRegion<Area<> >::MapHollowRegion
-	(Map const & map, HollowArea<Area<> > const hollow_area)
+	(const Map & map, HollowArea<Area<> > const hollow_area)
 :
 m_hollow_area (hollow_area),
 m_phase       (Top),
@@ -38,7 +38,7 @@ m_left        (hollow_area)
 	m_left = m_hollow_area;
 }
 
-template <> bool MapHollowRegion<Area<> >::advance(const Map & map) throw () {
+template <> bool MapHollowRegion<Area<> >::advance(const Map & map) {
 	if (m_phase == None)
 		return false;
 	++m_rowpos;

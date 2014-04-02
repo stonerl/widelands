@@ -22,13 +22,16 @@
 
 #include "economy/route.h"
 #include "graphic/animation.h"
+#include "graphic/diranimations.h"
+#include "logic/instances.h"
 #include "point.h"
-#include "writeHTML.h"
-#include "instances.h"
-#include "walkingdir.h"
+#include "port.h"
+#include "logic/walkingdir.h"
+
+struct Profile;
 
 namespace Widelands {
-struct Map;
+class Map;
 struct Route;
 struct Transfer;
 struct Tribe_Descr;
@@ -44,6 +47,40 @@ struct BobProgramBase {
 	virtual std::string get_name() const = 0;
 };
 
+class Bob;
+
+// Description for the Bob class.
+class BobDescr : public Map_Object_Descr {
+public:
+	friend struct Map_Bobdata_Data_Packet;
+
+	BobDescr(char const* name,
+	      char const* descname,
+	      const std::string& directory,
+	      Profile&,
+	      Section& global_s,
+	      Tribe_Descr const*);
+
+	virtual ~BobDescr() {};
+	Bob& create(Editor_Game_Base&, Player* owner, const Coords&) const;
+	bool is_world_bob() const {
+		return not m_owner_tribe;
+	}
+
+	Tribe_Descr const* get_owner_tribe() const {
+		return m_owner_tribe;
+	}
+
+	virtual uint32_t movecaps() const {
+		return 0;
+	}
+	uint32_t vision_range() const;
+
+protected:
+	virtual Bob& create_object() const = 0;
+
+	const Tribe_Descr* const m_owner_tribe;  //  0 if world bob
+};
 
 /**
  * Bobs are moving map objects: Animals, humans, ships...
@@ -115,14 +152,15 @@ struct BobProgramBase {
  * To this end, a task may have a \ref Task::pop method. If this method
  * exists, it is always called just before the task is popped from the stack.
  */
-struct Bob : public Map_Object {
-	friend struct Map;
+class Bob : public Map_Object {
+public:
+	friend class Map;
 	friend struct Map_Bobdata_Data_Packet;
 	friend struct Map_Bob_Data_Packet;
 
 	struct State;
 	typedef void (Bob::*Ptr)(Game &, State &);
-	typedef void (Bob::*PtrSignal)(Game &, State &, std::string const &);
+	typedef void (Bob::*PtrSignal)(Game &, State &, const std::string &);
 	enum Type {CRITTER, WORKER, SHIP};
 
 	/// \see struct Bob for in-depth explanation
@@ -159,19 +197,18 @@ struct Bob : public Map_Object {
 	 * of a function, while \ref State represents the stackframe of an
 	 * actual execution of the function.
 	 *
-	 * \see struct Bob for in-depth explanation
+	 * \see class Bob for in-depth explanation
 	 */
 	struct State {
-		State(const Task * const the_task = 0) :
+		State(const Task * const the_task = nullptr) :
 			task    (the_task),
 			ivar1   (0),
 			ivar2   (0),
 			ivar3   (0),
 			coords  (Coords::Null()),
-			diranims(0),
-			path    (0),
-			route   (0),
-			program (0)
+			path    (nullptr),
+			route   (nullptr),
+			program (nullptr)
 		{}
 
 		const Task           * task;
@@ -182,63 +219,35 @@ struct Bob : public Map_Object {
 		std::string            svar1;
 
 		Coords                 coords;
-		const DirAnimations  * diranims;
+		DirAnimations          diranims;
 		Path                 * path;
 		Route                * route;
 		const BobProgramBase * program; ///< pointer to current program
 	};
 
-	struct Descr: public Map_Object_Descr {
-		friend struct Map_Bobdata_Data_Packet;
-
-		Descr
-			(char const * name, char const * descname,
-			 std::string const & directory, Profile &, Section & global_s,
-			 Tribe_Descr const *);
-
-		virtual ~Descr() {};
-		Bob & create(Editor_Game_Base &, Player * owner, const Coords &) const;
-		bool is_world_bob() const {return not m_owner_tribe;}
-
-		char const * get_picture() const {return m_picture.c_str();}
-
-		Tribe_Descr const * get_owner_tribe() const throw () {
-			return m_owner_tribe;
-		}
-
-		virtual uint32_t movecaps() const throw () {return 0;}
-		uint32_t vision_range() const;
-
-	protected:
-		virtual Bob & create_object() const = 0;
-
-		std::string         m_picture;
-		const Tribe_Descr * const m_owner_tribe; //  0 if world bob
-	};
-
-	MO_DESCR(Descr);
+	MO_DESCR(BobDescr);
 
 	uint32_t get_current_anim() const {return m_anim;}
 	int32_t get_animstart() const {return m_animstart;}
 
-	virtual int32_t get_type() const throw () {return BOB;}
-	virtual char const * type_name() const throw () {return "bob";}
-	virtual Type get_bob_type() const throw () = 0;
-	const std::string & name() const throw () {return descr().name();}
+	virtual int32_t get_type() const override {return BOB;}
+	virtual char const * type_name() const override {return "bob";}
+	virtual Type get_bob_type() const = 0;
+	const std::string & name() const {return descr().name();}
 
-	virtual void init(Editor_Game_Base &);
-	virtual void cleanup(Editor_Game_Base &);
-	virtual void act(Game &, uint32_t data);
+	virtual void init(Editor_Game_Base &) override;
+	virtual void cleanup(Editor_Game_Base &) override;
+	virtual void act(Game &, uint32_t data) override;
 	void schedule_destroy(Game &);
 	void schedule_act(Game &, uint32_t tdelta);
 	void skip_act();
-	Point calc_drawpos(Editor_Game_Base const &, Point) const;
+	Point calc_drawpos(const Editor_Game_Base &, Point) const;
 	void set_owner(Player *);
 	Player * get_owner() const {return m_owner;}
 	void set_position(Editor_Game_Base &, const Coords &);
-	FCoords const & get_position() const {return m_position;}
-	Bob * get_next_bob() const throw () {return m_linknext;}
-	bool is_world_bob() const throw () {return descr().is_world_bob();}
+	const FCoords & get_position() const {return m_position;}
+	Bob * get_next_bob() const {return m_linknext;}
+	bool is_world_bob() const {return descr().is_world_bob();}
 
 	uint32_t vision_range() const {return descr().vision_range();}
 
@@ -247,13 +256,13 @@ struct Bob : public Map_Object {
 	/// \param commit indicates whether this function is called from the
 	///    \ref start_walk function, i.e. whether the bob will actually move
 	///    onto the \p to node if this function allows it to.
-	virtual bool checkNodeBlocked(Game &, FCoords const &, bool commit);
+	virtual bool checkNodeBlocked(Game &, const FCoords &, bool commit);
 
 	virtual void draw
-		(Editor_Game_Base const &, RenderTarget &, Point) const;
+		(const Editor_Game_Base &, RenderTarget &, const Point&) const;
 
 	// For debug
-	virtual void log_general_info(Editor_Game_Base const &);
+	virtual void log_general_info(const Editor_Game_Base &) override;
 
 	// default tasks
 	void reset_tasks(Game &);
@@ -291,17 +300,17 @@ struct Bob : public Map_Object {
 		 const int32_t         only_step = -1)
 		__attribute__((warn_unused_result));
 
-	void start_task_move(Game & game, int32_t dir, DirAnimations const *, bool);
+	void start_task_move(Game & game, int32_t dir, const DirAnimations &, bool);
 
 	// higher level handling (task-based)
 	State & top_state() {assert(m_stack.size()); return *m_stack.rbegin();}
-	State * get_state() {return m_stack.size() ? &*m_stack.rbegin() : 0;}
+	State * get_state() {return m_stack.size() ? &*m_stack.rbegin() : nullptr;}
 
 
 	std::string get_signal() {return m_signal;}
-	State       * get_state(Task const &);
-	State const * get_state(Task const &) const;
-	void push_task(Game & game, Task const & task, uint32_t tdelta = 10);
+	State       * get_state(const Task &);
+	State const * get_state(const Task &) const;
+	void push_task(Game & game, const Task & task, uint32_t tdelta = 10);
 	void pop_task(Game &);
 
 	void signal_handled();
@@ -324,7 +333,7 @@ struct Bob : public Map_Object {
 	Bob * get_next_on_field() const {return m_linknext;}
 
 protected:
-	Bob(const Descr & descr);
+	Bob(const BobDescr & descr);
 	virtual ~Bob();
 
 private:
@@ -388,8 +397,8 @@ protected:
 		Loader();
 
 		void load(FileRead &);
-		virtual void load_pointers();
-		virtual void load_finish();
+		virtual void load_pointers() override;
+		virtual void load_finish() override;
 
 	protected:
 		virtual const Task * get_task(const std::string & name);
@@ -405,9 +414,9 @@ protected:
 	};
 
 public:
-	virtual bool has_new_save_support() {return true;}
+	virtual bool has_new_save_support() override {return true;}
 
-	virtual void save(Editor_Game_Base &, Map_Map_Object_Saver &, FileWrite &);
+	virtual void save(Editor_Game_Base &, Map_Map_Object_Saver &, FileWrite &) override;
 	// Pure Bobs cannot be loaded
 };
 

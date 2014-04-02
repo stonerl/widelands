@@ -17,18 +17,17 @@
  *
  */
 
-#include "widelands_map_terrain_data_packet.h"
+#include "map_io/widelands_map_terrain_data_packet.h"
 
+#include <map>
+
+#include "log.h"
 #include "logic/editor_game_base.h"
 #include "logic/game_data_error.h"
 #include "logic/map.h"
 #include "logic/widelands_fileread.h"
 #include "logic/widelands_filewrite.h"
 #include "logic/world.h"
-
-#include "log.h"
-
-#include <map>
 
 namespace Widelands {
 
@@ -37,7 +36,6 @@ namespace Widelands {
 
 void Map_Terrain_Data_Packet::Read
 	(FileSystem & fs, Editor_Game_Base & egbase, bool, Map_Map_Object_Loader &)
-throw (_wexception)
 {
 	FileRead fr;
 	fr.Open(fs, "binary/terrain");
@@ -76,16 +74,15 @@ throw (_wexception)
 			}
 		} else
 			throw game_data_error
-				(_("unknown/unhandled version %u"), packet_version);
-	} catch (_wexception const & e) {
-		throw game_data_error(_("terrain: %s"), e.what());
+				("unknown/unhandled version %u", packet_version);
+	} catch (const _wexception & e) {
+		throw game_data_error("terrain: %s", e.what());
 	}
 }
 
 
 void Map_Terrain_Data_Packet::Write
 	(FileSystem & fs, Editor_Game_Base & egbase, Map_Map_Object_Saver &)
-throw (_wexception)
 {
 
 	FileWrite fw;
@@ -94,7 +91,7 @@ throw (_wexception)
 
 	//  This is a bit more complicated saved so that the order of loading of the
 	//  terrains at run time does not matter. This is slow like hell.
-	Map const & map = egbase.map();
+	const Map & map = egbase.map();
 	const World & world = map.world();
 	Terrain_Index const nr_terrains = world.get_nr_terrains();
 	fw.Unsigned16(nr_terrains);

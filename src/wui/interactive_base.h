@@ -20,19 +20,19 @@
 #ifndef INTERACTIVE_BASE_H
 #define INTERACTIVE_BASE_H
 
-#include <boost/scoped_ptr.hpp>
+#include <SDL_keysym.h>
 
 #include "debugconsole.h"
 #include "logic/editor_game_base.h"
 #include "logic/map.h"
-#include "mapview.h"
-#include "overlay_manager.h"
-
+#include "logic/notification.h"
+#include "logmessage.h"
+#include "wui/chatoverlay.h"
+#include "wui/mapview.h"
+#include "wui/overlay_manager.h"
 #include "ui_basic/box.h"
 #include "ui_basic/textarea.h"
 #include "ui_basic/unique_window.h"
-
-#include <SDL_keysym.h>
 
 namespace Widelands {struct CoordPath;}
 
@@ -57,14 +57,16 @@ struct Interactive_Base : public Map_View, public DebugConsole::Handler {
 	virtual ~Interactive_Base();
 
 	Widelands::Editor_Game_Base & egbase() const {return m_egbase;}
-	virtual void reference_player_tribe(const int32_t, const void * const) {}
+	virtual void reference_player_tribe(Widelands::Player_Number, const void * const) {}
 
 	bool m_show_workarea_preview;
+	Overlay_Manager::Job_Id show_work_area(const Workarea_Info & workarea_info, Widelands::Coords coords);
+	void hide_work_area(Overlay_Manager::Job_Id job_id);
 
 	//  point of view for drawing
-	virtual Widelands::Player * get_player() const throw () = 0;
+	virtual Widelands::Player * get_player() const = 0;
 
-	void think();
+	void think() override;
 	virtual void postload();
 
 	const Widelands::Node_and_Triangle<> & get_sel_pos() const {
@@ -80,12 +82,12 @@ struct Interactive_Base : public Map_View, public DebugConsole::Handler {
 	 * sel_triangles determines whether the mouse pointer selects triangles.
 	 * (False meas that it selects nodes.)
 	 */
-	bool get_sel_triangles() const throw () {return m_sel.triangles;}
-	void set_sel_triangles(const bool yes) throw () {m_sel.triangles = yes;}
+	bool get_sel_triangles() const {return m_sel.triangles;}
+	void set_sel_triangles(const bool yes) {m_sel.triangles = yes;}
 
-	uint32_t get_sel_radius() const throw () {return m_sel.radius;}
+	uint32_t get_sel_radius() const {return m_sel.radius;}
 	virtual void set_sel_pos(Widelands::Node_and_Triangle<>);
-	void set_sel_freeze(const bool yes) throw () {m_sel.freeze = yes;}
+	void set_sel_freeze(const bool yes) {m_sel.freeze = yes;}
 	void set_sel_radius(uint32_t);
 
 	void move_view_to(Widelands::Coords);
@@ -107,19 +109,23 @@ struct Interactive_Base : public Map_View, public DebugConsole::Handler {
 		void abort_build_road();
 		void finish_build_road();
 		bool append_build_road(Widelands::Coords field);
-	Widelands::Coords    get_build_road_start  () const throw ();
-	Widelands::Coords    get_build_road_end    () const throw ();
+	Widelands::Coords    get_build_road_start  () const;
+	Widelands::Coords    get_build_road_end    () const;
 
 	virtual void cleanup_for_load() {};
 
+	/**
+	 * Log a message to be displayed on screen
+	 */
+	void log_message(const std::string& message) const;
+	void log_message(const char* message) const {
+		log_message(std::string(message));
+	}
 private:
-	static int32_t get_xres();
-	static int32_t get_yres();
-
 	void roadb_add_overlay   ();
 	void roadb_remove_overlay();
 
-	boost::scoped_ptr<InteractiveBaseInternals> m;
+	std::unique_ptr<InteractiveBaseInternals> m;
 	Widelands::Editor_Game_Base & m_egbase;
 	struct Sel_Data {
 		Sel_Data
@@ -130,7 +136,7 @@ private:
 			 		 Widelands::TCoords<>
 			 		 	(Widelands::Coords(0, 0), Widelands::TCoords<>::D)),
 			 const uint32_t Radius                   = 0,
-			 const PictureID Pic                     = g_gr->get_no_picture(),
+			 const Image* Pic                     = nullptr,
 			 const Overlay_Manager::Job_Id Jobid = Overlay_Manager::Job_Id::Null())
 			:
 			freeze(Freeze), triangles(Triangles), pos(Pos), radius(Radius),
@@ -140,7 +146,7 @@ private:
 		bool              triangles; //  otherwise nodes
 		Widelands::Node_and_Triangle<>     pos;
 		uint32_t              radius;
-		PictureID             pic;
+		const Image* pic;
 		Overlay_Manager::Job_Id jobid;
 	} m_sel;
 
@@ -154,6 +160,7 @@ private:
 	Overlay_Manager::Job_Id m_road_buildhelp_overlay_jobid;
 	Widelands::CoordPath  * m_buildroad;         //  path for the new road
 	Widelands::Player_Number m_road_build_player;
+	const Image* workarea_pics[NUMBER_OF_WORKAREA_PICS];
 
 protected:
 	void toggle_minimap();
@@ -163,8 +170,8 @@ protected:
 	void mainview_move(int32_t x, int32_t y);
 	void minimap_warp(int32_t x, int32_t y);
 
-	virtual void draw_overlay(RenderTarget &);
-	bool handle_key(bool down, SDL_keysym);
+	virtual void draw_overlay(RenderTarget &) override;
+	bool handle_key(bool down, SDL_keysym) override;
 
 	void unset_sel_picture();
 	void set_sel_picture(const char * const);
@@ -172,21 +179,23 @@ protected:
 		m_toolbar.set_pos
 			(Point((get_inner_w() - m_toolbar.get_w()) >> 1, get_inner_h() - 34));
 	}
+	ChatOverlay     * m_chatOverlay;
 	UI::Box           m_toolbar;
 
 
 private:
-	void cmdMapObject(std::vector<std::string> const & args);
-	void cmdLua(std::vector<std::string> const & args);
+	void cmdMapObject(const std::vector<std::string> & args);
+	void cmdLua(const std::vector<std::string> & args);
 	void update_speedlabel();
 
 	UI::Textarea m_label_speed_shadow;
 	UI::Textarea m_label_speed;
 
 	UI::UniqueWindow::Registry m_debugconsole;
+	Widelands::NoteSender<LogMessage> m_log_sender;
 };
 
-#define PIC2 g_gr->get_picture(PicMod_UI, "pics/but2.png")
+#define PIC2 g_gr->images().get("pics/but2.png")
 #define TOOLBAR_BUTTON_COMMON_PARAMETERS(name) \
     &m_toolbar, name, 0, 0, 34U, 34U, PIC2
 

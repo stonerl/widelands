@@ -22,17 +22,17 @@
 
 #include <string>
 
-#include "logic/widelands_filewrite.h"
 #include "logic/widelands_fileread.h"
+#include "logic/widelands_filewrite.h"
+#include "scripting/eris/lua.hpp"
 
 namespace Widelands {
-	struct Map_Map_Object_Loader;
+	class Map_Map_Object_Loader;
 	struct Map_Map_Object_Saver;
-	struct Editor_Game_Base;
-	struct Game;
+	class Editor_Game_Base;
+	class Game;
 }
 
-#include <lua.hpp>
 
 /**
  * This persists the lua object at the stack position
@@ -42,10 +42,12 @@ namespace Widelands {
 uint32_t persist_object
 	(lua_State * L,
 	 Widelands::FileWrite &, Widelands::Map_Map_Object_Saver &);
-uint32_t unpersist_object
+
+// Does all the unpersisting work. The unpersisted object is at the top of the
+// stack after the function returns.
+void unpersist_object
 	(lua_State * L,
 	 Widelands::FileRead & fr, Widelands::Map_Map_Object_Loader & mol,
 	 uint32_t size);
 
 #endif /* end of include guard: PERSISTENCE_H */
-

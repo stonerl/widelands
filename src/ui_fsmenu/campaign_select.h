@@ -20,8 +20,7 @@
 #ifndef FULLSCREEN_MENU_CAMPAIGN_SELECT_H
 #define FULLSCREEN_MENU_CAMPAIGN_SELECT_H
 
-#include "base.h"
-
+#include "ui_fsmenu/base.h"
 #include "ui_basic/button.h"
 #include "ui_basic/listselect.h"
 #include "ui_basic/multilinetextarea.h"
@@ -54,7 +53,7 @@ private:
 	UI::Textarea                             label_campname;
 	UI::Textarea                             tacampname;
 	UI::Textarea                             label_difficulty;
-	UI::Textarea                             tadifficulty;
+	UI::Multiline_Textarea                   tadifficulty;
 	UI::Textarea                             label_campdescr;
 	UI::Multiline_Textarea                   tacampdescr;
 	UI::Button                               b_ok, back;

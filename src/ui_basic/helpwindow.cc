@@ -17,22 +17,23 @@
  *
  */
 
+#include "ui_basic/helpwindow.h"
 
 #include <boost/format.hpp>
 
-#include "scripting/scripting.h"
-#include "io/filesystem/layered_filesystem.h"
-
-#include "log.h"
 #include "constants.h"
-#include "i18n.h"
-#include "window.h"
-#include "button.h"
 #include "graphic/font.h"
 #include "graphic/font_handler.h"
+#include "graphic/graphic.h"
+#include "i18n.h"
+#include "io/filesystem/layered_filesystem.h"
+#include "log.h"
+#include "scripting/lua_table.h"
+#include "scripting/scripting.h"
+#include "ui_basic/button.h"
+#include "ui_basic/window.h"
 #include "wlapplication.h"
 
-#include "helpwindow.h"
 
 using boost::format;
 
@@ -44,7 +45,7 @@ HelpWindow::HelpWindow
 	 uint32_t fontsize,
 	 uint32_t width, uint32_t height)
 	:
-	Window(parent, "help_window", 0, 0, 20, 20, (_("Help: ") + caption).c_str()),
+	Window(parent, "help_window", 0, 0, 20, 20, (boost::format(_("Help: %s")) % caption).str().c_str()),
 	textarea(new Multiline_Textarea(this, 5, 5, 30, 30, std::string(), Align_Left)),
 	m_h1((format("%u") % (fontsize < 12 ? 18 : fontsize * 3 / 2)).str()),
 	m_h2((format("%u") % (fontsize < 12 ? 12 : fontsize)).str()),
@@ -79,7 +80,7 @@ HelpWindow::HelpWindow
 		(this, "ok",
 		 in_width / 3, in_height - but_height * 3 / 2,
 		 in_width / 3, but_height,
-		 g_gr->get_picture(PicMod_UI, "pics/but0.png"),
+		 g_gr->images().get("pics/but0.png"),
 		 _("OK"), std::string(), true, false);
 	btn->sigclicked.connect(boost::bind(&HelpWindow::pressedOk, boost::ref(*this)));
 	btn->set_font(Font::get(UI_FONT_NAME, (fontsize < 12 ? 12 : fontsize)));
@@ -188,19 +189,19 @@ LuaTextHelpWindow::LuaTextHelpWindow
 	 std::string path_to_script,
 	 uint32_t width, uint32_t height)
 	:
-	UI::UniqueWindow(parent, "help_window", &reg, width, height, (_("Help: ") + caption).c_str()),
+	UI::UniqueWindow(parent, "help_window", &reg, width, height,
+		(boost::format(_("Help: %s")) % caption).str().c_str()
+	),
 	textarea(new Multiline_Textarea(this, 5, 5, width - 10, height -10, std::string(), Align_Left))
 {
-	LuaInterface * li = create_LuaInterface();
+	LuaInterface lua;
 
 	try {
-		boost::shared_ptr<LuaTable> t = li->run_script(*g_fs, path_to_script, "help");
+		std::unique_ptr<LuaTable> t = lua.run_script(path_to_script);
 		textarea->set_text(t->get_string("text"));
 	} catch (LuaError & err) {
 		textarea->set_text(err.what());
 	}
-
-	delete li;
 }
 
 LuaTextHelpWindow::~LuaTextHelpWindow()

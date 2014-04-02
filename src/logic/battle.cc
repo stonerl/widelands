@@ -17,20 +17,18 @@
  *
  */
 
-#include "battle.h"
-
-#include "game.h"
-#include "player.h"
-#include "soldier.h"
-#include "wexception.h"
-#include "widelands_fileread.h"
-#include "widelands_filewrite.h"
-#include "map_io/widelands_map_map_object_loader.h"
-#include "map_io/widelands_map_map_object_saver.h"
+#include "logic/battle.h"
 
 #include "log.h"
-
+#include "logic/game.h"
+#include "logic/player.h"
+#include "logic/soldier.h"
+#include "logic/widelands_fileread.h"
+#include "logic/widelands_filewrite.h"
+#include "map_io/widelands_map_map_object_loader.h"
+#include "map_io/widelands_map_map_object_saver.h"
 #include "upcast.h"
+#include "wexception.h"
 
 namespace Widelands {
 
@@ -40,11 +38,13 @@ Battle::Descr g_Battle_Descr("battle", "Battle");
 Battle::Battle ()
 	:
 	Map_Object(&g_Battle_Descr),
-	m_first(0),
-	m_second(0),
+	m_first(nullptr),
+	m_second(nullptr),
+	m_creationtime(0),
 	m_readyflags(0),
 	m_damage(0),
-	m_first_strikes(true)
+	m_first_strikes(true),
+	m_last_attack_hits(false)
 {}
 
 Battle::Battle(Game & game, Soldier & First, Soldier & Second) :
@@ -76,10 +76,10 @@ void Battle::init (Editor_Game_Base & egbase)
 
 	m_creationtime = egbase.get_gametime();
 
-	if (Battle * const battle = m_first ->getBattle())
+	if (Battle* battle = m_first ->getBattle())
 		battle->cancel(ref_cast<Game, Editor_Game_Base>(egbase), *m_first);
 	m_first->setBattle(ref_cast<Game, Editor_Game_Base>(egbase), this);
-	if (Battle * const battle = m_second->getBattle())
+	if (Battle* battle = m_second->getBattle())
 		battle->cancel(ref_cast<Game, Editor_Game_Base>(egbase), *m_second);
 	m_second->setBattle(ref_cast<Game, Editor_Game_Base>(egbase), this);
 }
@@ -88,12 +88,12 @@ void Battle::init (Editor_Game_Base & egbase)
 void Battle::cleanup (Editor_Game_Base & egbase)
 {
 	if (m_first) {
-		m_first ->setBattle(ref_cast<Game, Editor_Game_Base>(egbase), 0);
-		m_first  = 0;
+		m_first ->setBattle(ref_cast<Game, Editor_Game_Base>(egbase), nullptr);
+		m_first  = nullptr;
 	}
 	if (m_second) {
-		m_second->setBattle(ref_cast<Game, Editor_Game_Base>(egbase), 0);
-		m_second = 0;
+		m_second->setBattle(ref_cast<Game, Editor_Game_Base>(egbase), nullptr);
+		m_second = nullptr;
 	}
 
 	Map_Object::cleanup(egbase);
@@ -105,12 +105,12 @@ void Battle::cleanup (Editor_Game_Base & egbase)
  */
 void Battle::cancel(Game & game, Soldier & soldier)
 {
-	if        (&soldier == m_first)  {
-		m_first = 0;
-		soldier.setBattle(game, 0);
+	if (&soldier == m_first)  {
+		m_first = nullptr;
+		soldier.setBattle(game, nullptr);
 	} else if (&soldier == m_second) {
-		m_second = 0;
-		soldier.setBattle(game, 0);
+		m_second = nullptr;
+		soldier.setBattle(game, nullptr);
 	} else
 		return;
 
@@ -127,16 +127,11 @@ bool Battle::locked(Game & game)
 	return m_first->get_position() == m_second->get_position();
 }
 
-Soldier * Battle::opponent(Soldier & soldier)
+Soldier * Battle::opponent(Soldier& soldier)
 {
 	assert(m_first == &soldier or m_second == &soldier);
-	return m_first == &soldier ? m_second : m_first;
-}
-
-bool Battle::has_opponent(Soldier & soldier)
-{
-	assert(m_first == &soldier or m_second == &soldier);
-	return m_first != 0 and m_second != 0;
+	Soldier* other_soldier = m_first == &soldier ? m_second : m_first;
+	return other_soldier;
 }
 
 //  FIXME Couldn't this code be simplified tremendously by doing all scheduling
@@ -175,11 +170,11 @@ void Battle::getBattleWork(Game & game, Soldier & soldier)
 	}
 
 	if (soldier.get_current_hitpoints() < 1) {
-		molog(_("[battle] soldier %u loose battle\n"), soldier.serial());
+		molog("[battle] soldier %u lost the battle\n", soldier.serial());
 		soldier          . owner().count_casualty();
 		opponent(soldier)->owner().count_kill    ();
 		soldier.start_task_die(game);
-		molog(_("[battle] waking up winner %d\n"), opponent(soldier)->serial());
+		molog("[battle] waking up winner %d\n", opponent(soldier)->serial());
 		opponent(soldier)->send_signal(game, "wakeup");
 		return schedule_destroy(game);
 	}
@@ -363,16 +358,16 @@ void Battle::Loader::load_pointers()
 		if (m_first)
 			try {
 				battle.m_first = &mol().get<Soldier>(m_first);
-			} catch (_wexception const & e) {
+			} catch (const _wexception & e) {
 				throw wexception("soldier 1 (%u): %s", m_first, e.what());
 			}
 		if (m_second)
 			try {
 				battle.m_second = &mol().get<Soldier>(m_second);
-			} catch (_wexception const & e) {
+			} catch (const _wexception & e) {
 				throw wexception("soldier 2 (%u): %s", m_second, e.what());
 			}
-	} catch (_wexception const & e) {
+	} catch (const _wexception & e) {
 		throw wexception("battle: %s", e.what());
 	}
 }
@@ -399,7 +394,7 @@ void Battle::save
 Map_Object::Loader * Battle::load
 	(Editor_Game_Base & egbase, Map_Map_Object_Loader & mol, FileRead & fr)
 {
-	std::auto_ptr<Loader> loader(new Loader);
+	std::unique_ptr<Loader> loader(new Loader);
 
 	try {
 		// Header has been peeled away by caller
@@ -409,7 +404,7 @@ Map_Object::Loader * Battle::load
 			loader->init(egbase, mol, *new Battle);
 			loader->load(fr, version);
 		} else
-			throw game_data_error(_("unknown/unhandled version %u"), version);
+			throw game_data_error("unknown/unhandled version %u", version);
 	} catch (const std::exception & e) {
 		throw wexception("Loading Battle: %s", e.what());
 	}

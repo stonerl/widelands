@@ -17,16 +17,17 @@
  *
  */
 
-#include "editor_tool_noise_height_options_menu.h"
+#include "editor/ui_menus/editor_tool_noise_height_options_menu.h"
+
+#include <cstdio>
 
 #include "editor/editorinteractive.h"
-#include "editor/tools/editor_increase_height_tool.h"
 #include "editor/tools/editor_decrease_height_tool.h"
+#include "editor/tools/editor_increase_height_tool.h"
 #include "editor/tools/editor_noise_height_tool.h"
 #include "graphic/graphic.h"
 #include "i18n.h"
 
-#include <cstdio>
 
 using Widelands::Field;
 
@@ -56,8 +57,8 @@ Editor_Tool_Noise_Height_Options_Menu::Editor_Tool_Noise_Height_Options_Menu
 		 (get_inner_w() - 2 * hmargin() - hspacing() - 4 * width) / 4,
 		 m_lower_label.get_y() + m_lower_label.get_h() + vspacing(),
 		 width, height,
-		 g_gr->get_picture(PicMod_UI, "pics/but0.png"),
-		 g_gr->get_picture(PicMod_UI, "pics/scrollbar_down.png"),
+		 g_gr->images().get("pics/but0.png"),
+		 g_gr->images().get("pics/scrollbar_down.png"),
 		 std::string(),
 		 0 < noise_tool.get_interval().min),
 	m_lower_increase
@@ -65,8 +66,8 @@ Editor_Tool_Noise_Height_Options_Menu::Editor_Tool_Noise_Height_Options_Menu
 		 m_lower_decrease.get_x() + m_lower_decrease.get_w(),
 		 m_lower_decrease.get_y(),
 		 width, height,
-		 g_gr->get_picture(PicMod_UI, "pics/but0.png"),
-		 g_gr->get_picture(PicMod_UI, "pics/scrollbar_up.png"),
+		 g_gr->images().get("pics/but0.png"),
+		 g_gr->images().get("pics/scrollbar_up.png"),
 		 std::string(),
 		 noise_tool.get_interval().min < MAX_FIELD_HEIGHT),
 	m_upper_decrease
@@ -77,8 +78,8 @@ Editor_Tool_Noise_Height_Options_Menu::Editor_Tool_Noise_Height_Options_Menu
 		 hspacing(),
 		 m_lower_decrease.get_y(),
 		 width, height,
-		 g_gr->get_picture(PicMod_UI, "pics/but0.png"),
-		 g_gr->get_picture(PicMod_Game, "pics/scrollbar_down.png"),
+		 g_gr->images().get("pics/but0.png"),
+		 g_gr->images().get("pics/scrollbar_down.png"),
 		 std::string(),
 		 0 < noise_tool.get_interval().max),
 	m_upper_increase
@@ -86,8 +87,8 @@ Editor_Tool_Noise_Height_Options_Menu::Editor_Tool_Noise_Height_Options_Menu
 		 m_upper_decrease.get_x() + m_upper_decrease.get_w(),
 		 m_upper_decrease.get_y(),
 		 width, height,
-		 g_gr->get_picture(PicMod_UI, "pics/but0.png"),
-		 g_gr->get_picture(PicMod_UI, "pics/scrollbar_up.png"),
+		 g_gr->images().get("pics/but0.png"),
+		 g_gr->images().get("pics/scrollbar_up.png"),
 		 std::string(),
 		 noise_tool.get_interval().max < MAX_FIELD_HEIGHT),
 	m_set_label
@@ -101,8 +102,8 @@ Editor_Tool_Noise_Height_Options_Menu::Editor_Tool_Noise_Height_Options_Menu
 		 get_inner_w() / 2 - width,
 		 m_set_label.get_y() + m_set_label.get_h() + vspacing(),
 		 width, height,
-		 g_gr->get_picture(PicMod_UI, "pics/but1.png"),
-		 g_gr->get_picture(PicMod_Game, "pics/scrollbar_down.png"),
+		 g_gr->images().get("pics/but1.png"),
+		 g_gr->images().get("pics/scrollbar_down.png"),
 		 std::string(),
 		 0 < noise_tool.set_tool().get_interval().min),
 	m_setto_increase
@@ -110,8 +111,8 @@ Editor_Tool_Noise_Height_Options_Menu::Editor_Tool_Noise_Height_Options_Menu
 		 get_inner_w() / 2,
 		 m_setto_decrease.get_y(),
 		 width, height,
-		 g_gr->get_picture(PicMod_UI, "pics/but1.png"),
-		 g_gr->get_picture(PicMod_Game, "pics/scrollbar_up.png"),
+		 g_gr->images().get("pics/but1.png"),
+		 g_gr->images().get("pics/scrollbar_up.png"),
 		 std::string(),
 		 noise_tool.set_tool().get_interval().max < MAX_FIELD_HEIGHT)
 {

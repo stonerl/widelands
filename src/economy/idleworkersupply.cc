@@ -17,26 +17,25 @@
  *
  */
 
-#include "idleworkersupply.h"
+#include "economy/idleworkersupply.h"
 
-#include "economy.h"
-#include "request.h"
-
+#include "economy/economy.h"
+#include "economy/request.h"
 #include "logic/game.h"
 #include "logic/player.h"
 #include "logic/requirements.h"
 #include "logic/soldier.h"
 #include "logic/tribe.h"
-#include "wexception.h"
 #include "logic/warehouse.h"
 #include "logic/worker.h"
+#include "wexception.h"
 
 namespace Widelands {
 
 /**
  * Automatically register with the worker's economy.
  */
-IdleWorkerSupply::IdleWorkerSupply(Worker & w) : m_worker (w), m_economy(0)
+IdleWorkerSupply::IdleWorkerSupply(Worker & w) : m_worker (w), m_economy(nullptr)
 {
 	set_economy(w.get_economy());
 }
@@ -47,7 +46,7 @@ IdleWorkerSupply::IdleWorkerSupply(Worker & w) : m_worker (w), m_economy(0)
  */
 IdleWorkerSupply::~IdleWorkerSupply()
 {
-	set_economy(0);
+	set_economy(nullptr);
 }
 
 
@@ -67,12 +66,12 @@ void IdleWorkerSupply::set_economy(Economy * const e)
 /**
  * Worker is walking around the road network, so active by definition.
  */
-bool IdleWorkerSupply::is_active() const throw ()
+bool IdleWorkerSupply::is_active() const
 {
 	return true;
 }
 
-bool IdleWorkerSupply::has_storage() const throw ()
+bool IdleWorkerSupply::has_storage() const
 {
 	return m_worker.get_transfer();
 }
@@ -92,7 +91,7 @@ PlayerImmovable * IdleWorkerSupply::get_position(Game & game)
 }
 
 
-uint32_t IdleWorkerSupply::nr_supplies(Game const &, Request const & req) const
+uint32_t IdleWorkerSupply::nr_supplies(const Game &, const Request & req) const
 {
 	assert
 		(req.get_type() != wwWORKER or
@@ -106,16 +105,16 @@ uint32_t IdleWorkerSupply::nr_supplies(Game const &, Request const & req) const
 	return 0;
 }
 
-WareInstance & IdleWorkerSupply::launch_item(Game &, Request const &)
+WareInstance & IdleWorkerSupply::launch_ware(Game &, const Request &)
 {
-	throw wexception("IdleWorkerSupply::launch_item() makes no sense.");
+	throw wexception("IdleWorkerSupply::launch_ware() makes no sense.");
 }
 
 
 /**
  * No need to explicitly launch the worker.
  */
-Worker & IdleWorkerSupply::launch_worker(Game &, Request const & req)
+Worker & IdleWorkerSupply::launch_worker(Game &, const Request & req)
 {
 	if (req.get_type() != wwWORKER)
 		throw wexception("IdleWorkerSupply: not a worker request");

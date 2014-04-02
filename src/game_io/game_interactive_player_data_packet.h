@@ -20,7 +20,7 @@
 #ifndef GAME_INTERACTIVE_PLAYER_DATA_PACKET_H
 #define GAME_INTERACTIVE_PLAYER_DATA_PACKET_H
 
-#include "game_data_packet.h"
+#include "game_io/game_data_packet.h"
 
 namespace Widelands {
 
@@ -29,8 +29,8 @@ namespace Widelands {
  * player number and so on
  */
 struct Game_Interactive_Player_Data_Packet : public Game_Data_Packet {
-	void Read (FileSystem &, Game &, Map_Map_Object_Loader * = 0);
-	void Write(FileSystem &, Game &, Map_Map_Object_Saver  * = 0);
+	void Read (FileSystem &, Game &, Map_Map_Object_Loader * = nullptr) override;
+	void Write(FileSystem &, Game &, Map_Map_Object_Saver  * = nullptr) override;
 };
 
 }

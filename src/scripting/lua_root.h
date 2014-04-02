@@ -20,9 +20,9 @@
 #ifndef LUA_ROOT_H
 #define LUA_ROOT_H
 
-#include <lua.hpp>
-
-#include "luna.h"
+#include "scripting/eris/lua.hpp"
+#include "scripting/lua_bases.h"
+#include "scripting/luna.h"
 
 namespace LuaRoot {
 
@@ -31,19 +31,19 @@ namespace LuaRoot {
  */
 class L_RootModuleClass : public LunaClass {
 	public:
-		const char * get_modulename() {return "";}
+		const char * get_modulename() override {return "";}
 };
 
 class L_Game : public LuaBases::L_EditorGameBase {
 public:
 	LUNA_CLASS_HEAD(L_Game);
-	const char * get_modulename() {return "";}
+	const char * get_modulename() override {return "";}
 
 	L_Game() {}
 	L_Game(lua_State * L);
 
-	virtual void __persist(lua_State * L);
-	virtual void __unpersist(lua_State * L);
+	virtual void __persist(lua_State * L) override;
+	virtual void __unpersist(lua_State * L) override;
 
 	/*
 	 * Properties
@@ -53,6 +53,8 @@ public:
 	int set_desired_speed(lua_State *);
 	int get_allow_autosaving(lua_State *);
 	int set_allow_autosaving(lua_State *);
+	int get_allow_saving(lua_State *);
+	int set_allow_saving(lua_State *);
 
 	/*
 	 * Lua methods
@@ -68,14 +70,14 @@ public:
 class L_Editor : public LuaBases::L_EditorGameBase {
 public:
 	LUNA_CLASS_HEAD(L_Editor);
-	const char * get_modulename() {return "";}
+	const char * get_modulename() override {return "";}
 
 	L_Editor() {}
 	L_Editor(lua_State * L);
 	virtual ~L_Editor() {}
 
-	virtual void __persist(lua_State * L);
-	virtual void __unpersist(lua_State * L);
+	virtual void __persist(lua_State * L) override;
+	virtual void __unpersist(lua_State * L) override;
 
 	/*
 	 * Properties
@@ -94,5 +96,3 @@ void luaopen_wlroot(lua_State *, bool in_editor);
 
 #endif
 };
-
-

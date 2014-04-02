@@ -20,12 +20,12 @@
 #ifndef WORKER_DESCR_H
 #define WORKER_DESCR_H
 
-#include "bob.h"
+#include "logic/bob.h"
 #include "graphic/diranimations.h"
-#include "graphic/picture_id.h"
-
-#include "immovable.h"
+#include "logic/immovable.h"
 #include "io/filewrite.h"
+
+class Image;
 
 namespace Widelands {
 
@@ -35,7 +35,7 @@ class Worker;
 struct WorkerProgram;
 
 
-class Worker_Descr : public Bob::Descr
+class Worker_Descr : public BobDescr
 {
 	friend struct Tribe_Descr;
 	friend class Warehouse;
@@ -53,22 +53,22 @@ public:
 
 	Worker_Descr
 		(char const * const name, char const * const descname,
-		 std::string const & directory, Profile &,  Section & global_s,
-		 Tribe_Descr const &);
+		 const std::string & directory, Profile &,  Section & global_s,
+		 const Tribe_Descr &);
 	virtual ~Worker_Descr();
 
-	virtual Bob & create_object() const;
+	virtual Bob & create_object() const override;
 
 	virtual void load_graphics();
 
 	bool is_buildable() const {return m_buildable;}
-	Buildcost const & buildcost() const throw () {
+	const Buildcost & buildcost() const {
 		assert(is_buildable());
 		return m_buildcost;
 	}
 
-	const Tribe_Descr * get_tribe() const throw () {return m_owner_tribe;}
-	const Tribe_Descr & tribe() const throw () {return *m_owner_tribe;}
+	const Tribe_Descr * get_tribe() const {return m_owner_tribe;}
+	const Tribe_Descr & tribe() const {return *m_owner_tribe;}
 	std::string helptext() const {return m_helptext;}
 	Point get_ware_hotspot() const {return m_ware_hotspot;}
 
@@ -90,42 +90,37 @@ public:
 			m_default_target_quantity = 1;
 	}
 
-	PictureID icon() const throw () {return m_icon;}
-	const DirAnimations & get_walk_anims() const throw () {return m_walk_anims;}
-	DirAnimations const & get_right_walk_anims(bool const carries_ware) const {
+	const Image* icon() const {return m_icon;}
+	const DirAnimations & get_walk_anims() const {return m_walk_anims;}
+	const DirAnimations & get_right_walk_anims(bool const carries_ware) const {
 		return carries_ware ? m_walkload_anims : m_walk_anims;
 	}
-	WorkerProgram const * get_program(std::string const &) const;
+	WorkerProgram const * get_program(const std::string &) const;
 
 	virtual Worker_Type get_worker_type() const {return NORMAL;}
 
 	// For leveling
-	int32_t get_level_experience() const throw () {return m_level_experience;}
-	Ware_Index becomes() const throw () {return m_becomes;}
-	Ware_Index worker_index() const throw ();
+	int32_t get_level_experience() const {return m_level_experience;}
+	Ware_Index becomes() const {return m_becomes;}
+	Ware_Index worker_index() const;
 	bool can_act_as(Ware_Index) const;
 
 	Worker & create
 		(Editor_Game_Base &, Player &, PlayerImmovable *, Coords) const;
 
 	typedef std::map<Worker_Descr const *, std::string> becomes_map_t;
-	virtual uint32_t movecaps() const throw ();
+	virtual uint32_t movecaps() const override;
 
 	typedef std::map<std::string, WorkerProgram *> Programs;
-	Programs const & programs() const throw () {return m_programs;}
-
-	const std::string & compatibility_program(const std::string & programname) const;
+	const Programs & programs() const {return m_programs;}
 
 protected:
-#ifdef WRITE_GAME_DATA_AS_HTML
-	void writeHTML(::FileWrite &) const;
-#endif
 
 	std::string       m_helptext;   ///< Short (tooltip-like) help text
 	Point             m_ware_hotspot;
 	uint32_t          m_default_target_quantity;
 	std::string const m_icon_fname; ///< Filename of worker's icon
-	PictureID         m_icon;       ///< Pointer to icon into picture stack
+	const Image     * m_icon;       ///< Pointer to icon into picture stack
 	DirAnimations     m_walk_anims;
 	DirAnimations     m_walkload_anims;
 	bool              m_buildable;
@@ -142,14 +137,6 @@ protected:
 	 */
 	Ware_Index  m_becomes;
 	Programs    m_programs;
-
-	/**
-	 * Compatibility hints for loading save games of older versions.
-	 *
-	 * Maps program name to a string that is to be interpreted by the
-	 * game loading logic.
-	 */
-	std::map<std::string, std::string> m_compatibility_programs;
 };
 
 }

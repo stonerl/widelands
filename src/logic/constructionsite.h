@@ -20,16 +20,15 @@
 #ifndef CONSTRUCTIONSITE_H
 #define CONSTRUCTIONSITE_H
 
-#include "partially_finished_building.h"
-
-#include "player.h"
-
 #include <vector>
+
+#include "logic/partially_finished_building.h"
+#include "logic/player.h"
 
 namespace Widelands {
 
 class Building;
-struct Request;
+class Request;
 struct WaresQueue;
 
 /*
@@ -53,10 +52,10 @@ The ConstructionSite's idling animation is the basic construction site marker.
 struct ConstructionSite_Descr : public Building_Descr {
 	ConstructionSite_Descr
 		(char const * name, char const * descname,
-		 std::string const & directory, Profile &, Section & global_s,
-		 Tribe_Descr const & tribe);
+		 const std::string & directory, Profile &, Section & global_s,
+		 const Tribe_Descr & tribe);
 
-	virtual Building & create_object() const;
+	virtual Building & create_object() const override;
 };
 
 class ConstructionSite : public Partially_Finished_Building {
@@ -69,42 +68,39 @@ class ConstructionSite : public Partially_Finished_Building {
 public:
 	ConstructionSite(const ConstructionSite_Descr & descr);
 
-	char const * type_name() const throw () {return "constructionsite";}
-	virtual std::string get_statistics_string();
+	char const * type_name() const override {return "constructionsite";}
+	virtual std::string get_statistics_string() override;
 
-	const Player::Constructionsite_Information * get_info() {return m_info;}
+	const Player::Constructionsite_Information & get_info() {return m_info;}
 
-	virtual WaresQueue & waresqueue(Ware_Index);
+	virtual WaresQueue & waresqueue(Ware_Index) override;
 
-	virtual void set_building(const Building_Descr &);
-	void set_previous_building(const Building_Descr * const);
-	const Building_Descr & building() const throw () {return *m_building;}
+	virtual void set_building(const Building_Descr &) override;
+	const Building_Descr & building() const {return *m_building;}
 
-	virtual void init   (Editor_Game_Base &);
-	virtual void cleanup(Editor_Game_Base &);
+	virtual void init   (Editor_Game_Base &) override;
+	virtual void cleanup(Editor_Game_Base &) override;
 
-	virtual bool burn_on_destroy();
+	virtual bool burn_on_destroy() override;
 
-	virtual bool fetch_from_flag(Game &);
-	virtual bool get_building_work(Game &, Worker &, bool success);
+	virtual bool fetch_from_flag(Game &) override;
+	virtual bool get_building_work(Game &, Worker &, bool success) override;
 
 protected:
-	virtual uint32_t build_step_time() const {return CONSTRUCTIONSITE_STEP_TIME;}
+	virtual uint32_t build_step_time() const override {return CONSTRUCTIONSITE_STEP_TIME;}
 	virtual void create_options_window
-		(Interactive_GameBase &, UI::Window * & registry);
+		(Interactive_GameBase &, UI::Window * & registry) override;
 
 	static void wares_queue_callback
 		(Game &, WaresQueue *, Ware_Index, void * data);
 
-	virtual void draw(Editor_Game_Base const &, RenderTarget &, FCoords, Point);
+	virtual void draw(const Editor_Game_Base &, RenderTarget &, const FCoords&, const Point&) override;
 
 private:
-	const Building_Descr * m_prev_building; // Building standing here earlier
-
-	int32_t  m_fetchfromflag;  // # of items to fetch from flag
+	int32_t  m_fetchfromflag;  // # of wares to fetch from flag
 
 	bool     m_builder_idle;   // used to determine whether the builder is idle
-	Player::Constructionsite_Information * m_info; // asked for by player point of view for the gameview
+	Player::Constructionsite_Information m_info; // asked for by player point of view for the gameview
 };
 
 }

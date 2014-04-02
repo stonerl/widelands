@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011 by the Widelands Development Team
+ * Copyright (C) 2011-2012 by the Widelands Development Team
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -26,9 +26,9 @@
 
 namespace Widelands {
 
-struct Economy;
+class Economy;
 struct Flag;
-struct PortDock;
+class PortDock;
 struct RoutingNodeNeighbour;
 struct Ship;
 
@@ -36,10 +36,10 @@ struct Ship;
  * Manage all ships and ports of a player that are connected
  * by ocean.
  *
- * That is, two ports belong to the same fleet iff ships can travel
- * between them, and so on. Players may have several fleets, if they
- * build ports that cannot communicate (e.g. one port on the ocean,
- * and another in a lake).
+ * That is, two ports belong to the same fleet if - and only if - ships can
+ * travel between them, and so on. Players may have several fleets, if they
+ * build ports that cannot communicate (e.g. one port on the ocean, and another
+ * in a lake).
  *
  * @paragraph Lifetime
  *
@@ -69,11 +69,11 @@ struct Fleet : Map_Object {
 
 	bool active() const;
 
-	virtual int32_t get_type() const throw ();
-	virtual char const * type_name() const throw ();
+	virtual int32_t get_type() const override;
+	virtual char const * type_name() const override;
 
-	virtual void init(Editor_Game_Base &);
-	virtual void cleanup(Editor_Game_Base &);
+	virtual void init(Editor_Game_Base &) override;
+	virtual void cleanup(Editor_Game_Base &) override;
 	void update(Editor_Game_Base &);
 
 	void add_ship(Ship * ship);
@@ -81,13 +81,13 @@ struct Fleet : Map_Object {
 	void add_port(Editor_Game_Base & egbase, PortDock * port);
 	void remove_port(Editor_Game_Base & egbase, PortDock * port);
 
-	virtual void log_general_info(Editor_Game_Base const &);
+	virtual void log_general_info(const Editor_Game_Base &) override;
 
 	bool get_path(PortDock & start, PortDock & end, Path & path);
 	void add_neighbours(PortDock & pd, std::vector<RoutingNodeNeighbour> & neighbours);
 
 protected:
-	virtual void act(Game &, uint32_t data);
+	virtual void act(Game &, uint32_t data) override;
 
 private:
 	void find_other_fleet(Editor_Game_Base & egbase);
@@ -105,7 +105,6 @@ private:
 	std::vector<PortDock *> m_ports;
 
 	bool m_act_pending;
-	uint32_t m_port_roundrobin;
 
 	/**
 	 * Store all pairs shortest paths between port docks
@@ -121,8 +120,8 @@ protected:
 		Loader();
 
 		void load(FileRead &, uint8_t version);
-		virtual void load_pointers();
-		virtual void load_finish();
+		virtual void load_pointers() override;
+		virtual void load_finish() override;
 
 	private:
 		std::vector<uint32_t> m_ships;
@@ -130,8 +129,8 @@ protected:
 	};
 
 public:
-	virtual bool has_new_save_support() {return true;}
-	virtual void save(Editor_Game_Base &, Map_Map_Object_Saver &, FileWrite &);
+	virtual bool has_new_save_support() override {return true;}
+	virtual void save(Editor_Game_Base &, Map_Map_Object_Saver &, FileWrite &) override;
 
 	static Map_Object::Loader * load
 		(Editor_Game_Base &, Map_Map_Object_Loader &, FileRead &);

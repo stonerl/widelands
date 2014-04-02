@@ -17,10 +17,11 @@
  *
  */
 
-#include "streamwrite.h"
-#include "wexception.h"
+#include "io/streamwrite.h"
 
 #include <cstdarg>
+
+#include "wexception.h"
 
 StreamWrite::~StreamWrite() {}
 
@@ -44,7 +45,7 @@ void StreamWrite::Printf(char const * const fmt, ...)
 		Data(buffer, i);
 	} else {
 		uint32_t size = sizeof(buffer);
-		char * heapbuf = 0;
+		char * heapbuf = nullptr;
 
 		do {
 			if (i < 0)

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2002-2003, 2006-2011 by the Widelands Development Team
+ * Copyright (C) 2002-2003, 2006-2011, 2013 by the Widelands Development Team
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -17,8 +17,21 @@
  *
  */
 
-#include "editorinteractive.h"
+#include "editor/editorinteractive.h"
 
+#include <string>
+#include <vector>
+
+#include <SDL_keysym.h>
+#include <boost/format.hpp>
+
+#include "editor/tools/editor_delete_immovable_tool.h"
+#include "editor/ui_menus/editor_main_menu.h"
+#include "editor/ui_menus/editor_main_menu_load_map.h"
+#include "editor/ui_menus/editor_main_menu_save_map.h"
+#include "editor/ui_menus/editor_player_menu.h"
+#include "editor/ui_menus/editor_tool_menu.h"
+#include "editor/ui_menus/editor_toolsize_menu.h"
 #include "graphic/graphic.h"
 #include "i18n.h"
 #include "logic/map.h"
@@ -26,35 +39,42 @@
 #include "logic/tribe.h"
 #include "map_io/widelands_map_loader.h"
 #include "profile/profile.h"
+#include "scoped_timer.h"
+#include "scripting/lua_table.h"
 #include "scripting/scripting.h"
-#include "tools/editor_delete_immovable_tool.h"
 #include "ui_basic/messagebox.h"
 #include "ui_basic/progresswindow.h"
-#include "ui_menus/editor_main_menu.h"
-#include "ui_menus/editor_main_menu_load_map.h"
-#include "ui_menus/editor_main_menu_save_map.h"
-#include "ui_menus/editor_player_menu.h"
-#include "ui_menus/editor_tool_menu.h"
-#include "ui_menus/editor_toolsize_menu.h"
 #include "warning.h"
 #include "wlapplication.h"
 #include "wui/game_tips.h"
 #include "wui/interactive_base.h"
 #include "wui/overlay_manager.h"
 
-#include <SDL_keysym.h>
+namespace {
 
 using Widelands::Building;
+
+// Load all tribes from disk.
+void load_all_tribes(Widelands::Editor_Game_Base* egbase, UI::ProgressWindow* loader_ui) {
+	for (const std::string& tribename : Widelands::Tribe_Descr::get_all_tribenames()) {
+		ScopedTimer timer((boost::format("Loading %s took %%ums.") % tribename).str());
+		loader_ui->stepf(_("Loading tribe: %s"), tribename.c_str());
+		egbase->manually_load_tribe(tribename);
+	}
+}
+
+}  // namespace
 
 Editor_Interactive::Editor_Interactive(Widelands::Editor_Game_Base & e) :
 	Interactive_Base(e, g_options.pull_section("global")),
 	m_need_save(false),
 	m_realtime(WLApplication::get()->get_time()),
+	m_left_mouse_button_is_down(false),
 	m_history(m_undo, m_redo),
 
 #define INIT_BUTTON(picture, name, tooltip)                         \
 	TOOLBAR_BUTTON_COMMON_PARAMETERS(name),                                      \
-	g_gr->get_picture(PicMod_Game, "pics/" picture ".png"),                      \
+	g_gr->images().get("pics/" picture ".png"),                      \
 	tooltip                                                                      \
 
 	m_toggle_main_menu
@@ -66,13 +86,13 @@ Editor_Interactive::Editor_Interactive(Widelands::Editor_Game_Base & e) :
 	m_toggle_toolsize_menu
 	(INIT_BUTTON
 	 ("editor_menu_set_toolsize_menu", "toolsize",
-	  _("Toolsize"))),
+	  _("Tool Size"))),
 	m_toggle_minimap
 	(INIT_BUTTON
 	 ("menu_toggle_minimap", "minimap", _("Minimap"))),
 	m_toggle_buildhelp
 	(INIT_BUTTON
-	 ("menu_toggle_buildhelp", "buildhelp", _("Buildhelp"))),
+	 ("menu_toggle_buildhelp", "buildhelp", _("Show Building Spaces (on/off)"))),
 	m_toggle_player_menu
 	(INIT_BUTTON
 	 ("editor_menu_player_menu", "players", _("Players"))),
@@ -106,15 +126,14 @@ Editor_Interactive::Editor_Interactive(Widelands::Editor_Game_Base & e) :
 	m_undo.set_enabled(false);
 	m_redo.set_enabled(false);
 
-#ifndef DEBUG
-	set_display_flag(Interactive_Base::dfDebug, false);
-#else
+#ifndef NDEBUG
 	set_display_flag(Interactive_Base::dfDebug, true);
+#else
+	set_display_flag(Interactive_Base::dfDebug, false);
 #endif
 
 	fieldclicked.connect(boost::bind(&Editor_Interactive::map_clicked, this, false));
 }
-
 
 void Editor_Interactive::register_overlays() {
 	Widelands::Map & map = egbase().map();
@@ -126,27 +145,26 @@ void Editor_Interactive::register_overlays() {
 	iterate_player_numbers(p, nr_players) {
 		if (fname[20] == '9') {fname[20] = '0'; ++fname[19];} else ++fname[20];
 		if (Widelands::Coords const sp = map.get_starting_pos(p)) {
-			PictureID const picid = g_gr->get_picture(PicMod_Game, fname);
-			uint32_t w, h;
-			g_gr->get_picture_size(picid, w, h);
+			const Image* pic = g_gr->images().get(fname);
+			assert(pic);
 			map.overlay_manager().register_overlay
-			(sp, picid, 8, Point(w / 2, STARTING_POS_HOTSPOT_Y));
+				(sp, pic, 8, Point(pic->width() / 2, STARTING_POS_HOTSPOT_Y));
 		}
 	}
 
 	//  Resources: we do not calculate default resources, therefore we do not
 	//  expect to meet them here.
-	Widelands::World const    &    world           = map.world();
+	const Widelands::World    &    world           = map.world();
 	Overlay_Manager        &       overlay_manager = map.overlay_manager();
 	Widelands::Extent        const extent          = map.extent();
 	iterate_Map_FCoords(map, extent, fc) {
 		if (uint8_t const amount = fc.field->get_resources_amount()) {
-			std::string const & immname =
+			const std::string & immname =
 			    world.get_resource(fc.field->get_resources())->get_editor_pic
 			    (amount);
 			if (immname.size())
 				overlay_manager.register_overlay
-				(fc, g_gr->get_picture(PicMod_Menu, immname.c_str()), 4);
+				(fc, g_gr->images().get(immname), 4);
 		}
 	}
 
@@ -154,45 +172,35 @@ void Editor_Interactive::register_overlays() {
 }
 
 
-void Editor_Interactive::load(std::string const & filename) {
+void Editor_Interactive::load(const std::string & filename) {
 	assert(filename.size());
 
 	Widelands::Map & map = egbase().map();
 
 	// TODO: get rid of cleanup_for_load, it tends to be very messy
 	// Instead, delete and re-create the egbase.
-	egbase().cleanup_for_load(true, false);
+	egbase().cleanup_for_load();
 	m_history.reset();
 
-	std::auto_ptr<Widelands::Map_Loader> const ml
-	(map.get_correct_loader(filename.c_str()));
+	std::unique_ptr<Widelands::Map_Loader> const ml(map.get_correct_loader(filename));
 	if (not ml.get())
 		throw warning
-		(_("Unsupported format"),
-		 _
-		 ("Widelands could not load the file \"%s\". The file format seems "
-		  "to be incompatible."),
-		 filename.c_str());
+			(_("Unsupported format"),
+			 _("Widelands could not load the file \"%s\". The file format seems to be incompatible."),
+			 filename.c_str());
 
 	UI::ProgressWindow loader_ui("pics/editor.jpg");
 	std::vector<std::string> tipstext;
 	tipstext.push_back("editor");
 	GameTips editortips(loader_ui, tipstext);
+
 	{
 		std::string const old_world_name = map.get_world_name();
 		ml->preload_map(true);
 		if (strcmp(map.get_world_name(), old_world_name.c_str()))
 			change_world();
 	}
-	{
-		//  Load all tribes into memory
-		std::vector<std::string> tribenames;
-		Widelands::Tribe_Descr::get_all_tribenames(tribenames);
-		container_iterate_const(std::vector<std::string>, tribenames, i) {
-			loader_ui.stepf(_("Loading tribe: %s"), i.current->c_str());
-			egbase().manually_load_tribe(*i.current);
-		}
-	}
+	load_all_tribes(&egbase(), &loader_ui);
 
 	// Create the players. TODO SirVer this must be managed better
 	loader_ui.step(_("Creating players"));
@@ -218,8 +226,8 @@ void Editor_Interactive::load(std::string const & filename) {
 void Editor_Interactive::start() {
 	// Run the editor initialization script, if any
 	try {
-		egbase().lua().run_script("map", "editor_init");
-	} catch (LuaScriptNotExistingError & e) {
+		egbase().lua().run_script("map:scripting/editor_init.lua");
+	} catch (LuaScriptNotExistingError &) {
 		// do nothing.
 	}
 	egbase().map().overlay_manager().show_buildhelp(true);
@@ -251,8 +259,8 @@ void Editor_Interactive::exit() {
 	if (m_need_save) {
 		UI::WLMessageBox mmb
 		(this,
-		 _("Map unsaved"),
-		 _("The Map is unsaved, do you really want to quit?"),
+		 _("Unsaved Map"),
+		 _("The map has not been saved, do you really want to quit?"),
 		 UI::WLMessageBox::YESNO);
 		if (mmb.run() == 0)
 			return;
@@ -267,13 +275,27 @@ void Editor_Interactive::toggle_mainmenu() {
 		new Editor_Main_Menu(*this, m_mainmenu);
 }
 
-void Editor_Interactive::map_clicked(bool draw) {
+void Editor_Interactive::map_clicked(bool should_draw) {
 	m_history.do_action
 		(tools.current(),
 		 tools.use_tool, egbase().map(),
-	     get_sel_pos(), *this, draw);
+	     get_sel_pos(), *this, should_draw);
 	need_complete_redraw();
 	set_need_save(true);
+}
+
+bool Editor_Interactive::handle_mouserelease(Uint8 btn, int32_t x, int32_t y) {
+	if (btn == SDL_BUTTON_LEFT) {
+		m_left_mouse_button_is_down = false;
+	}
+	return Interactive_Base::handle_mouserelease(btn, x, y);
+}
+
+bool Editor_Interactive::handle_mousepress(Uint8 btn, int32_t x, int32_t y) {
+	if (btn == SDL_BUTTON_LEFT) {
+		m_left_mouse_button_is_down = true;
+	}
+	return Interactive_Base::handle_mousepress(btn, x, y);
 }
 
 /// Needed to get freehand painting tools (hold down mouse and move to edit).
@@ -282,12 +304,7 @@ void Editor_Interactive::set_sel_pos(Widelands::Node_and_Triangle<> const sel) {
 	    tools.current().operates_on_triangles() ?
 	    sel.triangle != get_sel_pos().triangle : sel.node != get_sel_pos().node;
 	Interactive_Base::set_sel_pos(sel);
-	int32_t mask = SDL_BUTTON_LMASK;
-#ifdef __APPLE__
-	// workaround for SDLs middle button emulation
-	mask |= SDL_BUTTON_MMASK;
-#endif
-	if (target_changed and SDL_GetMouseState(0, 0) & mask)
+	if (target_changed and m_left_mouse_button_is_down)
 		map_clicked(true);
 }
 
@@ -314,7 +331,6 @@ void Editor_Interactive::toggle_playermenu() {
 
 }
 
-
 void Editor_Interactive::toolsize_menu_btn() {
 	if (m_toolsizemenu.window)
 		delete m_toolsizemenu.window;
@@ -322,8 +338,9 @@ void Editor_Interactive::toolsize_menu_btn() {
 		new Editor_Toolsize_Menu(*this, m_toolsizemenu);
 }
 
-
 void Editor_Interactive::set_sel_radius_and_update_menu(uint32_t const val) {
+	if (tools.current().has_size_one())
+		return;
 	if (UI::UniqueWindow * const w = m_toolsizemenu.window)
 		ref_cast<Editor_Toolsize_Menu, UI::UniqueWindow>(*w).update(val);
 	else
@@ -334,8 +351,9 @@ void Editor_Interactive::set_sel_radius_and_update_menu(uint32_t const val) {
 bool Editor_Interactive::handle_key(bool const down, SDL_keysym const code) {
 	bool handled = Interactive_Base::handle_key(down, code);
 
-	if (down)
+	if (down) {
 		// only on down events
+
 		switch (code.sym) {
 			// Sel radius
 		case SDLK_1:
@@ -464,7 +482,7 @@ bool Editor_Interactive::handle_key(bool const down, SDL_keysym const code) {
 			break;
 
 		}
-	else
+	} else {
 		// key up events
 		switch (code.sym) {
 		case SDLK_LSHIFT:
@@ -479,7 +497,7 @@ bool Editor_Interactive::handle_key(bool const down, SDL_keysym const code) {
 		default:
 			break;
 		}
-
+	}
 	return handled;
 }
 
@@ -487,10 +505,12 @@ bool Editor_Interactive::handle_key(bool const down, SDL_keysym const code) {
 void Editor_Interactive::select_tool
 (Editor_Tool & primary, Editor_Tool::Tool_Index const which) {
 	if (which == Editor_Tool::First and & primary != tools.current_pointer) {
+		if (primary.has_size_one())
+			set_sel_radius_and_update_menu(0);
 		Widelands::Map & map = egbase().map();
 		//  A new tool has been selected. Remove all registered overlay callback
 		//  functions.
-		map.overlay_manager().register_overlay_callback_function(0, 0);
+		map.overlay_manager().remove_overlay_callback_function();
 		map.recalc_whole_map();
 
 	}
@@ -510,7 +530,7 @@ void Editor_Interactive::select_tool
  *  data is a pointer to a tribe (for buildings)
  */
 void Editor_Interactive::reference_player_tribe
-(Widelands::Player_Number const player, void const * const data) {
+(Widelands::Player_Number player, void const * const data) {
 	assert(0 < player);
 	assert(player <= egbase().map().get_nrplayers());
 
@@ -568,12 +588,8 @@ void Editor_Interactive::change_world() {
 }
 
 
-/**
- * Public static method to create an instance of the editor
- * and run it. This takes care of all the setup and teardown.
- */
-void Editor_Interactive::run_editor(std::string const & filename) {
-	Widelands::Editor_Game_Base editor(0);
+void Editor_Interactive::run_editor(const std::string & filename, const std::string& script_to_run) {
+	Widelands::Editor_Game_Base editor(nullptr);
 	Editor_Interactive eia(editor);
 	editor.set_ibase(&eia); // TODO get rid of this
 	{
@@ -581,7 +597,6 @@ void Editor_Interactive::run_editor(std::string const & filename) {
 		std::vector<std::string> tipstext;
 		tipstext.push_back("editor");
 		GameTips editortips(loader_ui, tipstext);
-		g_gr->flush(PicMod_Menu);
 
 		{
 			Widelands::Map & map = *new Widelands::Map;
@@ -593,15 +608,8 @@ void Editor_Interactive::run_editor(std::string const & filename) {
 				 g_options.pull_section("global").get_string
 				 ("realname", _("Unknown")));
 
-				{
-					//  Load all tribes into memory
-					std::vector<std::string> tribenames;
-					Widelands::Tribe_Descr::get_all_tribenames(tribenames);
-					container_iterate_const(std::vector<std::string>, tribenames, i) {
-						loader_ui.stepf(_("Loading tribe: %s"), i.current->c_str());
-						editor.manually_load_tribe(*i.current);
-					}
-				}
+				load_all_tribes(&editor, &loader_ui);
+
 				loader_ui.step(_("Loading graphics..."));
 				editor.load_graphics(loader_ui);
 				loader_ui.step(std::string());
@@ -614,13 +622,12 @@ void Editor_Interactive::run_editor(std::string const & filename) {
 		eia.select_tool(eia.tools.increase_height, Editor_Tool::First);
 		editor.postload();
 		eia.start();
+
+		if (!script_to_run.empty()) {
+			eia.egbase().lua().run_script(script_to_run);
+		}
 	}
 	eia.run();
 
 	editor.cleanup_objects();
-
-	g_gr->flush(PicMod_Game);
-	g_gr->flush_animations();
-	g_anim.flush();
 }
-

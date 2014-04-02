@@ -20,32 +20,27 @@
 #ifndef IDLEWORKERSUPPLY_H
 #define IDLEWORKERSUPPLY_H
 
-#include "supply.h"
-
-#ifdef _MSC_VER
-#define __attribute__(x)
-#endif
+#include "economy/supply.h"
 
 namespace Widelands {
 class Worker;
-struct Economy;
+class Economy;
 
 struct IdleWorkerSupply : public Supply {
 	IdleWorkerSupply(Worker &);
 	~IdleWorkerSupply();
 
 	void set_economy(Economy *);
-	virtual PlayerImmovable * get_position(Game &);
+	virtual PlayerImmovable * get_position(Game &) override;
 
-	virtual bool is_active() const throw ();
-	virtual bool has_storage() const throw ();
-	virtual void get_ware_type(WareWorker & type, Ware_Index & ware) const;
-	virtual void send_to_storage(Game &, Warehouse * wh);
+	virtual bool is_active() const override;
+	virtual bool has_storage() const override;
+	virtual void get_ware_type(WareWorker & type, Ware_Index & ware) const override;
+	virtual void send_to_storage(Game &, Warehouse * wh) override;
 
-	virtual uint32_t nr_supplies(Game const &, Request const &) const;
-	virtual WareInstance & launch_item(Game &, Request const &)
-		__attribute__ ((noreturn));
-	virtual Worker & launch_worker(Game &, Request const &);
+	virtual uint32_t nr_supplies(const Game &, const Request &) const override;
+	virtual WareInstance & launch_ware(Game &, const Request &) override;
+	virtual Worker & launch_worker(Game &, const Request &) override;
 
 private:
 	Worker  & m_worker;

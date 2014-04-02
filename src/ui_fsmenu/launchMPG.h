@@ -20,22 +20,22 @@
 #ifndef FULLSCREEN_MENU_LAUNCHMPG_H
 #define FULLSCREEN_MENU_LAUNCHMPG_H
 
-#include "base.h"
+#include <string>
 
+#include "ui_fsmenu/base.h"
 #include "ui_basic/button.h"
 #include "ui_basic/helpwindow.h"
-#include "ui_basic/textarea.h"
-#include "ui_basic/multilinetextarea.h"
 #include "ui_basic/listselect.h"
+#include "ui_basic/multilinetextarea.h"
+#include "ui_basic/textarea.h"
 
-#include <string>
 
 struct ChatProvider;
 struct GameChatPanel;
-struct GameController;
+class GameController;
 struct GameSettingsProvider;
 struct MultiPlayerSetupGroup;
-struct LuaInterface;
+class LuaInterface;
 
 /**
  * Fullscreen menu for setting map and mapsettings for single and multi player
@@ -54,7 +54,7 @@ struct Fullscreen_Menu_LaunchMPG : public Fullscreen_Menu_Base {
 
 	void setChatProvider(ChatProvider &);
 
-	void think();
+	void think() override;
 
 	void refresh();
 

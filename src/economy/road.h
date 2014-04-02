@@ -20,15 +20,15 @@
 #ifndef ROAD_H
 #define ROAD_H
 
+#include <vector>
+
 #include "logic/immovable.h"
 #include "logic/path.h"
 #include "logic/roadtype.h"
 
-#include <vector>
-
 namespace Widelands {
 struct Carrier;
-struct Request;
+class Request;
 
 /**
  * Road is a special object which connects two flags.
@@ -69,24 +69,24 @@ struct Road : public PlayerImmovable {
 
 	static Road & create
 		(Editor_Game_Base &,
-		 Flag & start, Flag & end, Path const &);
+		 Flag & start, Flag & end, const Path &);
 
 	Flag & get_flag(FlagId const flag) const {return *m_flags[flag];}
 
-	virtual int32_t  get_type    () const throw ();
+	virtual int32_t  get_type    () const override;
 	uint8_t get_roadtype() const {return m_type;}
-	char const * type_name() const throw () {return "road";}
-	virtual int32_t  get_size    () const throw ();
-	virtual bool get_passable() const throw ();
-	virtual PositionList get_positions(const Editor_Game_Base &) const throw ();
-	std::string const & name() const throw ();
+	char const * type_name() const override {return "road";}
+	virtual int32_t  get_size    () const override;
+	virtual bool get_passable() const override;
+	virtual PositionList get_positions(const Editor_Game_Base &) const override;
+	const std::string & name() const override;
 
-	virtual Flag & base_flag();
+	virtual Flag & base_flag() override;
 
-	virtual void set_economy(Economy *);
+	virtual void set_economy(Economy *) override;
 
 	int32_t get_cost(FlagId fromflag);
-	Path const & get_path() const {return m_path;}
+	const Path & get_path() const {return m_path;}
 	int32_t get_idle_index() const {return m_idle_index;}
 
 	void presplit(Game &, Coords split);
@@ -94,19 +94,19 @@ struct Road : public PlayerImmovable {
 
 	bool notify_ware(Game & game, FlagId flagid);
 
-	virtual void remove_worker(Worker &);
+	virtual void remove_worker(Worker &) override;
 	void assign_carrier(Carrier &, uint8_t);
 
-	void log_general_info(Editor_Game_Base const &);
+	void log_general_info(const Editor_Game_Base &) override;
 
 protected:
-	virtual void init(Editor_Game_Base &);
-	virtual void cleanup(Editor_Game_Base &);
+	virtual void init(Editor_Game_Base &) override;
+	virtual void cleanup(Editor_Game_Base &) override;
 
-	virtual void draw(Editor_Game_Base const &, RenderTarget &, FCoords, Point);
+	virtual void draw(const Editor_Game_Base &, RenderTarget &, const FCoords&, const Point&) override;
 
 private:
-	void _set_path(Editor_Game_Base &, Path const &);
+	void _set_path(Editor_Game_Base &, const Path &);
 
 	void _mark_map(Editor_Game_Base &);
 	void _unmark_map(Editor_Game_Base &);
@@ -143,5 +143,3 @@ private:
 }
 
 #endif
-
-

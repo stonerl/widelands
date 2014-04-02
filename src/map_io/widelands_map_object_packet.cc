@@ -17,7 +17,7 @@
  *
  */
 
-#include "widelands_map_object_packet.h"
+#include "map_io/widelands_map_object_packet.h"
 
 #include "economy/fleet.h"
 #include "economy/portdock.h"
@@ -28,12 +28,12 @@
 #include "logic/legacy.h"
 #include "logic/map.h"
 #include "logic/ship.h"
-#include "wexception.h"
 #include "logic/widelands_fileread.h"
 #include "logic/widelands_filewrite.h"
 #include "logic/worker.h"
-#include "widelands_map_map_object_loader.h"
-#include "widelands_map_map_object_saver.h"
+#include "map_io/widelands_map_map_object_loader.h"
+#include "map_io/widelands_map_map_object_saver.h"
+#include "wexception.h"
 
 namespace Widelands {
 
@@ -58,7 +58,7 @@ void Map_Object_Packet::Read
 		const uint8_t packet_version = fr.Unsigned8();
 		if (packet_version != CURRENT_PACKET_VERSION)
 			throw game_data_error
-				(_("unknown/unhandled version %u"), packet_version);
+				("unknown/unhandled version %u", packet_version);
 
 		// Initial loading stage
 		for (;;)
@@ -106,10 +106,10 @@ void Map_Object_Packet::Read
 				break;
 
 			default:
-				throw game_data_error(_("unknown object header %u"), header);
+				throw game_data_error("unknown object header %u", header);
 			}
 	} catch (const std::exception & e) {
-		throw game_data_error(_("map objects: %s"), e.what());
+		throw game_data_error("map objects: %s", e.what());
 	}
 }
 

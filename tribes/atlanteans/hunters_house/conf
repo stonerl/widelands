@@ -2,8 +2,11 @@ size=small
 output=meat
 
 [buildcost]
-trunk=1
+log=1
 planks=1
+stone=1
+
+[return_on_dismantle]
 stone=1
 
 [aihints]
@@ -22,4 +25,3 @@ worker=hunt
 [idle]
 pics=hunter_i_??.png
 hotspot=36 44
-playercolor=true

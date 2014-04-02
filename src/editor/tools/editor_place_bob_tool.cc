@@ -17,14 +17,13 @@
  *
  */
 
-#include "editor_place_bob_tool.h"
+#include "editor/tools/editor_place_bob_tool.h"
+
+#include "editor/editorinteractive.h"
+#include "logic/bob.h"
+#include "logic/editor_game_base.h"
 #include "logic/field.h"
 #include "logic/mapregion.h"
-#include "editor/editorinteractive.h"
-#include "logic/editor_game_base.h"
-#include "logic/bob.h"
-
-using Widelands::Bob;
 
 /**
  * Choses an object to place randomly from all enabled
@@ -43,8 +42,8 @@ int32_t Editor_Place_Bob_Tool::handle_click_impl
 		 Widelands::Area<Widelands::FCoords>
 		 (map.get_fcoords(center.node), args.sel_radius));
 		do {
-			Bob * const mbob = mr.location().field->get_first_bob();
-			args.obob_type.push_back((mbob ? &mbob->descr() : NULL));
+			Widelands::Bob * const mbob = mr.location().field->get_first_bob();
+			args.obob_type.push_back((mbob ? &mbob->descr() : nullptr));
 			args.nbob_type.push_back(map.world().get_bob_descr(get_random_enabled()));
 		} while (mr.advance(map));
 	}
@@ -55,15 +54,15 @@ int32_t Editor_Place_Bob_Tool::handle_click_impl
 		(map,
 		 Widelands::Area<Widelands::FCoords>
 		 (map.get_fcoords(center.node), args.sel_radius));
-		std::list< const Bob::Descr * >::iterator i = args.nbob_type.begin();
+		std::list< const Widelands::BobDescr * >::iterator i = args.nbob_type.begin();
 		do {
-			Bob::Descr const & descr = *(*i);
+			const Widelands::BobDescr & descr = *(*i);
 			if (mr.location().field->nodecaps() & descr.movecaps()) {
-				if (Bob * const bob = mr.location().field->get_first_bob())
+				if (Widelands::Bob * const bob = mr.location().field->get_first_bob())
 					bob->remove(egbase); //  There is already a bob. Remove it.
-				descr.create(egbase, 0, mr.location());
+				descr.create(egbase, nullptr, mr.location());
 			}
-			i++;
+			++i;
 		} while (mr.advance(map));
 		return mr.radius() + 2;
 	} else
@@ -80,19 +79,19 @@ int32_t Editor_Place_Bob_Tool::handle_undo_impl
 		(map,
 		 Widelands::Area<Widelands::FCoords>
 		 (map.get_fcoords(center.node), args.sel_radius));
-		std::list<const Bob::Descr *>::iterator i = args.obob_type.begin();
+		std::list<const Widelands::BobDescr *>::iterator i = args.obob_type.begin();
 		do {
 			if (*i) {
-				Bob::Descr const & descr = *(*i);
+				const Widelands::BobDescr & descr = *(*i);
 				if (mr.location().field->nodecaps() & descr.movecaps()) {
-					if (Bob * const bob = mr.location().field->get_first_bob())
+					if (Widelands::Bob * const bob = mr.location().field->get_first_bob())
 						bob->remove(egbase); //  There is already a bob. Remove it.
-					descr.create(egbase, 0, mr.location());
+					descr.create(egbase, nullptr, mr.location());
 				}
-			} else if (Bob * const bob = mr.location().field->get_first_bob()) {
+			} else if (Widelands::Bob * const bob = mr.location().field->get_first_bob()) {
 				bob->remove(egbase);
 			}
-			i++;
+			++i;
 		} while (mr.advance(map));
 		return mr.radius() + 2;
 	} else
@@ -103,5 +102,3 @@ Editor_Action_Args Editor_Place_Bob_Tool::format_args_impl(Editor_Interactive & 
 {
 	return Editor_Tool::format_args_impl(parent);
 }
-
-

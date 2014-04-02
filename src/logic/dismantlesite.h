@@ -20,10 +20,9 @@
 #ifndef DISMANTLESITE_H
 #define DISMANTLESITE_H
 
-#include "building.h"
-#include "player.h"
-
-#include "partially_finished_building.h"
+#include "logic/building.h"
+#include "logic/partially_finished_building.h"
+#include "logic/player.h"
 
 namespace Widelands {
 
@@ -45,17 +44,16 @@ class DismantleSite;
 struct DismantleSite_Descr : public Building_Descr {
 	DismantleSite_Descr
 		(char const * name, char const * descname,
-		 std::string const & directory, Profile &, Section & global_s,
-		 Tribe_Descr const & tribe);
+		 const std::string & directory, Profile &, Section & global_s,
+		 const Tribe_Descr & tribe);
 
-	virtual Building & create_object() const;
+	virtual Building & create_object() const override;
 };
 
 class DismantleSite : public Partially_Finished_Building {
 	friend struct Map_Buildingdata_Data_Packet;
 
 	static const uint32_t DISMANTLESITE_STEP_TIME = 45000;
-	static const uint8_t RATIO_RETURNED_WARES = 2;  // you get half the wares back
 
 	MO_DESCR(DismantleSite_Descr);
 
@@ -63,23 +61,25 @@ public:
 	DismantleSite(const DismantleSite_Descr & descr);
 	DismantleSite
 		(const DismantleSite_Descr & descr, Editor_Game_Base &,
-		 Coords const, Player &, const Building_Descr &, bool);
+		 Coords const, Player &, bool, Building::FormerBuildings & former_buildings);
 
-	char const * type_name() const throw () {return "dismantlesite";}
-	virtual std::string get_statistics_string();
+	char const * type_name() const override {return "dismantlesite";}
+	virtual std::string get_statistics_string() override;
 
-	virtual bool burn_on_destroy();
-	virtual void init   (Editor_Game_Base &);
+	virtual bool burn_on_destroy() override;
+	virtual void init   (Editor_Game_Base &) override;
 
-	virtual bool get_building_work(Game &, Worker &, bool success);
+	virtual bool get_building_work(Game &, Worker &, bool success) override;
+
+	static void count_returned_wares(Building* building, std::map<Ware_Index, uint8_t> & res);
 
 protected:
-	virtual uint32_t build_step_time() const {return DISMANTLESITE_STEP_TIME;}
+	virtual uint32_t build_step_time() const override {return DISMANTLESITE_STEP_TIME;}
 
 	virtual void create_options_window
-		(Interactive_GameBase &, UI::Window * & registry);
+		(Interactive_GameBase &, UI::Window * & registry) override;
 
-	virtual void draw(Editor_Game_Base const &, RenderTarget &, FCoords, Point);
+	virtual void draw(const Editor_Game_Base &, RenderTarget &, const FCoords&, const Point&) override;
 };
 
 }

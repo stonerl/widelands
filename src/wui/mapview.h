@@ -21,12 +21,12 @@
 #define MAPVIEW_H
 
 #include <boost/function.hpp>
-#include <boost/signal.hpp>
+#include <boost/signals2.hpp>
 
 #include "logic/widelands_geometry.h"
-
 #include "ui_basic/panel.h"
 
+class GameRenderer;
 struct Interactive_Base;
 
 /**
@@ -45,6 +45,7 @@ struct Map_View : public UI::Panel {
 		(UI::Panel * const parent,
 		 const int32_t x, const int32_t y, const uint32_t w, const uint32_t h,
 		 Interactive_Base &);
+	virtual ~Map_View();
 
 	void set_changeview(const ChangeViewFn & fn);
 
@@ -53,9 +54,9 @@ struct Map_View : public UI::Panel {
 	 *
 	 * Parameters are x/y position in screen coordinates.
 	 */
-	boost::signal<void (int32_t, int32_t)> changeview;
+	boost::signals2::signal<void (int32_t, int32_t)> changeview;
 
-	boost::signal<void ()> fieldclicked;
+	boost::signals2::signal<void ()> fieldclicked;
 
 	void warp_mouse_to_node(Widelands::Coords);
 
@@ -66,23 +67,24 @@ struct Map_View : public UI::Panel {
 	bool is_dragging() const {return m_dragging;}
 
 	// Drawing
-	void draw(RenderTarget &);
+	void draw(RenderTarget &) override;
 
 	// Event handling
-	bool handle_mousepress  (Uint8 btn, int32_t x, int32_t y);
-	bool handle_mouserelease(Uint8 btn, int32_t x, int32_t y);
+	bool handle_mousepress  (Uint8 btn, int32_t x, int32_t y) override;
+	bool handle_mouserelease(Uint8 btn, int32_t x, int32_t y) override;
 	bool handle_mousemove
-		(Uint8 state, int32_t x, int32_t y, int32_t xdiff, int32_t ydiff);
+		(Uint8 state, int32_t x, int32_t y, int32_t xdiff, int32_t ydiff) override;
 
 	void track_sel(Point m);
 	void need_complete_redraw() {m_complete_redraw_needed = true;}
 
 protected:
-	Interactive_Base & intbase() const throw () {return m_intbase;}
+	Interactive_Base & intbase() const {return m_intbase;}
 
 private:
 	void stop_dragging();
 
+	std::unique_ptr<GameRenderer> m_renderer;
 	Interactive_Base & m_intbase;
 	ChangeViewFn m_changeview;
 	Point              m_viewpoint;

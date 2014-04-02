@@ -17,31 +17,71 @@
  *
  */
 
-#include "panel.h"
+#include "ui_basic/panel.h"
 
 #include "constants.h"
 #include "graphic/font_handler.h"
-#include "graphic/offscreensurface.h"
+#include "graphic/font_handler1.h"
+#include "graphic/graphic.h"
 #include "graphic/rendertarget.h"
-#include "graphic/wordwrap.h"
+#include "graphic/surface.h"
+#include "graphic/surface_cache.h"
+#include "helper.h"
 #include "log.h"
 #include "profile/profile.h"
 #include "sound/sound_handler.h"
+#include "text_layout.h"
 #include "wlapplication.h"
-#include <boost/concept_check.hpp>
+
+
+using namespace std;
 
 namespace UI {
 
-Panel * Panel::_modal       = 0;
-Panel * Panel::_g_mousegrab = 0;
-Panel * Panel::_g_mousein   = 0;
+// Caches the image of the inner of a panel. Will redraw the Panel on cache misses.
+class Panel::CacheImage : public Image {
+public:
+	CacheImage(Panel* const panel, uint16_t w, uint16_t h) :
+		width_(w),
+		height_(h),
+		panel_(panel),
+		hash_("cache_image_" + random_string("0123456789ABCDEFGH", 32)) {}
+	virtual ~CacheImage() {}
+
+	// Implements Image.
+	virtual uint16_t width() const override {return width_;}
+	virtual uint16_t height() const override {return height_;}
+	virtual const string& hash() const override {return hash_;}
+	virtual Surface* surface() const override {
+		Surface* rv = g_gr->surfaces().get(hash_);
+		if (rv)
+			return rv;
+
+		rv = g_gr->surfaces().insert(hash_, Surface::create(width_, height_), true);
+
+		// Cache miss! We have to redraw our panel onto our surface.
+		RenderTarget inner(rv);
+		panel_->do_draw_inner(inner);
+
+		return rv;
+	}
+
+private:
+	const int16_t width_, height_;
+	Panel* const panel_;  // not owned.
+	const string hash_;
+};
+
+Panel * Panel::_modal       = nullptr;
+Panel * Panel::_g_mousegrab = nullptr;
+Panel * Panel::_g_mousein   = nullptr;
 
 // The following variable can be set to false. If so, all mouse and keyboard
 // events are ignored and not passed on to any widget. This is only useful
 // for scripts that want to show off functionality without the user interfering.
 bool Panel::_g_allow_user_input = true;
-PictureID Panel::s_default_cursor = g_gr->get_no_picture();
-PictureID Panel::s_default_cursor_click = g_gr->get_no_picture();
+const Image* Panel::s_default_cursor = nullptr;
+const Image* Panel::s_default_cursor_click = nullptr;
 
 /**
  * Initialize a panel, link it into the parent's queue.
@@ -51,7 +91,7 @@ Panel::Panel
 	 const int32_t nx, const int32_t ny, const uint32_t nw, const uint32_t nh,
 	 const std::string & tooltip_text)
 	:
-	_parent(nparent), _fchild(0), _lchild(0), _mousein(0), _focus(0),
+	_parent(nparent), _fchild(nullptr), _lchild(nullptr), _mousein(nullptr), _focus(nullptr),
 	_flags(pf_handle_mouse|pf_think|pf_visible),
 	_needdraw(false),
 	_x(nx), _y(ny), _w(nw), _h(nh),
@@ -59,19 +99,19 @@ Panel::Panel
 	_border_snap_distance(0), _panel_snap_distance(0),
 	_desired_w(nw), _desired_h(nh),
 	_running(false),
-	_tooltip(tooltip_text.size() ? strdup(tooltip_text.c_str()) : 0)
+	_tooltip(tooltip_text)
 {
 	assert(nparent != this);
 	if (_parent) {
 		_next = _parent->_fchild;
-		_prev = 0;
+		_prev = nullptr;
 		if (_next)
 			_next->_prev = this;
 		else
 			_parent->_lchild = this;
 		_parent->_fchild = this;
 	} else
-		_prev = _next = 0;
+		_prev = _next = nullptr;
 	update(0, 0, _w, _h);
 }
 
@@ -84,9 +124,9 @@ Panel::~Panel()
 
 	// Release pointers to this object
 	if (_g_mousegrab == this)
-		_g_mousegrab = 0;
+		_g_mousegrab = nullptr;
 	if (_g_mousein == this)
-		_g_mousein = 0;
+		_g_mousein = nullptr;
 
 	// Free children
 	free_children();
@@ -94,9 +134,9 @@ Panel::~Panel()
 	// Unlink
 	if (_parent) {
 		if (_parent->_mousein == this)
-			_parent->_mousein = 0;
+			_parent->_mousein = nullptr;
 		if (_parent->_focus == this)
-			_parent->_focus = 0;
+			_parent->_focus = nullptr;
 
 		if (_prev)
 			_prev->_next = _next;
@@ -107,8 +147,6 @@ Panel::~Panel()
 		else
 			_parent->_lchild = _prev;
 	}
-
-	free(_tooltip);
 }
 
 
@@ -130,15 +168,15 @@ int32_t Panel::run()
 	WLApplication * const app = WLApplication::get();
 	Panel * const prevmodal = _modal;
 	_modal = this;
-	_g_mousegrab = 0; // good ol' paranoia
+	_g_mousegrab = nullptr; // good ol' paranoia
 	app->set_mouse_lock(false); // more paranoia :-)
 
 	Panel * forefather = this;
 	while (Panel * const p = forefather->_parent)
 		forefather = p;
 
-	s_default_cursor = g_gr->get_picture(PicMod_UI,  "pics/cursor.png");
-	s_default_cursor_click = g_gr->get_picture(PicMod_UI,  "pics/cursor_click.png");
+	s_default_cursor = g_gr->images().get("pics/cursor.png");
+	s_default_cursor_click = g_gr->images().get("pics/cursor_click.png");
 
 	// Loop
 	_running = true;
@@ -184,12 +222,7 @@ int32_t Panel::run()
 				 	s_default_cursor_click :
 					s_default_cursor);
 
-			if (Panel * lowest = _mousein) {
-				while (Panel * const mousein = lowest->_mousein)
-					lowest = mousein;
-				if (char const * const text = lowest->tooltip())
-					draw_tooltip(rt, text);
-			}
+			forefather->do_tooltip();
 
 			g_gr->refresh();
 		}
@@ -197,8 +230,8 @@ int32_t Panel::run()
 		if (_flags & pf_child_die)
 			check_child_death();
 
-#ifdef DEBUG
-#ifndef WIN32
+#ifndef NDEBUG
+#ifndef _WIN32
 		WLApplication::yield_double_game ();
 #endif
 #endif
@@ -261,11 +294,6 @@ void Panel::set_size(const uint32_t nw, const uint32_t nh)
 	_w = nw;
 	_h = nh;
 
-	if (_cache) {
-		// The old surface is freed automatically
-		_cache = g_gr->create_offscreen_surface(_w, _h);
-	}
-
 	if (_parent)
 		move_inside_parent();
 
@@ -311,8 +339,6 @@ void Panel::set_desired_size(uint32_t w, uint32_t h)
 	if (_desired_w == w && _desired_h == h)
 		return;
 
-	assert(w >= 0);
-	assert(h >= 0);
 	assert(w < 3000);
 	assert(h < 3000);
 
@@ -428,7 +454,7 @@ void Panel::move_to_top()
 		_parent->_lchild = _prev;
 
 	// relink
-	_prev = 0;
+	_prev = nullptr;
 	_next = _parent->_fchild;
 	_parent->_fchild = this;
 	if (_next)
@@ -533,16 +559,12 @@ void Panel::update_inner(int32_t x, int32_t y, int32_t w, int32_t h)
  * Enable/Disable the drawing cache.
  * When the drawing cache is enabled, draw() is only called after an update()
  * has been called explicitly. Otherwise, the contents of the panel are copied
- * from an \ref IOffscreenSurface containing the cached image, provided that
- * the graphics system supports it.
+ * from an \ref Surface containing the cached image.
  *
  * \note Caching only works properly for solid panels that have no transparency.
  */
 void Panel::set_cache(bool cache)
 {
-	if (!g_gr->caps().offscreen_rendering)
-		return;
-
 	if (cache) {
 		_flags |= pf_cache;
 	} else {
@@ -577,7 +599,7 @@ void Panel::do_think()
 /**
  * Get mouse position relative to this panel
 */
-Point Panel::get_mouse_position() const throw () {
+Point Panel::get_mouse_position() const {
 	return
 		(_parent ?
 		 _parent             ->get_mouse_position()
@@ -647,7 +669,7 @@ bool Panel::handle_mouserelease(const Uint8, int32_t, int32_t)
  */
 bool Panel::handle_mousemove(const Uint8, int32_t, int32_t, int32_t, int32_t)
 {
-	return _tooltip;
+	return !_tooltip.empty();
 }
 
 /**
@@ -657,10 +679,48 @@ bool Panel::handle_mousemove(const Uint8, int32_t, int32_t, int32_t, int32_t)
  *
  * \return true if the event was processed, false otherwise
 */
-bool Panel::handle_key(bool, SDL_keysym)
+bool Panel::handle_key(bool down, SDL_keysym code)
 {
+	if (down) {
+		if (_focus) {
+				Panel * p = _focus->_next;
+				switch (code.sym) {
+
+				case SDLK_TAB:
+					while (p != _focus) {
+						if (p->get_can_focus()) {
+							p->focus();
+							p->update();
+							break;
+						}
+						if (p == _lchild) {
+								p = _fchild;
+						}
+						else {
+								p = p->_next;
+						}
+					}
+					return true;
+
+				default:
+					return false;
+			}
+		}
+	}
 	return false;
 }
+
+/**
+ * Called whenever a tooltip could be drawn.
+ * Return true if the tooltip has been drawn,
+ * false otherwise.
+ */
+bool Panel::handle_tooltip()
+{
+	RenderTarget & rt = *g_gr->get_render_target();
+	return draw_tooltip(rt, tooltip());
+}
+
 
 /**
  * Called whenever the user presses a mouse button in the panel while pressing the alt-key.
@@ -668,7 +728,7 @@ bool Panel::handle_key(bool, SDL_keysym)
  * It should be only overwritten by the UI::Window class.
  * \return true if the click was processed, false otherwise
  */
-bool Panel::handle_alt_drag(int32_t x, int32_t y)
+bool Panel::handle_alt_drag(int32_t /* x */, int32_t /* y */)
 {
 	return false;
 }
@@ -702,7 +762,7 @@ void Panel::grab_mouse(bool const grab)
 		_g_mousegrab = this;
 	} else {
 		assert(!_g_mousegrab || _g_mousegrab == this);
-		_g_mousegrab = 0;
+		_g_mousegrab = nullptr;
 	}
 }
 
@@ -718,7 +778,7 @@ void Panel::set_can_focus(bool const yes)
 		_flags &= ~pf_can_focus;
 
 		if (_parent && _parent->_focus == this)
-			_parent->_focus = 0;
+			_parent->_focus = nullptr;
 	}
 }
 
@@ -732,8 +792,9 @@ void Panel::focus()
 	// can't. but focus is called recursivly
 	// assert(get_can_focus());
 
-	if (!_parent || this == _modal)
+	if (!_parent || this == _modal) {
 		return;
+	}
 	if (_parent->_focus == this)
 		return;
 
@@ -778,8 +839,17 @@ void Panel::die()
  */
 void Panel::play_click()
 {
-	g_sound_handler.play_fx("click", 128, PRIO_ALWAYS_PLAY);
+	g_sound_handler.play_fx("sound/click", 128, PRIO_ALWAYS_PLAY);
 }
+void Panel::play_new_chat_message()
+{
+	g_sound_handler.play_fx("sound/message_chat", 128, PRIO_ALWAYS_PLAY);
+}
+void Panel::play_new_chat_member()
+{
+	g_sound_handler.play_fx("sound/message_freshmen", 128, PRIO_ALWAYS_PLAY);
+}
+
 
 /**
  * Recursively walk the panel tree, killing panels that are marked for death
@@ -845,29 +915,25 @@ void Panel::do_draw(RenderTarget & dst)
 		uint32_t innerw = _w - (_lborder + _rborder);
 		uint32_t innerh = _h - (_tborder + _bborder);
 
-		if
-			(!_cache || !_cache->valid() ||
-			 static_cast<Surface *>(_cache.get())->get_w() != innerw ||
-			 static_cast<Surface *>(_cache.get())->get_h() != innerh)
-		{
-			_cache = g_gr->create_offscreen_surface(innerw, innerh);
+	if (!_cache || _cache->width() != innerw || _cache->height() != innerh) {
+			_cache.reset(new CacheImage(this, innerw, innerh));
 			_needdraw = true;
 		}
 
 		if (_needdraw) {
-			RenderTarget inner(_cache);
+			RenderTarget inner(_cache->surface());
 			do_draw_inner(inner);
 
 			_needdraw = false;
 		}
 
-		dst.blit(Point(_lborder, _tborder), _cache);
+		dst.blit(Point(_lborder, _tborder), _cache.get(), CM_Copy);
 	} else {
 		Rect innerwindow
 			(Point(_lborder, _tborder),
 				_w - (_lborder + _rborder), _h - (_tborder + _bborder));
 
-		if (dst.enter_window(innerwindow, 0, 0))
+		if (dst.enter_window(innerwindow, nullptr, nullptr))
 			do_draw_inner(dst);
 	}
 
@@ -914,7 +980,7 @@ void Panel::do_mousein(bool const inside)
 
 	if (!inside && _mousein) {
 		_mousein->do_mousein(false);
-		_mousein = NULL;
+		_mousein = nullptr;
 	}
 	handle_mousein(inside);
 }
@@ -925,9 +991,12 @@ void Panel::do_mousein(bool const inside)
  * Returns whether the event was processed.
  */
 bool Panel::do_mousepress(const Uint8 btn, int32_t x, int32_t y) {
-	if (not _g_allow_user_input)
+	if (not _g_allow_user_input) {
 		return true;
-
+	}
+	if (get_can_focus()) {
+		focus();
+	}
 	x -= _lborder;
 	y -= _tborder;
 	if (_flags & pf_top_on_click)
@@ -949,8 +1018,10 @@ bool Panel::do_mousepress(const Uint8 btn, int32_t x, int32_t y) {
 			(Panel * child = _fchild;
 			 (child = child_at_mouse_cursor(x, y, child));
 			 child = child->_next)
-			if (child->do_mousepress(btn, x - child->_x, y - child->_y))
-				return true;
+			{
+				if (child->do_mousepress(btn, x - child->_x, y - child->_y))
+					return true;
+			}
 	return handle_mousepress(btn, x, y);
 }
 bool Panel::do_mouserelease(const Uint8 btn, int32_t x, int32_t y) {
@@ -968,6 +1039,7 @@ bool Panel::do_mouserelease(const Uint8 btn, int32_t x, int32_t y) {
 				return true;
 	return handle_mouserelease(btn, x, y);
 }
+
 bool Panel::do_mousemove
 	(Uint8 const state,
 	 int32_t x, int32_t y, int32_t const xdiff, int32_t const ydiff)
@@ -977,15 +1049,20 @@ bool Panel::do_mousemove
 
 	x -= _lborder;
 	y -= _tborder;
-	if (_g_mousegrab != this)
+	if (_g_mousegrab != this) {
 		for
 			(Panel * child = _fchild;
 			 (child = child_at_mouse_cursor(x, y, child));
 			 child = child->_next)
+		{
 			if
 				(child->do_mousemove
 				 	(state, x - child->_x, y - child->_y, xdiff, ydiff))
+			{
 				return true;
+			}
+		}
+	}
 	return handle_mousemove(state, x, y, xdiff, ydiff);
 }
 
@@ -1006,6 +1083,13 @@ bool Panel::do_key(bool const down, SDL_keysym const code)
 	return handle_key(down, code);
 }
 
+bool Panel::do_tooltip()
+{
+	if (_mousein && _mousein->do_tooltip()) {
+		return true;
+	}
+	return handle_tooltip();
+}
 
 /**
  * \return \c true if the given key is currently pressed, or \c false otherwise
@@ -1024,7 +1108,7 @@ bool Panel::get_key_state(const SDLKey key) const
 Panel * Panel::ui_trackmouse(int32_t & x, int32_t & y)
 {
 	Panel * mousein;
-	Panel * rcv = 0;
+	Panel * rcv = nullptr;
 
 	if (_g_mousegrab)
 		mousein = rcv = _g_mousegrab;
@@ -1044,7 +1128,7 @@ Panel * Panel::ui_trackmouse(int32_t & x, int32_t & y)
 		 0 <= y and y < static_cast<int32_t>(mousein->_h))
 		rcv = mousein;
 	else
-		mousein = 0;
+		mousein = nullptr;
 
 	if (mousein != _g_mousein) {
 		if (_g_mousein)
@@ -1091,8 +1175,8 @@ void Panel::ui_mousemove
 		return;
 
 	Panel * p;
-	uint32_t w, h;
-	g_gr->get_picture_size(s_default_cursor, w, h);
+	uint16_t w = s_default_cursor->width();
+	uint16_t h = s_default_cursor->height();
 
 	g_gr->update_rectangle(x - xdiff, y - ydiff, w, h);
 	g_gr->update_rectangle(x, y, w, h);
@@ -1116,39 +1200,28 @@ void Panel::ui_key(bool const down, SDL_keysym const code)
 }
 
 /**
- * Set the tooltip for the panel.
+ * Draw the tooltip. Return true on success
  */
-void Panel::set_tooltip(const char * const text) {
-	assert(not text or *text);
-	if (_tooltip != text) {
-		free(_tooltip);
-		_tooltip = text ? strdup(text) : 0;
-	}
-}
-
-/**
- * Draw the tooltip.
- */
-void Panel::draw_tooltip(RenderTarget & dst, const std::string & text)
+bool Panel::draw_tooltip(RenderTarget & dst, const std::string & text)
 {
-	static const uint32_t TIP_WIDTH_MAX = 360;
-	static TextStyle tooltip_style;
-	if (!tooltip_style.font) {
-		tooltip_style.font = Font::get(UI_FONT_TOOLTIP);
-		tooltip_style.fg = UI_FONT_TOOLTIP_CLR;
-		tooltip_style.bold = true;
+	if (text.empty())
+		return false;
+
+	std::string text_to_render = text;
+	if (!is_richtext(text_to_render)) {
+		text_to_render = as_tooltip(text);
 	}
 
-	WordWrap ww(tooltip_style, TIP_WIDTH_MAX);
+	static const uint32_t TIP_WIDTH_MAX = 360;
+	const Image* rendered_text = g_fh1->render(text_to_render, TIP_WIDTH_MAX);
+	if (!rendered_text)
+		return false;
 
-	ww.wrap(text);
+	uint16_t tip_width = rendered_text->width() + 4;
+	uint16_t tip_height = rendered_text->height() + 4;
 
-	uint32_t tip_width = ww.width() + 4;
-	uint32_t tip_height = ww.height() + 4;
-
-	const WLApplication & wlapplication = *WLApplication::get();
 	Rect r
-		(wlapplication.get_mouse_position() + Point(2, 32),
+		(WLApplication::get()->get_mouse_position() + Point(2, 32),
 		 tip_width, tip_height);
 	const Point tooltip_bottom_right = r.bottom_right();
 	const Point screen_bottom_right(g_gr->get_xres(), g_gr->get_yres());
@@ -1159,8 +1232,8 @@ void Panel::draw_tooltip(RenderTarget & dst, const std::string & text)
 
 	dst.fill_rect(r, RGBColor(63, 52, 34));
 	dst.draw_rect(r, RGBColor(0, 0, 0));
-
-	ww.draw(dst, r + Point(2, 2));
+	dst.blit(r + Point(2, 2), rendered_text);
+	return true;
 }
 
 std::string Panel::ui_fn() {

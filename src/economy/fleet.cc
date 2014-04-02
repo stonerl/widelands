@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011 by the Widelands Development Team
+ * Copyright (C) 2011-2013 by the Widelands Development Team
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -17,12 +17,13 @@
  *
  */
 
-#include "fleet.h"
+#include "economy/fleet.h"
 
 #include "container_iterate.h"
-#include "economy.h"
-#include "flag.h"
-#include "portdock.h"
+#include "economy/economy.h"
+#include "economy/flag.h"
+#include "economy/portdock.h"
+#include "economy/routing_node.h"
 #include "logic/game.h"
 #include "logic/mapastar.h"
 #include "logic/path.h"
@@ -31,7 +32,6 @@
 #include "logic/warehouse.h"
 #include "map_io/widelands_map_map_object_loader.h"
 #include "map_io/widelands_map_map_object_saver.h"
-#include "routing_node.h"
 #include "upcast.h"
 
 namespace Widelands {
@@ -48,17 +48,16 @@ Map_Object_Descr fleet_descr("fleet", "Fleet");
 Fleet::Fleet(Player & player) :
 	Map_Object(&fleet_descr),
 	m_owner(player),
-	m_act_pending(false),
-	m_port_roundrobin(0)
+	m_act_pending(false)
 {
 }
 
-int32_t Fleet::get_type() const throw ()
+int32_t Fleet::get_type() const
 {
 	return FLEET;
 }
 
-char const * Fleet::type_name() const throw ()
+char const * Fleet::type_name() const
 {
 	return "fleet";
 }
@@ -68,7 +67,7 @@ char const * Fleet::type_name() const throw ()
  */
 bool Fleet::active() const
 {
-	return !m_ships.empty() && m_ports.size() >= 2;
+	return !m_ships.empty() && !m_ports.empty();
 }
 
 /**
@@ -82,9 +81,9 @@ void Fleet::set_economy(Economy * e)
 		if (!m_ports.empty()) {
 			e = m_ports[0]->get_economy();
 		}
-#ifdef DEBUG
+#ifndef NDEBUG
 		else
-			assert(e == 0);
+			assert(e == nullptr);
 #endif
 
 		if (upcast(Game, game, &owner().egbase())) {
@@ -116,8 +115,8 @@ void Fleet::init(Editor_Game_Base & egbase)
 }
 
 struct StepEvalFindFleet {
-	int32_t estimate(Map & map, FCoords pos) const {return 0;}
-	int32_t stepcost(Map & map, FCoords from, int32_t fromcost, WalkingDir dir, FCoords to) const {
+	int32_t estimate(Map & /* map */, FCoords /* pos */) const {return 0;}
+	int32_t stepcost(Map & /* map */, FCoords from, int32_t fromcost, WalkingDir /* dir */, FCoords to) const {
 		if (!(to.field->nodecaps() & (MOVECAPS_SWIM | MOVECAPS_WALK)))
 			return -1;
 
@@ -169,12 +168,16 @@ void Fleet::find_other_fleet(Editor_Game_Base & egbase)
 			}
 		}
 
-		for (Bob * bob = cur.field->get_first_bob(); bob != 0; bob = bob->get_next_bob()) {
+		for (Bob * bob = cur.field->get_first_bob(); bob != nullptr; bob = bob->get_next_bob()) {
 			if (bob->get_bob_type() != Bob::SHIP)
 				continue;
 
 			if (upcast(Ship, ship, bob)) {
-				if (ship->get_fleet() != this && ship->get_owner() == get_owner()) {
+				if
+					(ship->get_fleet() != nullptr &&
+					 ship->get_fleet() != this &&
+					 ship->get_owner() == get_owner())
+				{
 					ship->get_fleet()->merge(egbase, this);
 					return;
 				}
@@ -241,13 +244,21 @@ void Fleet::check_merge_economy()
 void Fleet::cleanup(Editor_Game_Base & egbase)
 {
 	while (!m_ports.empty()) {
-		m_ports.back()->set_fleet(0);
+		PortDock * pd = m_ports.back();
 		m_ports.pop_back();
+
+		pd->set_fleet(nullptr);
+		if (!m_ports.empty() && !m_ships.empty()) {
+			// This is required when, during end-of-game cleanup,
+			// the fleet gets removed before the ports
+			Flag & base = m_ports[0]->base_flag();
+			Economy::check_split(base, pd->base_flag());
+		}
 	}
 	m_portpaths.clear();
 
 	while (!m_ships.empty()) {
-		m_ships.back()->set_fleet(0);
+		m_ships.back()->set_fleet(nullptr);
 		m_ships.pop_back();
 	}
 
@@ -347,7 +358,7 @@ void Fleet::add_ship(Ship * ship)
 	ship->set_fleet(this);
 	if (upcast(Game, game, &owner().egbase())) {
 		if (m_ports.empty())
-			ship->set_economy(*game, 0);
+			ship->set_economy(*game, nullptr);
 		else
 			ship->set_economy(*game, m_ports[0]->get_economy());
 	}
@@ -364,12 +375,13 @@ void Fleet::remove_ship(Editor_Game_Base & egbase, Ship * ship)
 		*it = m_ships.back();
 		m_ships.pop_back();
 	}
-	ship->set_fleet(0);
+	ship->set_fleet(nullptr);
 	if (upcast(Game, game, &egbase))
-		ship->set_economy(*game, 0);
+		ship->set_economy(*game, nullptr);
 
-	if (ship->get_destination(egbase))
+	if (ship->get_destination(egbase)) {
 		update(egbase);
+	}
 
 	if (m_ships.empty()) {
 		if (m_ports.empty()) {
@@ -380,7 +392,7 @@ void Fleet::remove_ship(Editor_Game_Base & egbase, Ship * ship)
 				// since two ports can be connected by land, it is possible that
 				// disconnecting a previous port also disconnects later ports
 				if (base.get_economy() == m_ports[i]->base_flag().get_economy())
-					base.get_economy()->check_split(base, m_ports[i]->base_flag());
+					Economy::check_split(base, m_ports[i]->base_flag());
 			}
 		}
 	}
@@ -402,7 +414,7 @@ struct StepEvalFindPorts {
 		return std::max(0, est - 5 * map.calc_cost(0));
 	}
 
-	int32_t stepcost(Map & map, FCoords from, int32_t fromcost, WalkingDir dir, FCoords to) const
+	int32_t stepcost(Map & map, FCoords from, int32_t /* fromcost */, WalkingDir dir, FCoords to) const
 	{
 		if (!(to.field->nodecaps() & MOVECAPS_SWIM))
 			return -1;
@@ -493,7 +505,7 @@ void Fleet::connect_port(Editor_Game_Base & egbase, uint32_t idx)
 	}
 }
 
-void Fleet::add_port(Editor_Game_Base & egbase, PortDock * port)
+void Fleet::add_port(Editor_Game_Base & /* egbase */, PortDock * port)
 {
 	m_ports.push_back(port);
 	port->set_fleet(this);
@@ -525,14 +537,14 @@ void Fleet::remove_port(Editor_Game_Base & egbase, PortDock * port)
 		*it = m_ports.back();
 		m_ports.pop_back();
 	}
-	port->set_fleet(0);
+	port->set_fleet(nullptr);
 
 	if (m_ports.empty()) {
-		set_economy(0);
+		set_economy(nullptr);
 	} else {
 		set_economy(m_ports[0]->get_economy());
 		if (!m_ships.empty())
-			m_ports[0]->get_economy()->check_split(m_ports[0]->base_flag(), port->base_flag());
+			Economy::check_split(m_ports[0]->base_flag(), port->base_flag());
 	}
 
 	if (m_ships.empty() && m_ports.empty())
@@ -551,7 +563,7 @@ PortDock * Fleet::get_dock(Flag & flag) const
 			return *portit.current;
 	}
 
-	return 0;
+	return nullptr;
 }
 
 /**
@@ -560,7 +572,7 @@ PortDock * Fleet::get_dock(Flag & flag) const
 PortDock * Fleet::get_arbitrary_dock() const
 {
 	if (m_ports.empty())
-		return 0;
+		return nullptr;
 	return m_ports[0];
 }
 
@@ -584,12 +596,16 @@ void Fleet::update(Editor_Game_Base & egbase)
  *
  * @note Do not call this directly; instead, trigger it via @ref update
  */
-void Fleet::act(Game & game, uint32_t data)
+void Fleet::act(Game & game, uint32_t /* data */)
 {
 	m_act_pending = false;
-
-	if (!active())
+	if (!active()) {
+		// If we are here, most likely act() was called by a port with waiting wares or an expedition ready
+		// although there are still no ships. We can't handle it now, so we reschedule the act()
+		schedule_act(game, 5000); // retry in the next time
+		m_act_pending = true;
 		return;
+	}
 
 	molog("Fleet::act\n");
 
@@ -597,23 +613,26 @@ void Fleet::act(Game & game, uint32_t data)
 		Ship & ship = **shipit.current;
 		if (ship.get_nritems() > 0 && !ship.get_destination(game)) {
 			molog("Ship %u has items\n", ship.serial());
+			bool found_dst = false;
 			container_iterate(std::vector<ShippingItem>, ship.m_items, it) {
 				PortDock * dst = it->get_destination(game);
 				if (dst) {
 					molog("... sending to portdock %u\n", dst->serial());
 					ship.set_destination(game, *dst);
+					found_dst = true;
 					break;
 				}
+			}
+			// If we end here, we just send the ship to the first port - maybe the old port got destroyed
+			if (!found_dst) {
+				assert(!m_ports.empty());
+				ship.set_destination(game, *m_ports[0]);
 			}
 		}
 	}
 
-	if (m_port_roundrobin >= m_ports.size())
-		m_port_roundrobin = 0;
-
-	uint32_t rr = m_port_roundrobin;
-	do {
-		PortDock & pd = *m_ports[rr];
+	for (uint32_t i = 0; i < m_ports.size(); ++i) {
+		PortDock & pd = *m_ports[i];
 
 		if (pd.get_need_ship()) {
 			molog("Port %u needs ship\n", pd.serial());
@@ -621,7 +640,12 @@ void Fleet::act(Game & game, uint32_t data)
 			bool success = false;
 			container_iterate_const(std::vector<Ship *>, m_ships, shipit) {
 				Ship & ship = **shipit.current;
+				// Check whether ship is in TRANSPORT state
+				if (ship.get_ship_state() != Ship::TRANSPORT)
+					continue;
+
 				PortDock * dst = ship.get_destination(game);
+				// Check if ship has currently a different destination
 				if (dst && dst != &pd)
 					continue;
 				if (ship.get_nritems() >= ship.get_capacity())
@@ -636,23 +660,24 @@ void Fleet::act(Game & game, uint32_t data)
 				break;
 			}
 
-			if (!success)
+			if (!success) {
+				schedule_act(game, 5000); // retry in the next time
+				m_act_pending = true;
 				break;
+			}
 		}
-
-		if (++rr >= m_ports.size())
-			rr = 0;
-	} while (rr != m_port_roundrobin);
+	}
 }
 
-void Fleet::log_general_info(Editor_Game_Base const & egbase)
+void Fleet::log_general_info(const Editor_Game_Base & egbase)
 {
 	Map_Object::log_general_info(egbase);
 
-	molog("%zu ships and %zu ports\n", m_ships.size(), m_ports.size());
+	molog
+		("%" PRIuS " ships and %" PRIuS " ports\n",  m_ships.size(), m_ports.size());
 }
 
-#define FLEET_SAVEGAME_VERSION 3
+#define FLEET_SAVEGAME_VERSION 4
 
 Fleet::Loader::Loader()
 {
@@ -678,7 +703,8 @@ void Fleet::Loader::load(FileRead & fr, uint8_t version)
 		fleet.m_act_pending = fr.Unsigned8();
 		if (version < 3)
 			fleet.m_act_pending = false;
-		fleet.m_port_roundrobin = fr.Unsigned32();
+		if (version < 4)
+			fr.Unsigned32(); // m_roundrobin
 	}
 }
 
@@ -723,11 +749,10 @@ void Fleet::Loader::load_finish()
 Map_Object::Loader * Fleet::load
 		(Editor_Game_Base & egbase, Map_Map_Object_Loader & mol, FileRead & fr)
 {
-	std::auto_ptr<Loader> loader(new Loader);
+	std::unique_ptr<Loader> loader(new Loader);
 
 	try {
 		// The header has been peeled away by the caller
-
 		uint8_t const version = fr.Unsigned8();
 		if (1 <= version && version <= FLEET_SAVEGAME_VERSION) {
 			Player_Number owner_number = fr.Unsigned8();
@@ -743,9 +768,9 @@ Map_Object::Loader * Fleet::load
 			loader->init(egbase, mol, *(new Fleet(*owner)));
 			loader->load(fr, version);
 		} else
-			throw game_data_error(_("unknown/unhandled version %u"), version);
+			throw game_data_error("unknown/unhandled version %u", version);
 	} catch (const std::exception & e) {
-		throw wexception(_("loading portdock: %s"), e.what());
+		throw wexception("loading portdock: %s", e.what());
 	}
 
 	return loader.release();
@@ -770,7 +795,6 @@ void Fleet::save(Editor_Game_Base & egbase, Map_Map_Object_Saver & mos, FileWrit
 	}
 
 	fw.Unsigned8(m_act_pending);
-	fw.Unsigned32(m_port_roundrobin);
 }
 
 } // namespace Widelands

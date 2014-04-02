@@ -17,12 +17,12 @@
  *
  */
 
-#include "maptriangleregion.h"
+#include "logic/maptriangleregion.h"
 
 namespace Widelands {
 
 template <> MapTriangleRegion<>::MapTriangleRegion
-	(Map const & map, Area<TCoords<> > area)
+	(const Map & map, Area<TCoords<> > area)
 : m_radius_is_odd(area.radius & 1)
 {
 	assert(area.t == TCoords<>::R or area.t == TCoords<>::D);
@@ -73,7 +73,7 @@ template <> MapTriangleRegion<>::MapTriangleRegion
 }
 
 
-template <> bool MapTriangleRegion<>::advance(const Map & map) throw () {
+template <> bool MapTriangleRegion<>::advance(const Map & map) {
 	assert(m_remaining_in_row < 10000); //  Catch wrapping (integer underflow)
 	if (m_remaining_in_row == 0)
 		return false;
@@ -140,6 +140,7 @@ template <> bool MapTriangleRegion<>::advance(const Map & map) throw () {
 		break;
 	default:
 		assert(false);
+		break;
 	}
 	assert(m_remaining_in_row < 10000); //  Catch wrapping (integer underflow)
 	return true;
@@ -147,7 +148,7 @@ template <> bool MapTriangleRegion<>::advance(const Map & map) throw () {
 
 
 template <> MapTriangleRegion<TCoords<FCoords> >::MapTriangleRegion
-	(Map const & map, Area<TCoords<FCoords> > area)
+	(const Map & map, Area<TCoords<FCoords> > area)
 : m_radius_is_odd(area.radius & 1)
 {
 	assert(area.t == TCoords<FCoords>::R or area.t == TCoords<FCoords>::D);
@@ -199,7 +200,7 @@ template <> MapTriangleRegion<TCoords<FCoords> >::MapTriangleRegion
 
 /// Traverse the region by row.
 template <>
-bool MapTriangleRegion<TCoords<FCoords> >::advance(const Map & map) throw ()
+bool MapTriangleRegion<TCoords<FCoords> >::advance(const Map & map)
 {
 	assert(m_remaining_in_row < 10000); //  Catch wrapping (integer underflow)
 	if (m_remaining_in_row == 0)
@@ -270,6 +271,7 @@ bool MapTriangleRegion<TCoords<FCoords> >::advance(const Map & map) throw ()
 		break;
 	default:
 		assert(false);
+		break;
 	}
 	assert(m_remaining_in_row < 10000); //  Catch wrapping (integer underflow)
 	return true;

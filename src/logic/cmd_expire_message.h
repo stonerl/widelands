@@ -20,8 +20,8 @@
 #ifndef CMD_EXPIRE_MESSAGE_H
 #define CMD_EXPIRE_MESSAGE_H
 
-#include "cmd_queue.h"
-#include "message_queue.h"
+#include "logic/cmd_queue.h"
+#include "logic/message_queue.h"
 
 namespace Widelands {
 
@@ -39,8 +39,8 @@ struct Cmd_ExpireMessage : public Command {
 		: Command(t), player(p), message(m)
 	{}
 
-	void execute (Game & game);
-	virtual uint8_t id() const {return QUEUE_CMD_EXPIREMESSAGE;}
+	void execute (Game & game) override;
+	virtual uint8_t id() const override {return QUEUE_CMD_EXPIREMESSAGE;}
 
 private:
 	Player_Number player;

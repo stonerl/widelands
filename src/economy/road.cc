@@ -17,20 +17,17 @@
  *
  */
 
-#include "road.h"
+#include "economy/road.h"
 
-// Package includes
-#include "economy.h"
-#include "flag.h"
-
+#include "economy/economy.h"
+#include "economy/flag.h"
+#include "economy/request.h"
 #include "logic/carrier.h"
-#include "logic/instances.h"
-#include "logic/player.h"
-#include "request.h"
 #include "logic/editor_game_base.h"
 #include "logic/game.h"
+#include "logic/instances.h"
+#include "logic/player.h"
 #include "logic/tribe.h"
-
 #include "upcast.h"
 
 namespace Widelands {
@@ -50,9 +47,10 @@ Road::Road() :
 	PlayerImmovable  (g_road_descr),
 	m_busyness            (0),
 	m_busyness_last_update(0),
-	m_type           (0)
+	m_type           (0),
+	m_idle_index(0)
 {
-	m_flags[0] = m_flags[1] = 0;
+	m_flags[0] = m_flags[1] = nullptr;
 	m_flagidx[0] = m_flagidx[1] = -1;
 
 	/*
@@ -67,8 +65,8 @@ Road::Road() :
 }
 
 Road::CarrierSlot::CarrierSlot() :
-	carrier (0),
-	carrier_request(0),
+	carrier (nullptr),
+	carrier_request(nullptr),
 	carrier_type(0)
 	{}
 
@@ -87,7 +85,7 @@ Road::~Road()
 */
 Road & Road::create
 	(Editor_Game_Base & egbase,
-	 Flag & start, Flag & end, Path const & path)
+	 Flag & start, Flag & end, const Path & path)
 {
 	assert(start.get_position() == path.get_start());
 	assert(end  .get_position() == path.get_end  ());
@@ -107,23 +105,23 @@ Road & Road::create
 	return road;
 }
 
-int32_t Road::get_type() const throw ()
+int32_t Road::get_type() const
 {
 	return ROAD;
 }
 
-int32_t Road::get_size() const throw ()
+int32_t Road::get_size() const
 {
 	return SMALL;
 }
 
-bool Road::get_passable() const throw ()
+bool Road::get_passable() const
 {
 	return true;
 }
 
 BaseImmovable::PositionList Road::get_positions
-	(const Editor_Game_Base & egbase) const throw ()
+	(const Editor_Game_Base & egbase) const
 {
 	Map & map = egbase.map();
 	Coords curf = map.get_fcoords(m_path.get_start());
@@ -142,7 +140,7 @@ BaseImmovable::PositionList Road::get_positions
 }
 
 static std::string const road_name = "road";
-std::string const & Road::name() const throw () {return road_name;}
+const std::string & Road::name() const {return road_name;}
 
 
 Flag & Road::base_flag()
@@ -162,7 +160,7 @@ int32_t Road::get_cost(FlagId fromflag)
  * Set the new path, calculate costs.
  * You have to set start and end flags before calling this function.
 */
-void Road::_set_path(Editor_Game_Base & egbase, Path const & path)
+void Road::_set_path(Editor_Game_Base & egbase, const Path & path)
 {
 	assert(path.get_nsteps() >= 2);
 	assert(path.get_start() == m_flags[FlagStart]->get_position());
@@ -291,7 +289,7 @@ void Road::_link_into_flags(Editor_Game_Base & egbase) {
 	 * request a new carrier
 	 */
 	if (upcast(Game, game, &egbase))
-	container_iterate(SlotVector, m_carrier_slots, i)
+	container_iterate(SlotVector, m_carrier_slots, i) {
 		if (Carrier * const carrier = i.current->carrier.get(*game)) {
 			//  This happens after a road split. Tell the carrier what's going on.
 			carrier->set_location    (this);
@@ -301,6 +299,7 @@ void Road::_link_into_flags(Editor_Game_Base & egbase) {
 			 (i.current->carrier_type == 1 or
 			  m_type == Road_Busy))
 			_request_carrier(*i.current);
+	}
 }
 
 /**
@@ -311,10 +310,10 @@ void Road::cleanup(Editor_Game_Base & egbase)
 
 	container_iterate(SlotVector, m_carrier_slots, i) {
 		delete i.current->carrier_request;
-		i.current->carrier_request = 0;
+		i.current->carrier_request = nullptr;
 
 		// carrier will be released via PlayerImmovable::cleanup
-		i.current->carrier = 0;
+		i.current->carrier = nullptr;
 	}
 
 	// Unmark Fields
@@ -327,8 +326,8 @@ void Road::cleanup(Editor_Game_Base & egbase)
 	Economy::check_split(*m_flags[FlagStart], *m_flags[FlagEnd]);
 
 	if (upcast(Game, game, &egbase)) {
-		m_flags[FlagStart]->update_items(*game, m_flags[FlagEnd]);
-		m_flags[FlagEnd]->update_items(*game, m_flags[FlagStart]);
+		m_flags[FlagStart]->update_wares(*game, m_flags[FlagEnd]);
+		m_flags[FlagEnd]->update_wares(*game, m_flags[FlagStart]);
 	}
 
 	PlayerImmovable::cleanup(egbase);
@@ -388,7 +387,7 @@ void Road::_request_carrier_callback
 	container_iterate(SlotVector, road.m_carrier_slots, i)
 		if (i.current->carrier_request == &rq) {
 			Carrier & carrier = ref_cast<Carrier, Worker> (*w);
-			i.current->carrier_request = 0;
+			i.current->carrier_request = nullptr;
 			i.current->carrier = &carrier;
 
 			carrier.start_task_road(game);
@@ -418,8 +417,8 @@ void Road::remove_worker(Worker & w)
 		Carrier const * carrier = i.current->carrier.get(egbase);
 
 		if (carrier == &w) {
-			i.current->carrier = 0;
-			carrier            = 0;
+			i.current->carrier = nullptr;
+			carrier            = nullptr;
 			_request_carrier(*i.current);
 		}
 	}
@@ -439,12 +438,12 @@ void Road::assign_carrier(Carrier & c, uint8_t slot)
 	CarrierSlot & s = m_carrier_slots[slot];
 
 	delete s.carrier_request;
-	s.carrier_request = 0;
+	s.carrier_request = nullptr;
 	if (Carrier * const current_carrier = s.carrier.get(owner().egbase()))
-		current_carrier->set_location(0);
+		current_carrier->set_location(nullptr);
 
 	m_carrier_slots[slot].carrier = &c;
-	m_carrier_slots[slot].carrier_request = 0;
+	m_carrier_slots[slot].carrier_request = nullptr;
 }
 
 
@@ -547,7 +546,7 @@ void Road::postsplit(Game & game, Flag & flag)
 				Carrier const * const carrier = j.current->carrier.get(game);
 
 				if (carrier == &w) {
-					j.current->carrier = 0;
+					j.current->carrier = nullptr;
 					container_iterate(SlotVector, newroad.m_carrier_slots, k)
 						if
 							(not k.current->carrier.get(game) and
@@ -584,13 +583,13 @@ void Road::postsplit(Game & game, Flag & flag)
 			  m_type == Road_Busy))
 			_request_carrier(*i.current);
 
-	//  Make sure items waiting on the original endpoint flags are dealt with.
-	m_flags[FlagStart]->update_items(game, &oldend);
-	oldend.update_items(game, m_flags[FlagStart]);
+	//  Make sure wares waiting on the original endpoint flags are dealt with.
+	m_flags[FlagStart]->update_wares(game, &oldend);
+	oldend.update_wares(game, m_flags[FlagStart]);
 }
 
 /**
- * Called by Flag code: an item should be picked up from the given flag.
+ * Called by Flag code: an ware should be picked up from the given flag.
  * \return true if a carrier has been sent on its way, false otherwise.
  */
 bool Road::notify_ware(Game & game, FlagId const flagid)
@@ -625,8 +624,8 @@ bool Road::notify_ware(Game & game, FlagId const flagid)
 								// the string "cancel" has been used to make clear
 								// the final goal we want to achieve
 								// ie: cancelling current task
-								m_carrier_slots[1].carrier = 0;
-								m_carrier_slots[1].carrier_request = 0;
+								m_carrier_slots[1].carrier = nullptr;
+								m_carrier_slots[1].carrier_request = nullptr;
 								m_type = Road_Normal;
 								_mark_map(game);
 							}
@@ -655,7 +654,7 @@ bool Road::notify_ware(Game & game, FlagId const flagid)
 	return false;
 }
 
-void Road::log_general_info(Editor_Game_Base const & egbase)
+void Road::log_general_info(const Editor_Game_Base & egbase)
 {
 	PlayerImmovable::log_general_info(egbase);
 	molog("m_busyness: %i\n", m_busyness);

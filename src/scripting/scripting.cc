@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2006-2010 by the Widelands Development Team
+ * Copyright (C) 2006-2010, 2013 by the Widelands Development Team
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -17,208 +17,149 @@
  *
  */
 
-#include <string>
+#include "scripting/scripting.h"
+
 #include <stdexcept>
+#include <string>
 
-#include "log.h"
-#include "io/filesystem/layered_filesystem.h"
-
-#include "c_utils.h"
-#include "coroutine_impl.h"
-#include "lua_bases.h"
-#include "lua_editor.h"
-#include "lua_game.h"
-#include "lua_globals.h"
-#include "lua_map.h"
-#include "lua_root.h"
-#include "lua_ui.h"
-#include "persistence.h"
-#include "factory.h"
-
-#include "scripting.h"
-
+#include <boost/algorithm/string/predicate.hpp>
 #ifdef _MSC_VER
 #include <ctype.h> // for tolower
 #endif
+#include <stdint.h>
 
-/*
-============================================
-       Lua Table
-============================================
-*/
-class LuaTable_Impl : virtual public LuaTable {
-	lua_State * m_L;
+#include "io/filesystem/layered_filesystem.h"
+#include "log.h"
+#include "scripting/c_utils.h"
+#include "scripting/factory.h"
+#include "scripting/lua_bases.h"
+#include "scripting/lua_coroutine.h"
+#include "scripting/lua_editor.h"
+#include "scripting/lua_game.h"
+#include "scripting/lua_globals.h"
+#include "scripting/lua_map.h"
+#include "scripting/lua_root.h"
+#include "scripting/lua_table.h"
+#include "scripting/lua_ui.h"
+#include "scripting/persistence.h"
 
-public:
-		LuaTable_Impl(lua_State * L) : m_L(L) {}
+namespace {
 
-		virtual ~LuaTable_Impl() {
-			lua_pop(m_L, 1);
-		}
+// Calls 'method_to_call' with argument 'name'. This expects that this will
+// return a table with registered functions in it. If 'register_globally' is
+// true, this will also do name = <table> globally.
+void open_lua_library
+	(lua_State* L, const std::string& name, lua_CFunction method_to_call, bool register_globally) {
+	lua_pushcfunction(L, method_to_call);  // S: function
+	lua_pushstring(L, name); // S: function name
+	lua_call(L, 1, 1); // S: module_table
 
-		virtual std::string get_string(std::string s) {
-			lua_getfield(m_L, -1, s.c_str());
-			if (lua_isnil(m_L, -1)) {
-				lua_pop(m_L, 1);
-				throw LuaTableKeyError(s);
-			}
-			if (not lua_isstring(m_L, -1)) {
-				lua_pop(m_L, 1);
-				throw LuaError(s + "is not a string value.");
-			}
-			std::string rv = lua_tostring(m_L, -1);
-			lua_pop(m_L, 1);
-
-			return rv;
-		}
-
-	virtual LuaCoroutine * get_coroutine(std::string s) {
-		lua_getfield(m_L, -1, s.c_str());
-
-		if (lua_isnil(m_L, -1)) {
-				lua_pop(m_L, 1);
-				throw LuaTableKeyError(s);
-		}
-		if (lua_isfunction(m_L, -1)) {
-			// Oh well, a function, not a coroutine. Let's turn it into one
-			lua_State * t = lua_newthread(m_L);
-			lua_pop(m_L, 1); // Immediately remove this thread again
-
-			lua_xmove(m_L, t, 1); // Move function to coroutine
-			lua_pushthread(t); // Now, move thread object back
-			lua_xmove(t, m_L, 1);
-		}
-
-		if (not lua_isthread(m_L, -1)) {
-			lua_pop(m_L, 1);
-			throw LuaError(s + "is not a function value.");
-		}
-		LuaCoroutine * cr = new LuaCoroutine_Impl(luaL_checkthread(m_L, -1));
-		lua_pop(m_L, 1); // Remove coroutine from stack
-		return cr;
+	if (register_globally) {
+		lua_setglobal(L, name.c_str()); // S:
+	} else {
+		lua_pop(L, 1); // S:
 	}
-};
-/*
-============================================
-       Lua Interface
-============================================
-*/
-struct LuaInterface_Impl : public virtual LuaInterface {
-	std::string m_last_error;
-	std::map<std::string, ScriptContainer> m_scripts;
+}
 
-protected:
-	lua_State * m_L;
-
-	/*
-	 * Private functions
-	 */
-	private:
-		int m_check_for_errors(int);
-		std::string m_register_script
-			(FileSystem & fs, std::string path, std::string ns);
-		bool m_filename_to_short(const std::string &);
-		bool m_is_lua_file(const std::string &);
-
-	public:
-		LuaInterface_Impl();
-		virtual ~LuaInterface_Impl();
-
-		virtual void interpret_string(std::string);
-		virtual std::string const & get_last_error() const {return m_last_error;}
-
-		virtual void register_scripts
-			(FileSystem &, std::string, std::string = "scripting");
-		virtual ScriptContainer & get_scripts_for(std::string ns) {
-			return m_scripts[ns];
-		}
-
-		virtual boost::shared_ptr<LuaTable> run_script(std::string, std::string);
-		virtual boost::shared_ptr<LuaTable> run_script
-			(FileSystem &, std::string, std::string);
-		virtual boost::shared_ptr<LuaTable> get_hook(std::string name);
-};
-
-
-/*************************
- * Private functions
- *************************/
-int LuaInterface_Impl::m_check_for_errors(int rv) {
+// Checks the return value of a function all for nonzero state and throws the
+// string that the function hopefully pushed as an Error. Returns 'rv' if there
+// is no error.
+int check_return_value_for_errors(lua_State* L, int rv) {
 	if (rv) {
-		std::string err = luaL_checkstring(m_L, -1);
-		lua_pop(m_L, 1);
+		const std::string err = luaL_checkstring(L, -1);
+		lua_pop(L, 1);
 		throw LuaError(err);
 	}
 	return rv;
 }
 
-std::string LuaInterface_Impl::m_register_script
-	(FileSystem & fs, std::string path, std::string ns)
-{
-		size_t length;
-		std::string data(static_cast<char *>(fs.Load(path, length)));
-		std::string name = path.substr(0, path.size() - 4); // strips '.lua'
+// Setup the basic Widelands functions and pushes egbase into the Lua registry
+// so that it is available for all the other Lua functions.
+void setup_for_editor_and_game(lua_State* L, Widelands::Editor_Game_Base * g) {
+	LuaBases::luaopen_wlbases(L);
+	LuaMap::luaopen_wlmap(L);
+	LuaUi::luaopen_wlui(L);
 
-		size_t pos = name.find_last_of("/\\");
-		if (pos != std::string::npos)  name = name.substr(pos + 1);
-
-		log("Registering script: (%s,%s)\n", ns.c_str(), name.c_str());
-		m_scripts[ns][name] = data;
-
-		return name;
+	// Push the editor game base
+	lua_pushlightuserdata(L, static_cast<void *>(g));
+	lua_setfield(L, LUA_REGISTRYINDEX, "egbase");
 }
 
-bool LuaInterface_Impl::m_filename_to_short(const std::string & s) {
-	return s.size() < 4;
-}
-bool LuaInterface_Impl::m_is_lua_file(const std::string & s) {
-	std::string ext = s.substr(s.size() - 4, s.size());
-	// std::transform fails on older system, therefore we use an explicit loop
-	for (uint32_t i = 0; i < ext.size(); i++) {
-#ifndef _MSC_VER
-		ext[i] = std::tolower(ext[i]);
-#else
-		ext[i] = tolower(ext[i]);
-#endif
+// Runs the 'content' as a lua script identified by 'identifier' in 'L'.
+std::unique_ptr<LuaTable>
+run_string_as_script(lua_State* L, const std::string& identifier, const std::string& content) {
+	// Get the current value of __file__
+	std::string last_file;
+	lua_getglobal(L, "__file__");
+	if (!lua_isnil(L, -1)) {
+		last_file = luaL_checkstring(L, -1);
 	}
-	return (ext == ".lua");
+	lua_pop(L, 1);
+
+	// Set __file__.
+	lua_pushstring(L, identifier);
+	lua_setglobal(L, "__file__");
+
+	check_return_value_for_errors(
+	   L,
+	   luaL_loadbuffer(L, content.c_str(), content.size(), identifier.c_str()) ||
+	      lua_pcall(L, 0, 1, 0));
+
+	if (lua_isnil(L, -1)) {
+		lua_pop(L, 1);    // No return value from script
+		lua_newtable(L);  // Push an empty table
+	}
+	if (not lua_istable(L, -1))
+		throw LuaError("Script did not return a table!");
+
+	// Restore old value of __file__.
+	if (last_file.empty()) {
+		lua_pushnil(L);
+	} else {
+		lua_pushstring(L, last_file);
+	}
+	lua_setglobal(L, "__file__");
+
+	return std::unique_ptr<LuaTable>(new LuaTable(L));
 }
 
-/*************************
- * Public functions
- *************************/
-LuaInterface_Impl::LuaInterface_Impl() : m_last_error("") {
-	m_L = lua_open();
+// Reads the 'filename' from the 'fs' and returns its content.
+std::string get_file_content(FileSystem* fs, const std::string& filename) {
+	if (!fs || !fs->FileExists(filename)) {
+		throw LuaScriptNotExistingError(filename);
+	}
+	size_t length;
+	void* input_data = fs->Load(filename, length);
+	const std::string data(static_cast<char*>(input_data));
+	// make sure the input_data is freed
+	free(input_data);
+	return data;
+}
+
+}  // namespace
+
+
+/*
+============================================
+       Lua Interface
+============================================
+*/
+LuaInterface::LuaInterface() {
+	m_L = luaL_newstate();
 
 	// Open the Lua libraries
-#ifdef DEBUG
-	static const luaL_Reg lualibs[] = {
-		{"", luaopen_base},
-		{LUA_LOADLIBNAME, luaopen_package},
-		{LUA_TABLIBNAME, luaopen_table},
-		{LUA_IOLIBNAME, luaopen_io},
-		{LUA_OSLIBNAME, luaopen_os},
-		{LUA_STRLIBNAME, luaopen_string},
-		{LUA_MATHLIBNAME, luaopen_math},
-		{LUA_DBLIBNAME, luaopen_debug},
-		{0,               0}
-	};
-#else
-	static const luaL_Reg lualibs[] = {
-		{"", luaopen_base},
-		{LUA_TABLIBNAME, luaopen_table},
-		{LUA_STRLIBNAME, luaopen_string},
-		{LUA_MATHLIBNAME, luaopen_math},
-		{LUA_DBLIBNAME, luaopen_debug}, // needed for testsuite
-		{0,               0}
-	};
+	open_lua_library(m_L, "", luaopen_base, false);
+	open_lua_library(m_L, LUA_TABLIBNAME, luaopen_table, true);
+	open_lua_library(m_L, LUA_STRLIBNAME, luaopen_string, true);
+	open_lua_library(m_L, LUA_MATHLIBNAME, luaopen_math, true);
+	open_lua_library(m_L, LUA_DBLIBNAME, luaopen_debug, true);
+	open_lua_library(m_L, LUA_COLIBNAME, luaopen_coroutine, true);
+
+#ifndef NDEBUG
+	open_lua_library(m_L, LUA_LOADLIBNAME, luaopen_package, true);
+	open_lua_library(m_L, LUA_IOLIBNAME, luaopen_io, true);
+	open_lua_library(m_L, LUA_OSLIBNAME, luaopen_os, true);
 #endif
-	const luaL_Reg * lib = lualibs;
-	for (; lib->func; lib++) {
-		lua_pushcfunction(m_L, lib->func);
-		lua_pushstring(m_L, lib->name);
-		lua_call(m_L, 1, 0);
-	}
 
 	// Push the instance of this class into the registry
 	// MSVC2008 requires that stored and retrieved types are
@@ -230,152 +171,71 @@ LuaInterface_Impl::LuaInterface_Impl() : m_last_error("") {
 	// Now our own
 	LuaGlobals::luaopen_globals(m_L);
 
-	register_scripts(*g_fs, "aux");
+	// Also push the "wl" table.
+	lua_newtable(m_L);
+	lua_setglobal(m_L, "wl");
 }
 
-LuaInterface_Impl::~LuaInterface_Impl() {
+LuaInterface::~LuaInterface() {
 	lua_close(m_L);
 }
 
-void LuaInterface_Impl::register_scripts
-	(FileSystem & fs, std::string ns, std::string subdir)
-{
-	filenameset_t scripting_files;
-
-	// Theoretically, we should be able to use fs.FindFiles(*.lua) here,
-	// but since FindFiles doesn't support Globbing in Zips and most
-	// saved maps/games are zip, we have to work around this issue.
-	fs.FindFiles(subdir, "*", &scripting_files);
-
-	for
-		(filenameset_t::iterator i = scripting_files.begin();
-		 i != scripting_files.end(); i++)
-	{
-		if (m_filename_to_short(*i) or not m_is_lua_file(*i))
-			continue;
-
-		m_register_script(fs, *i, ns);
-	}
-}
-
-void LuaInterface_Impl::interpret_string(std::string cmd) {
+void LuaInterface::interpret_string(const std::string& cmd) {
 	int rv = luaL_dostring(m_L, cmd.c_str());
-	m_check_for_errors(rv);
+	check_return_value_for_errors(m_L, rv);
 }
 
-boost::shared_ptr<LuaTable> LuaInterface_Impl::run_script
-	(FileSystem & fs, std::string path, std::string ns)
-{
-	bool delete_ns = false;
-	if (not m_scripts.count(ns))
-		delete_ns = true;
+std::unique_ptr<LuaTable> LuaInterface::run_script(const std::string& path) {
+	std::string content;
 
-	std::string name = m_register_script(fs, path, ns);
-
-	boost::shared_ptr<LuaTable> rv = run_script(ns, name);
-
-	if (delete_ns)
-		m_scripts.erase(ns);
-	else
-		m_scripts[ns].erase(name);
-
-	return rv;
-}
-
-boost::shared_ptr<LuaTable> LuaInterface_Impl::run_script
-	(std::string ns, std::string name)
-{
-	if
-		((m_scripts.find(ns) == m_scripts.end()) ||
-		 (m_scripts[ns].find(name) == m_scripts[ns].end()))
-		throw LuaScriptNotExistingError(ns, name);
-
-	const std::string & s = m_scripts[ns][name];
-
-	m_check_for_errors
-		(luaL_loadbuffer(m_L, s.c_str(), s.size(), (ns + ":" + name).c_str()) ||
-		 lua_pcall(m_L, 0, 1, 0)
-	);
-
-	if (lua_isnil(m_L, -1)) {
-		lua_pop(m_L, 1); // No return value from script
-		lua_newtable(m_L); // Push an empty table
+	if (boost::starts_with(path, "map:")) {
+		content = get_file_content(get_egbase(m_L).map().filesystem(), path.substr(4));
+	} else {
+		content = get_file_content(g_fs, path);
 	}
-	if (not lua_istable(m_L, -1))
-		throw LuaError("Script did not return a table!");
-	return boost::shared_ptr<LuaTable>(new LuaTable_Impl(m_L));
+
+	return run_string_as_script(m_L, path, content);
 }
 
 /*
  * Returns a given hook if one is defined, otherwise returns 0
  */
-boost::shared_ptr<LuaTable> LuaInterface_Impl::get_hook(std::string name) {
+std::unique_ptr<LuaTable> LuaInterface::get_hook(const std::string& name) {
 	lua_getglobal(m_L, "hooks");
 	if (lua_isnil(m_L, -1)) {
 		lua_pop(m_L, 1);
-		return boost::shared_ptr<LuaTable>();
+		return std::unique_ptr<LuaTable>();
 	}
 
 	lua_getfield(m_L, -1, name.c_str());
 	if (lua_isnil(m_L, -1)) {
 		lua_pop(m_L, 2);
-		return boost::shared_ptr<LuaTable>();
+		return std::unique_ptr<LuaTable>();
 	}
 	lua_remove(m_L, -2);
 
-	return boost::shared_ptr<LuaTable>(new LuaTable_Impl(m_L));
-}
-
-/*
- * ===========================
- * LuaEditorGameBaseInterface_Impl
- * ===========================
- */
-struct LuaEditorGameBaseInterface_Impl : public LuaInterface_Impl
-{
-	LuaEditorGameBaseInterface_Impl(Widelands::Editor_Game_Base * g);
-	virtual ~LuaEditorGameBaseInterface_Impl() {}
-};
-
-LuaEditorGameBaseInterface_Impl::LuaEditorGameBaseInterface_Impl
-	(Widelands::Editor_Game_Base * g) :
-LuaInterface()
-{
-	LuaBases::luaopen_wlbases(m_L);
-	LuaMap::luaopen_wlmap(m_L);
-	LuaUi::luaopen_wlui(m_L);
-
-	// Push the editor game base
-	lua_pushlightuserdata(m_L, static_cast<void *>(g));
-	lua_setfield(m_L, LUA_REGISTRYINDEX, "egbase");
+	return std::unique_ptr<LuaTable>(new LuaTable(m_L));
 }
 
 
 /*
  * ===========================
- * LuaEditorInterface_Impl
+ * LuaEditorInterface
  * ===========================
  */
-struct LuaEditorInterface_Impl : public LuaEditorGameBaseInterface_Impl
+LuaEditorInterface::LuaEditorInterface(Widelands::Editor_Game_Base* g)
+	: m_factory(new EditorFactory())
 {
-	LuaEditorInterface_Impl(Widelands::Editor_Game_Base * g);
-	virtual ~LuaEditorInterface_Impl() {}
-
-private:
-	EditorFactory m_factory;
-};
-
-LuaEditorInterface_Impl::LuaEditorInterface_Impl
-	(Widelands::Editor_Game_Base * g) :
-LuaEditorGameBaseInterface_Impl(g)
-{
+	setup_for_editor_and_game(m_L, g);
 	LuaRoot::luaopen_wlroot(m_L, true);
 	LuaEditor::luaopen_wleditor(m_L);
 
 	// Push the factory class into the registry
-	lua_pushlightuserdata
-		(m_L, reinterpret_cast<void *>(dynamic_cast<Factory *>(&m_factory)));
+	lua_pushlightuserdata(m_L, reinterpret_cast<void*>(dynamic_cast<Factory*>(m_factory.get())));
 	lua_setfield(m_L, LUA_REGISTRYINDEX, "factory");
+}
+
+LuaEditorInterface::~LuaEditorInterface() {
 }
 
 
@@ -384,40 +244,16 @@ LuaEditorGameBaseInterface_Impl(g)
  * LuaGameInterface
  * ===========================
  */
-struct LuaGameInterface_Impl : public LuaEditorGameBaseInterface_Impl,
-	public virtual LuaGameInterface
-{
-	LuaGameInterface_Impl(Widelands::Game * g);
-	virtual ~LuaGameInterface_Impl() {}
 
-	virtual LuaCoroutine * read_coroutine
-		(Widelands::FileRead &, Widelands::Map_Map_Object_Loader &,
-		 uint32_t);
-	virtual uint32_t write_coroutine
-		(Widelands::FileWrite &, Widelands::Map_Map_Object_Saver &,
-		 LuaCoroutine *);
+// Special handling of math.random.
 
-	virtual void read_global_env
-		(Widelands::FileRead &, Widelands::Map_Map_Object_Loader &,
-		 uint32_t);
-	virtual uint32_t write_global_env
-		(Widelands::FileWrite &, Widelands::Map_Map_Object_Saver &);
+// We inject this function to make sure that Lua uses our random number
+// generator.  This guarantees that the game stays in sync over the network and
+// in replays. Obviously, we only do this for LuaGameInterface, not for
+// the others.
 
-private:
-	GameFactory m_factory;
-};
-
-/*
- * Special handling of math.random.
- *
- * We inject this function to make sure that Lua uses our random number
- * generator.  This guarantees that the game stays in sync over the network and
- * in replays. Obviously, we only do this for LuaGameInterface, not for
- * the others.
- *
- * The function was designed to simulate the standard math.random function and
- * was therefore copied nearly verbatim from the Lua sources.
- */
+// The function was designed to simulate the standard math.random function and
+// was therefore copied nearly verbatim from the Lua sources.
 static int L_math_random(lua_State * L) {
 	Widelands::Game & game = get_game(L);
 	uint32_t t = game.logic_rand();
@@ -452,9 +288,11 @@ static int L_math_random(lua_State * L) {
 
 }
 
-LuaGameInterface_Impl::LuaGameInterface_Impl(Widelands::Game * g) :
-	LuaEditorGameBaseInterface_Impl(g)
+LuaGameInterface::LuaGameInterface(Widelands::Game * g)
+	: m_factory(new GameFactory())
 {
+	setup_for_editor_and_game(m_L, g);
+
 	// Overwrite math.random
 	lua_getglobal(m_L, "math");
 	lua_pushcfunction(m_L, L_math_random);
@@ -470,91 +308,83 @@ LuaGameInterface_Impl::LuaGameInterface_Impl(Widelands::Game * g) :
 
 	// Push the factory class into the registry
 	lua_pushlightuserdata
-		(m_L, reinterpret_cast<void *>(dynamic_cast<Factory *>(&m_factory)));
+		(m_L, reinterpret_cast<void *>(dynamic_cast<Factory *>(m_factory.get())));
 	lua_setfield(m_L, LUA_REGISTRYINDEX, "factory");
 }
 
-LuaCoroutine * LuaGameInterface_Impl::read_coroutine
+LuaGameInterface::~LuaGameInterface() {
+}
+
+LuaCoroutine * LuaGameInterface::read_coroutine
 	(Widelands::FileRead & fr, Widelands::Map_Map_Object_Loader & mol,
 	 uint32_t size)
 {
-	LuaCoroutine_Impl * rv = new LuaCoroutine_Impl(0);
-
+	LuaCoroutine * rv = new LuaCoroutine(nullptr);
 	rv->read(m_L, fr, mol, size);
 
 	return rv;
 }
 
-uint32_t LuaGameInterface_Impl::write_coroutine
-	(Widelands::FileWrite & fw, Widelands::Map_Map_Object_Saver & mos,
-	 LuaCoroutine * cr)
+uint32_t LuaGameInterface::write_coroutine
+	(Widelands::FileWrite & fw, Widelands::Map_Map_Object_Saver & mos, LuaCoroutine * cr)
 {
-	// we do not want to make the write function public by adding
-	// it to the interface of LuaCoroutine. Therefore, we make a cast
-	// to the Implementation function here.
-	return dynamic_cast<LuaCoroutine_Impl *>(cr)->write(m_L, fw, mos);
+	return cr->write(m_L, fw, mos);
 }
 
 
-void LuaGameInterface_Impl::read_global_env
+void LuaGameInterface::read_global_env
 	(Widelands::FileRead & fr, Widelands::Map_Map_Object_Loader & mol,
 	 uint32_t size)
 {
-	// Empty table + object to persist on the stack Stack
+	// Clean out the garbage before loading.
+	lua_gc(m_L, LUA_GCCOLLECT, 0);
+
+	assert(lua_gettop(m_L) == 0); // S:
 	unpersist_object(m_L, fr, mol, size);
+	assert(lua_gettop(m_L) == 1); // S: unpersisted_object
 	luaL_checktype(m_L, -1, LUA_TTABLE);
 
 	// Now, we have to merge all keys from the loaded table
 	// into the global table
-	lua_pushnil(m_L);
-	while (lua_next(m_L, -2) != 0) {
-		// key value
-		lua_pushvalue(m_L, -2); // key value key
-		lua_gettable(m_L, LUA_GLOBALSINDEX); // key value global_value
-		if (lua_equal(m_L, -1, -2)) {
-			lua_pop(m_L, 2); // key
+	lua_pushnil(m_L);  // S: table nil
+	while (lua_next(m_L, 1) != 0) {
+		// S: table key value
+		lua_rawgeti(m_L, LUA_REGISTRYINDEX, LUA_RIDX_GLOBALS);  // S: table key value globals_table
+		lua_pushvalue(m_L, -3); // S: table key value globals_table key
+		lua_gettable(m_L, -2);  // S: table key value globals_table value_in_globals
+		if (lua_compare(m_L, -1, -3, LUA_OPEQ)) {
+			lua_pop(m_L, 3); // S: table key
 			continue;
 		} else {
 			// Make this a global value
-			lua_pop(m_L, 1); // key value
-			lua_pushvalue(m_L, -2); // key value key
-			lua_pushvalue(m_L, -2); // key value key value
-			lua_settable(m_L, LUA_GLOBALSINDEX); // key value
-			lua_pop(m_L, 1); // key
+			lua_pop(m_L, 1);  // S: table key value globals_table
+			lua_pushvalue(m_L, -3);  // S: table key value globals_table key
+			lua_pushvalue(m_L, -3);  // S: table key value globals_table key value
+			lua_settable(m_L, -3);  // S: table key value globals_table
+			lua_pop(m_L, 2);  // S: table key
 		}
 	}
 
 	lua_pop(m_L, 1); // pop the table returned by unpersist_object
+
+	// Clean out the garbage before returning.
+	lua_gc(m_L, LUA_GCCOLLECT, 0);
 }
 
-uint32_t LuaGameInterface_Impl::write_global_env
+uint32_t LuaGameInterface::write_global_env
 	(Widelands::FileWrite & fw, Widelands::Map_Map_Object_Saver & mos)
 {
+	// Clean out the garbage before writing.
+	lua_gc(m_L, LUA_GCCOLLECT, 0);
+
 	// Empty table + object to persist on the stack Stack
 	lua_newtable(m_L);
-	lua_pushvalue(m_L, LUA_GLOBALSINDEX);
+	lua_rawgeti(m_L, LUA_REGISTRYINDEX, LUA_RIDX_GLOBALS);
 
-	return persist_object(m_L, fw, mos);
-}
+	uint32_t nwritten = persist_object(m_L, fw, mos);
 
-/*
-============================================
-       Global functions
-============================================
-*/
-/*
- * Factory Function, create Lua interfaces for the following use cases:
- *
- * "game": load all libraries needed for the game to run properly
- */
-LuaGameInterface * create_LuaGameInterface(Widelands::Game * g) {
-	return new LuaGameInterface_Impl(g);
-}
-LuaInterface * create_LuaEditorInterface(Widelands::Editor_Game_Base * g) {
-	return new LuaEditorInterface_Impl(g);
-}
-LuaInterface * create_LuaInterface() {
-	return new LuaInterface_Impl();
-}
+	// Garbage collect once more, so we do not return unnecessary stuff.
+	lua_gc(m_L, LUA_GCCOLLECT, 0);
 
-
+	return nwritten;
+}

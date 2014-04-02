@@ -6,10 +6,15 @@ enhancement=brewery
 build_material=false
 
 [buildcost]
-trunk=3
+log=3
 blackwood=2
 raw_stone=3
 thatchreed=2
+
+[return_on_dismantle]
+log=1
+blackwood=1
+raw_stone=2
 
 [working positions]
 brewer=1

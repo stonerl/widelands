@@ -20,27 +20,29 @@
 #ifndef WIDELANDS_MAP_MAP_OBJECT_LOADER_H
 #define WIDELANDS_MAP_MAP_OBJECT_LOADER_H
 
-#include "logic/game_data_error.h"
-#include "logic/instances.h"
-#include "logic/widelands.h"
-
-#include "upcast.h"
-
-#include <stdint.h>
 #include <map>
 #include <typeinfo>
 
+#include <stdint.h>
+
+#include "logic/game_data_error.h"
+#include "logic/instances.h"
+#include "logic/widelands.h"
+#include "upcast.h"
+
+
 namespace Widelands {
-struct Bob;
+class Bob;
 class Map_Object;
-struct Editor_Game_Base;
+class Editor_Game_Base;
 
 /*
  * This class helps to
  *   - keep track of map objects on the map (to be loaded)
  *   - translate file index pointers into Map_Objects
  */
-struct Map_Map_Object_Loader {
+class Map_Map_Object_Loader {
+public:
 	bool is_object_known(uint32_t);
 
 	/// Registers the object as a new one.

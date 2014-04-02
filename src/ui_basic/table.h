@@ -21,15 +21,16 @@
 #ifndef UI_TABLE_H
 #define UI_TABLE_H
 
-#include "align.h"
-#include "panel.h"
-
-#include "compile_assert.h"
-
 #include <limits>
 #include <vector>
+
 #include <boost/function.hpp>
-#include <boost/signal.hpp>
+#include <boost/signals2.hpp>
+
+#include "align.h"
+#include "ui_basic/panel.h"
+#include "rgbcolor.h"
+
 
 namespace UI {
 struct Scrollbar;
@@ -42,8 +43,8 @@ struct Button;
 ///   1. a reference type,
 ///   2. a pointer type or
 ///   3. uintptr_t.
-template<typename Entry> struct Table {
-
+template<typename Entry> class Table {
+public:
 	struct Entry_Record {
 	};
 
@@ -53,22 +54,23 @@ template<typename Entry> struct Table {
 		 bool descending = false);
 	~Table();
 
-	boost::signal<void (uint32_t)> selected;
-	boost::signal<void (uint32_t)> double_clicked;
+	boost::signals2::signal<void (uint32_t)> selected;
+	boost::signals2::signal<void (uint32_t)> double_clicked;
 
 	/// A column that has a title is sortable (by clicking on the title).
 	void add_column
 		(uint32_t width,
-		 std::string const & title = std::string(),
+		 const std::string & title = std::string(),
+		 const std::string & tooltip = std::string(),
 		 Align                                  = Align_Left,
 		 bool                is_checkbox_column = false);
 
-	void set_column_title(uint8_t col, std::string const & title);
+	void set_column_title(uint8_t col, const std::string & title);
 
 	void clear();
-	void set_sort_column(uint8_t col) throw ();
-	uint8_t get_sort_colum() const throw ();
-	bool get_sort_descending() const throw ();
+	void set_sort_column(uint8_t col);
+	uint8_t get_sort_colum() const;
+	bool get_sort_descending() const;
 
 	void sort
 		(uint32_t Begin = 0,
@@ -77,19 +79,19 @@ template<typename Entry> struct Table {
 
 	Entry_Record & add(void * const entry, const bool select_this = false);
 
-	uint32_t size() const throw ();
-	Entry operator[](uint32_t) const throw ();
-	static uint32_t no_selection_index() throw ();
-	bool has_selection() const throw ();
-	uint32_t selection_index() const throw ();
-	Entry_Record & get_record(uint32_t) const throw ();
+	uint32_t size() const;
+	Entry operator[](uint32_t) const;
+	static uint32_t no_selection_index();
+	bool has_selection() const;
+	uint32_t selection_index() const;
+	Entry_Record & get_record(uint32_t) const;
 	static Entry get(const Entry_Record &);
-	Entry_Record * find(Entry) const throw ();
+	Entry_Record * find(Entry) const;
 
 	void select(uint32_t);
 	void move_selection(int32_t offset);
 	struct No_Selection : public std::exception {
-		char const * what() const throw () {
+		char const * what() const throw () override {
 			return "UI::Table<Entry>: No selection";
 		}
 	};
@@ -97,9 +99,9 @@ template<typename Entry> struct Table {
 	Entry get_selected() const;
 
 	///  Return the total height (text + spacing) occupied by a single line.
-	uint32_t get_lineheight() const throw ();
+	uint32_t get_lineheight() const;
 
-	uint32_t get_eff_w     () const throw ();
+	uint32_t get_eff_w     () const;
 
 	// Drawing and event handling
 	void draw(RenderTarget &);
@@ -108,36 +110,36 @@ template<typename Entry> struct Table {
 	virtual bool handle_key(bool down, SDL_keysym code);
 };
 
-template <> struct Table<void *> : public Panel {
-
+template <> class Table<void *> : public Panel {
+public:
 	struct Entry_Record {
 		Entry_Record(void * entry);
 
 		void set_picture
-			(uint8_t col, PictureID picid, std::string const & = std::string());
-		void set_string(uint8_t col, std::string const &);
-		PictureID get_picture(uint8_t col) const;
-		std::string const & get_string(uint8_t col) const;
-		void * entry() const throw () {return m_entry;}
+			(uint8_t col, const Image* pic, const std::string & = std::string());
+		void set_string(uint8_t col, const std::string &);
+		const Image* get_picture(uint8_t col) const;
+		const std::string & get_string(uint8_t col) const;
+		void * entry() const {return m_entry;}
 		void set_color(const  RGBColor c) {
 			use_clr = true;
 			clr = c;
 		}
 
-		bool     use_color() const throw () {return use_clr;}
-		RGBColor get_color() const throw () {return clr;}
+		bool     use_color() const {return use_clr;}
+		RGBColor get_color() const {return clr;}
 
 		void set_checked(uint8_t col, bool checked);
 		void toggle     (uint8_t col);
 		bool  is_checked(uint8_t col) const;
 
 	private:
-		friend struct Table<void *>;
+		friend class Table<void *>;
 		void *   m_entry;
 		bool     use_clr;
 		RGBColor clr;
 		struct _data {
-			PictureID   d_picture;
+			const Image* d_picture;
 			std::string d_string;
 			bool d_checked;
 
@@ -159,16 +161,17 @@ template <> struct Table<void *> : public Panel {
 		 bool descending = false);
 	~Table();
 
-	boost::signal<void (uint32_t)> selected;
-	boost::signal<void (uint32_t)> double_clicked;
+	boost::signals2::signal<void (uint32_t)> selected;
+	boost::signals2::signal<void (uint32_t)> double_clicked;
 
 	void add_column
 		(uint32_t width,
-		 std::string const & title = std::string(),
+		 const std::string & title = std::string(),
+		 const std::string & tooltip = std::string(),
 		 Align                                  = Align_Left,
 		 bool                is_checkbox_column = false);
 
-	void set_column_title(uint8_t col, std::string const & title);
+	void set_column_title(uint8_t col, const std::string & title);
 	void set_column_compare(uint8_t col, const CompareFn & fn);
 
 	void clear();
@@ -176,12 +179,12 @@ template <> struct Table<void *> : public Panel {
 		assert(col < m_columns.size());
 		m_sort_column = col;
 	}
-	uint8_t get_sort_colum() const throw () {return m_sort_column;}
-	bool  get_sort_descending() const throw () {return m_sort_descending;}
+	uint8_t get_sort_colum() const {return m_sort_column;}
+	bool  get_sort_descending() const {return m_sort_descending;}
 	void set_sort_descending(bool const descending) {
 		m_sort_descending = descending;
 	}
-	void set_font(std::string const & fontname, int32_t const fontsize) {
+	void set_font(const std::string & fontname, int32_t const fontsize) {
 		m_fontname = fontname;
 		m_fontsize = fontsize;
 		m_headerheight = fontsize * 6 / 5;
@@ -192,9 +195,9 @@ template <> struct Table<void *> : public Panel {
 		 uint32_t End   = std::numeric_limits<uint32_t>::max());
 	void remove(uint32_t);
 
-	Entry_Record & add(void * entry = 0, bool select = false);
+	Entry_Record & add(void * entry = nullptr, bool select = false);
 
-	uint32_t size() const throw () {return m_entry_records.size();}
+	uint32_t size() const {return m_entry_records.size();}
 	void * operator[](uint32_t const i) const {
 		assert(i < m_entry_records.size());
 		return m_entry_records[i]->entry();
@@ -205,18 +208,18 @@ template <> struct Table<void *> : public Panel {
 	bool has_selection() const {
 		return m_selection != no_selection_index();
 	}
-	uint32_t selection_index() const throw () {return m_selection;}
+	uint32_t selection_index() const {return m_selection;}
 	Entry_Record & get_record(uint32_t const n) const {
 		assert(n < m_entry_records.size());
 		return *m_entry_records[n];
 	}
-	static void * get(Entry_Record const & er) {return er.entry();}
-	Entry_Record * find(const void * entry) const throw ();
+	static void * get(const Entry_Record & er) {return er.entry();}
+	Entry_Record * find(const void * entry) const;
 
 	void select(uint32_t);
 	void move_selection(int32_t offset);
 	struct No_Selection : public std::exception {
-		char const * what() const throw () {
+		char const * what() const throw () override {
 			return "UI::Table<void *>: No selection";
 		}
 	};
@@ -226,21 +229,21 @@ template <> struct Table<void *> : public Panel {
 		assert(m_selection < m_entry_records.size());
 		return *m_entry_records.at(m_selection);
 	}
-	void remove_selected() throw (No_Selection) {
+	void remove_selected() {
 		if (m_selection == no_selection_index())
 			throw No_Selection();
 		remove(m_selection);
 	}
 	void * get_selected() const {return get_selected_record().entry();};
 
-	uint32_t get_lineheight() const throw () {return m_lineheight + 2;}
-	uint32_t get_eff_w     () const throw () {return get_w();}
+	uint32_t get_lineheight() const {return m_lineheight + 2;}
+	uint32_t get_eff_w     () const {return get_w();}
 
 	// Drawing and event handling
-	void draw(RenderTarget &);
-	bool handle_mousepress  (Uint8 btn, int32_t x, int32_t y);
-	bool handle_mouserelease(Uint8 btn, int32_t x, int32_t y);
-	virtual bool handle_key(bool down, SDL_keysym code);
+	void draw(RenderTarget &) override;
+	bool handle_mousepress  (Uint8 btn, int32_t x, int32_t y) override;
+	bool handle_mouserelease(Uint8 btn, int32_t x, int32_t y) override;
+	virtual bool handle_key(bool down, SDL_keysym code) override;
 
 private:
 	bool default_compare_checkbox(uint32_t column, uint32_t a, uint32_t b);
@@ -261,7 +264,6 @@ private:
 
 	Columns            m_columns;
 	uint32_t           m_total_width;
-	uint32_t           m_max_pic_width;
 	std::string        m_fontname;
 	uint32_t           m_fontsize;
 	uint32_t           m_headerheight;
@@ -281,8 +283,10 @@ private:
 };
 
 template <typename Entry>
-	struct Table<const Entry * const> : public Table<void *>
+	class Table<const Entry * const> : public Table<void *>
 {
+public:
+
 	typedef Table<void *> Base;
 	Table
 		(Panel * parent,
@@ -297,7 +301,7 @@ template <typename Entry>
 		return Base::add(const_cast<Entry *>(entry), select_this);
 	}
 
-	Entry const * operator[](uint32_t const i) const throw () {
+	Entry const * operator[](uint32_t const i) const {
 		return static_cast<Entry const *>(Base::operator[](i));
 	}
 
@@ -310,7 +314,8 @@ template <typename Entry>
 	}
 };
 
-template <typename Entry> struct Table<Entry * const> : public Table<void *> {
+template <typename Entry> class Table<Entry * const> : public Table<void *> {
+public:
 	typedef Table<void *> Base;
 	Table
 		(Panel * parent,
@@ -328,7 +333,7 @@ template <typename Entry> struct Table<Entry * const> : public Table<void *> {
 		return static_cast<Entry *>(Base::operator[](i));
 	}
 
-	static Entry * get(Entry_Record const & er) {
+	static Entry * get(const Entry_Record & er) {
 		return static_cast<Entry *>(er.entry());
 	}
 
@@ -337,7 +342,8 @@ template <typename Entry> struct Table<Entry * const> : public Table<void *> {
 	}
 };
 
-template <typename Entry> struct Table<const Entry &> : public Table<void *> {
+template <typename Entry> class Table<const Entry &> : public Table<void *> {
+public:
 	typedef Table<void *> Base;
 	Table
 		(Panel * parent,
@@ -346,28 +352,29 @@ template <typename Entry> struct Table<const Entry &> : public Table<void *> {
 		: Base(parent, x, y, w, h, descending)
 	{}
 
-	Entry_Record & add(Entry const & entry, bool const select_this = false) {
+	Entry_Record & add(const Entry & entry, bool const select_this = false) {
 		return Base::add(&const_cast<Entry &>(entry), select_this);
 	}
 
-	Entry const & operator[](uint32_t const i) const {
+	const Entry & operator[](uint32_t const i) const {
 		return *static_cast<Entry const *>(Base::operator[](i));
 	}
 
-	static Entry const & get(Entry_Record const & er) {
+	static const Entry & get(const Entry_Record & er) {
 		return *static_cast<Entry const *>(er.entry());
 	}
 
-	Entry_Record * find(Entry const & entry) const {
+	Entry_Record * find(const Entry & entry) const {
 		return Base::find(&entry);
 	}
 
-	Entry const & get_selected() const {
+	const Entry & get_selected() const {
 		return *static_cast<Entry const *>(Base::get_selected());
 	}
 };
 
-template <typename Entry> struct Table<Entry &> : public Table<void *> {
+template <typename Entry> class Table<Entry &> : public Table<void *> {
+public:
 	typedef Table<void *> Base;
 	Table
 		(Panel * parent,
@@ -384,7 +391,7 @@ template <typename Entry> struct Table<Entry &> : public Table<void *> {
 		return *static_cast<Entry *>(Base::operator[](i));
 	}
 
-	static Entry & get(Entry_Record const & er) {
+	static Entry & get(const Entry_Record & er) {
 		return *static_cast<Entry *>(er.entry());
 	}
 
@@ -395,8 +402,9 @@ template <typename Entry> struct Table<Entry &> : public Table<void *> {
 	}
 };
 
-compile_assert(sizeof(void *) == sizeof(uintptr_t));
-template <> struct Table<uintptr_t> : public Table<void *> {
+static_assert(sizeof(void *) == sizeof(uintptr_t), "assert(sizeof(void *) == sizeof(uintptr_t)) failed.");
+template <> class Table<uintptr_t> : public Table<void *> {
+public:
 	typedef Table<void *> Base;
 	Table
 		(Panel * parent,
@@ -409,10 +417,10 @@ template <> struct Table<uintptr_t> : public Table<void *> {
 		return Base::add(reinterpret_cast<void *>(entry), select_this);
 	}
 
-	uintptr_t operator[](uint32_t const i) const throw () {
+	uintptr_t operator[](uint32_t const i) const {
 		return reinterpret_cast<uintptr_t>(Base::operator[](i));
 	}
-	static uintptr_t get(Entry_Record const & er) {
+	static uintptr_t get(const Entry_Record & er) {
 		return reinterpret_cast<uintptr_t>(er.entry());
 	}
 
@@ -424,7 +432,8 @@ template <> struct Table<uintptr_t> : public Table<void *> {
 		return reinterpret_cast<uintptr_t>(Base::get_selected());
 	}
 };
-template <> struct Table<uintptr_t const> : public Table<uintptr_t> {
+template <> class Table<uintptr_t const> : public Table<uintptr_t> {
+public:
 	typedef Table<uintptr_t> Base;
 	Table
 		(Panel * parent,

@@ -20,7 +20,7 @@
 #ifndef CRITTER_BOB_H
 #define CRITTER_BOB_H
 
-#include "bob.h"
+#include "logic/bob.h"
 #include "graphic/diranimations.h"
 
 namespace Widelands {
@@ -31,26 +31,26 @@ struct Critter_BobProgram;
 //
 // Description
 //
-struct Critter_Bob_Descr : public Bob::Descr {
+struct Critter_Bob_Descr : public BobDescr {
 	Critter_Bob_Descr
 		(char const * name, char const * descname,
-		 std::string const & directory, Profile &, Section & global_s,
+		 const std::string & directory, Profile &, Section & global_s,
 		 Tribe_Descr const *);
 	virtual ~Critter_Bob_Descr();
 
-	Bob & create_object() const;
+	Bob & create_object() const override;
 
-	bool is_swimming() const throw () {return m_swimming;}
-	uint32_t movecaps() const throw ();
-	const DirAnimations & get_walk_anims() const throw () {return m_walk_anims;}
+	bool is_swimming() const {return m_swimming;}
+	uint32_t movecaps() const override;
+	const DirAnimations & get_walk_anims() const {return m_walk_anims;}
 
-	Critter_BobProgram const * get_program(std::string const &) const;
+	Critter_BobProgram const * get_program(const std::string &) const;
 
 private:
 	DirAnimations m_walk_anims;
 	bool          m_swimming;
 	typedef std::map<std::string, Critter_BobProgram *> Programs;
-	Programs    m_programs;
+	Programs      m_programs;
 };
 
 class Critter_Bob : public Bob {
@@ -62,19 +62,19 @@ class Critter_Bob : public Bob {
 public:
 	Critter_Bob(const Critter_Bob_Descr &);
 
-	char const * type_name() const throw () {return "critter";}
-	virtual Bob::Type get_bob_type() const throw () {return Bob::CRITTER;}
+	char const * type_name() const override {return "critter";}
+	virtual Bob::Type get_bob_type() const override {return Bob::CRITTER;}
 
-	virtual void init_auto_task(Game &);
+	virtual void init_auto_task(Game &) override;
 
-	void start_task_program(Game &, std::string const & name);
-	const std::string & descname() const throw () {return descr().descname();}
+	void start_task_program(Game &, const std::string & name);
+	const std::string & descname() const {return descr().descname();}
 
 private:
 	void roam_update   (Game &, State &);
 	void program_update(Game &, State &);
 
-	bool run_remove(Game &, State &, Critter_BobAction const &);
+	bool run_remove(Game &, State &, const Critter_BobAction &);
 
 	static Task const taskRoam;
 	static Task const taskProgram;
@@ -84,12 +84,12 @@ protected:
 	struct Loader : Bob::Loader {
 		Loader();
 
-		virtual const Task * get_task(const std::string & name);
-		virtual const BobProgramBase * get_program(const std::string & name);
+		virtual const Task * get_task(const std::string & name) override;
+		virtual const BobProgramBase * get_program(const std::string & name) override;
 	};
 
 public:
-	virtual void save(Editor_Game_Base &, Map_Map_Object_Saver &, FileWrite &);
+	virtual void save(Editor_Game_Base &, Map_Map_Object_Saver &, FileWrite &) override;
 
 	static Map_Object::Loader * load
 		(Editor_Game_Base &, Map_Map_Object_Loader &, FileRead &);

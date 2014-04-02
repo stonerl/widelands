@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2002-2004, 2006-2011 by the Widelands Development Team
+ * Copyright (C) 2002-2004, 2006-2013 by the Widelands Development Team
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -20,25 +20,25 @@
 #ifndef MAP_H
 #define MAP_H
 
-#include "economy/itransport_cost_calculator.h"
-#include "field.h"
-#include "graphic/picture_id.h"
-#include "objective.h"
-#include "widelands_geometry.h"
-#include "world.h"
-
-#include "interval.h"
-#include "manager.h"
-#include "notification.h"
-
+#include <cstring>
+#include <memory>
 #include <set>
 #include <string>
-#include <cstring>
 #include <vector>
-#include <boost/scoped_ptr.hpp>
 
+#include "economy/itransport_cost_calculator.h"
+#include "logic/field.h"
+#include "interval.h"
+#include "manager.h"
+#include "logic/map_revision.h"
+#include "logic/notification.h"
+#include "logic/objective.h"
 #include "random.h"
+#include "logic/widelands_geometry.h"
+#include "logic/world.h"
 
+class FileSystem;
+class Image;
 struct Overlay_Manager;
 struct S2_Map_Loader;
 
@@ -47,10 +47,10 @@ namespace Widelands {
 struct MapGenerator;
 struct BaseImmovable;
 struct PathfieldManager;
-struct Player;
+class Player;
 struct World;
-struct Map;
-struct Map_Loader;
+class Map;
+class Map_Loader;
 #define WLMF_SUFFIX ".wmf"
 #define S2MF_SUFFIX ".swd"
 #define S2MF_SUFFIX2 ".wld"
@@ -84,7 +84,7 @@ CheckStep
 Predicates used in path finding and find functions.
 */
 struct FindImmovable;
-FindImmovable const & FindImmovableAlwaysTrue();
+const FindImmovable & FindImmovableAlwaysTrue();
 
 struct FindBob {
 	//  Return true if this bob should be returned by find_bobs.
@@ -98,11 +98,11 @@ struct CheckStep;
 Some very simple default predicates (more predicates below Map).
 */
 struct FindBobAlwaysTrue : public FindBob {
-	virtual bool accept(Bob *) const {return true;}
+	virtual bool accept(Bob *) const override {return true;}
 	virtual ~FindBobAlwaysTrue() {}  // make gcc shut up
 };
 
-/** struct Map
+/** class Map
  *
  * This really identifies a map like it is in the game
  *
@@ -116,20 +116,24 @@ struct FindBobAlwaysTrue : public FindBob {
  *
  * Warning: width and height must be even
  */
-struct Map :
-	ITransportCostCalculator,
-	NoteSender<NoteFieldTransformed>
+class Map :
+	public ITransportCostCalculator,
+	public NoteSender<NoteFieldTransformed>
 {
-	friend struct Editor_Game_Base;
-	friend struct Map_Loader;
+public:
+	friend class Editor_Game_Base;
+	friend class Map_Loader;
 	friend struct ::S2_Map_Loader;
 	friend struct WL_Map_Loader;
 	friend struct Map_Elemental_Data_Packet;
 	friend struct Map_Extradata_Data_Packet;
+	friend struct Map_Version_Data_Packet;
 	friend class Editor;
 	friend struct Main_Menu_New_Map;
 	friend struct MapGenerator;
 	friend struct MapAStarBase;
+
+	typedef std::set<Coords, Coords::ordering_functor> PortSpacesSet;
 
 	enum { // flags for findpath()
 
@@ -149,18 +153,19 @@ struct Map :
 	Map ();
 	virtual ~Map();
 
-	Overlay_Manager * get_overlay_manager()       {return  m_overlay_manager;}
-	Overlay_Manager & get_overlay_manager() const {return *m_overlay_manager;}
+	Overlay_Manager * get_overlay_manager()       {return m_overlay_manager.get();}
+	Overlay_Manager * get_overlay_manager() const {return m_overlay_manager.get();}
 	const Overlay_Manager & overlay_manager() const {return *m_overlay_manager;}
 	Overlay_Manager       & overlay_manager()       {return *m_overlay_manager;}
 
-	//  for loading
-	Map_Loader * get_correct_loader(char const *);
+	/// Returns the correct initialized loader for the given mapfile
+	std::unique_ptr<Map_Loader> get_correct_loader(const std::string& filename);
+
 	void cleanup();
 
 	void create_empty_map // for editor
 		(uint32_t w = 64, uint32_t h = 64,
-		 std::string const & worldname   =   "greenland",
+		 const std::string & worldname   =   "greenland",
 		 char        const * name        = _("No Name"),
 		 char        const * author      = _("Unknown"),
 		 char        const * description = _("no description defined"));
@@ -189,6 +194,10 @@ struct Map :
 	void add_tag        (std::string);
 	void set_scenario_types(ScenarioTypes t) {m_scenario_types = t;}
 
+	// Allows access to the filesystem of the map to access auxiliary files.
+	// This can be nullptr if this file is new.
+	FileSystem* filesystem() const;
+
 	// informational functions
 	const char * get_filename()    const {return m_filename;}
 	const char * get_author()      const {return m_author;}
@@ -199,14 +208,14 @@ struct Map :
 	const std::string & get_background() const {return m_background;}
 	typedef std::set<std::string> Tags;
 	const Tags & get_tags() const {return m_tags;}
-	const bool has_tag(std::string & s) const {return m_tags.count(s);}
+	bool has_tag(std::string & s) const {return m_tags.count(s);}
 
-	Player_Number get_nrplayers() const throw () {return m_nrplayers;}
-	ScenarioTypes scenario_types() const throw () {return m_scenario_types;}
-	Extent extent() const throw () {return Extent(m_width, m_height);}
-	X_Coordinate get_width   () const throw () {return m_width;}
-	Y_Coordinate get_height  () const throw () {return m_height;}
-	World & world() const throw () {return *m_world;}
+	Player_Number get_nrplayers() const {return m_nrplayers;}
+	ScenarioTypes scenario_types() const {return m_scenario_types;}
+	Extent extent() const {return Extent(m_width, m_height);}
+	X_Coordinate get_width   () const {return m_width;}
+	Y_Coordinate get_height  () const {return m_height;}
+	World & world() const {return *m_world;}
 	World * get_world() const {return m_world;}
 
 	//  The next few functions are only valid when the map is loaded as a
@@ -219,6 +228,9 @@ struct Map :
 	void set_scenario_player_name     (Player_Number, const std::string &);
 	void set_scenario_player_ai       (Player_Number, const std::string &);
 	void set_scenario_player_closeable(Player_Number, bool);
+
+	/// \returns the maximum theoretical possible nodecaps (no blocking bobs, etc.)
+	NodeCaps get_max_nodecaps(FCoords &);
 
 	BaseImmovable * get_immovable(Coords) const;
 	uint32_t find_bobs
@@ -266,7 +278,7 @@ struct Map :
 
 	uint32_t calc_distance(Coords, Coords) const;
 
-	int32_t calc_cost_estimate(Coords, Coords) const;
+	int32_t calc_cost_estimate(Coords, Coords) const override;
 	int32_t calc_cost_lowerbound(Coords, Coords) const;
 	int32_t calc_cost(int32_t slope) const;
 	int32_t calc_cost(Coords, int32_t dir) const;
@@ -300,7 +312,7 @@ struct Map :
 
 	void get_neighbour (const Coords &, Direction dir,  Coords *) const;
 	void get_neighbour(const FCoords &, Direction dir, FCoords *) const;
-	FCoords get_neighbour(const FCoords &, Direction dir) const throw ();
+	FCoords get_neighbour(const FCoords &, Direction dir) const;
 
 	// Pathfinding
 	int32_t findpath
@@ -348,7 +360,7 @@ struct Map :
 	//  change terrain of a triangle, recalculate buildcaps
 	int32_t change_terrain(TCoords<FCoords>, Terrain_Index);
 
-	Manager<Objective>  const & mom() const {return m_mom;}
+	const Manager<Objective>  & mom() const {return m_mom;}
 	Manager<Objective>        & mom()       {return m_mom;}
 
 	/// Returns the military influence on a location from an area.
@@ -358,9 +370,10 @@ struct Map :
 	void set_origin(Coords);
 
 	/// Port space specific functions
-	bool is_port_space(Coords c);
+	bool is_port_space(const Coords& c);
 	void set_port_space(Coords c, bool allowed);
-	std::vector<Coords> get_port_spaces() {return m_port_spaces;}
+	const PortSpacesSet& get_port_spaces() {return m_port_spaces;}
+	std::vector<Coords> find_portdock(const Widelands::Coords& c) const;
 
 protected: /// These functions are needed in Testclasses
 	void set_size(uint32_t w, uint32_t h);
@@ -388,40 +401,39 @@ private:
 
 	Field     * m_fields;
 
-	Overlay_Manager * m_overlay_manager;
+	std::unique_ptr<Overlay_Manager> m_overlay_manager;
 
-	boost::scoped_ptr<PathfieldManager> m_pathfieldmgr;
+	std::unique_ptr<PathfieldManager> m_pathfieldmgr;
 	std::vector<std::string> m_scenario_tribes;
 	std::vector<std::string> m_scenario_names;
 	std::vector<std::string> m_scenario_ais;
 	std::vector<bool>        m_scenario_closeables;
 
-	std::vector<Coords>        m_port_spaces;
+	// The map file as a filesystem.
+	std::unique_ptr<FileSystem> filesystem_;
+
+	PortSpacesSet m_port_spaces;
 
 	Manager<Objective>  m_mom;
 
-	struct Extradata_Info {
-		enum Type {
-			PIC,
-		};
-		PictureID   data;
-		std::string filename;
-		Type        type;
-	};
-	typedef std::vector<Extradata_Info> Extradata_Infos;
-
-	/// Extradata cache only for reading/writing
-	Extradata_Infos m_extradatainfos;
-
 	void recalc_brightness(FCoords);
 	void recalc_nodecaps_pass1(FCoords);
-	void recalc_nodecaps_pass2(FCoords);
+	void recalc_nodecaps_pass2(const FCoords & f);
+	NodeCaps _calc_nodecaps_pass1(FCoords, bool consider_mobs = true);
+	NodeCaps _calc_nodecaps_pass2(FCoords, bool consider_mobs = true, NodeCaps initcaps = CAPS_NONE);
 	void check_neighbour_heights(FCoords, uint32_t & radius);
+	int calc_buildsize
+		(const Widelands::FCoords& f, bool avoidnature, bool * ismine = nullptr,
+		 bool consider_mobs = true, NodeCaps initcaps = CAPS_NONE);
+	bool is_cycle_connected
+		(const FCoords & start, uint32_t length, const WalkingDir * dirs);
 
 	template<typename functorT>
-		void find_reachable(Area<FCoords>, CheckStep const &, functorT &);
+		void find_reachable(Area<FCoords>, const CheckStep &, functorT &);
 
 	template<typename functorT> void find(const Area<FCoords>, functorT &) const;
+
+	MapVersion m_map_version;
 };
 
 
@@ -1010,7 +1022,6 @@ inline FCoords Map::br_n(const FCoords & f) const {
 }
 
 inline FCoords Map::get_neighbour(const FCoords & f, const Direction dir) const
-throw ()
 {
 	switch (dir) {
 	case WALK_NW: return tl_n(f);

@@ -24,11 +24,11 @@
 
 #include <boost/noncopyable.hpp>
 
+#include "editor/tools/editor_action_args.h"
 #include "logic/widelands_geometry.h"
-#include "editor_action_args.h"
 
 struct Editor_Interactive;
-namespace Widelands {struct Map;}
+namespace Widelands {class Map;}
 
 /**
  * An editor tool is a tool that can be selected in the editor. Examples are:
@@ -36,7 +36,8 @@ namespace Widelands {struct Map;}
  * one function (like delete_building, place building, modify building are 3
  * tools).
  */
-struct Editor_Tool : boost::noncopyable {
+class Editor_Tool : boost::noncopyable {
+public:
 	Editor_Tool(Editor_Tool & second, Editor_Tool & third, bool uda = true) :
 		m_second(second), m_third(third), undoable(uda)
 	{}
@@ -76,6 +77,7 @@ struct Editor_Tool : boost::noncopyable {
 	}
 
 	bool is_unduable() {return undoable;}
+	virtual bool has_size_one() const {return false;}
 	virtual Editor_Action_Args format_args_impl(Editor_Interactive & parent) {
 		return Editor_Action_Args(parent);
 	}

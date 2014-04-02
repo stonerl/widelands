@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012 by the Widelands Development Team
+ * Copyright (C) 2012-2013 by the Widelands Development Team
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -17,14 +17,33 @@
  *
  */
 
-#include "dedicated_log.h"
-#include "filesystem/layered_filesystem.h"
-#include "log.h"
+#include "io/dedicated_log.h"
 
 #include <boost/format.hpp>
 
+#include "i18n.h"
+#include "io/filesystem/layered_filesystem.h"
+#include "log.h"
+
 /// The dedicated server logger
 static DedicatedLog * logger;
+
+extern std::ostream & wout;
+
+void dedicatedlog(const char * const fmt, ...) {
+	char buffer[2048];
+	va_list va;
+
+	va_start(va, fmt);
+	vsnprintf(buffer, sizeof(buffer), fmt, va);
+	va_end(va);
+
+	// Here comes the difference to widelands standard log() ;)
+	DedicatedLog::get()->dlog(buffer);
+
+	wout << buffer;
+	wout.flush();
+}
 
 /// protected constructor
 DedicatedLog::DedicatedLog()
@@ -33,7 +52,6 @@ m_chat_file_path(""),
 m_info_file_path(""),
 m_log_file_path(""),
 d_name(""),
-d_ip("<unkown>"),
 d_motd(""),
 d_start(""),
 d_logins(0),
@@ -42,15 +60,16 @@ d_chatmessages(0),
 root(new RealFSImpl("/"))
 {
 	char ts[42];
-	time_t currenttime = time(0);
+	time_t currenttime = time(nullptr);
 	strftime(ts, sizeof(ts), "%a %Y/%m/%d, %H:%M:%S", localtime(&currenttime));
 	d_start = ts;
+	d_ip = (boost::format("\\<%s\\>") % _("unknown")).str();
 }
 
 
 /// \returns the dedicated server logger, if it is not yet initialized, this is done before.
 DedicatedLog * DedicatedLog::get() {
-	if (logger == 0)
+	if (logger == nullptr)
 		logger = new DedicatedLog();
 	return logger;
 }
@@ -72,13 +91,13 @@ void DedicatedLog::chat(ChatMessage & c) {
 
 	std::string temp("<tr>");
 	temp += "<td class=\"time\">";
-	char ts[13];
-	strftime(ts, sizeof(ts), "[%H:%M]", localtime(&c.time));
+	char ts[32];
+	strftime(ts, sizeof(ts), "[%Y-%m-%d, %H:%M]", localtime(&c.time));
 	temp += (boost::format("%s</td><td class=\"player%i\">") % ts % c.playern).str();
 	temp += c.sender.empty() ? "SYSTEM" : c.sender;
 	temp += "</td><td class=\"recipient\"> ->" + c.recipient + "</td><td class=\"message\">";
 	temp += c.msg + "</td></tr>\n";
-	m_chat.Printf(temp.c_str());
+	m_chat.Printf("%s", temp.c_str());
 	m_chat.WriteAppend(*root, m_chat_file_path.c_str());
 }
 
@@ -116,9 +135,11 @@ void DedicatedLog::set_server_ip(std::string ip) {
 void DedicatedLog::game_start(std::vector<std::string> clients, std::string mapname) {
 	GameStatistic * new_game = new GameStatistic;
 	new_game->mapname = mapname;
-	new_game->times.push_back(time(0));
+	new_game->times.push_back(time(nullptr));
 	new_game->clients = clients;
 	d_games.push_back(*new_game);
+	delete new_game;
+	new_game = nullptr;
 	info_update();
 }
 
@@ -127,7 +148,7 @@ void DedicatedLog::game_start(std::vector<std::string> clients, std::string mapn
 void DedicatedLog::game_end(std::vector<std::string> winners) {
 	assert(!d_games.empty());
 	d_games.back().winners = winners;
-	d_games.back().times.push_back(time(0));
+	d_games.back().times.push_back(time(nullptr));
 	info_update();
 }
 
@@ -185,7 +206,7 @@ void DedicatedLog::info_update() {
 		}
 	}
 	temp += "</table>\n";
-	m_chat.Printf(temp.c_str());
+	m_chat.Printf("%s", temp.c_str());
 	m_chat.Write(*root, m_info_file_path.c_str());
 }
 
@@ -194,10 +215,16 @@ void DedicatedLog::dlog(std::string msg) {
 	if (m_log_file_path.empty())
 		return;
 
-	std::string temp("<tr><td class=\"log\">");
+	std::string temp("<tr><td class=\"time\">");
+	char ts[32];
+	time_t * t = new time_t(time(nullptr));
+	strftime(ts, sizeof(ts), "[%Y-%m-%d, %H:%M]", localtime(t));
+	delete t;
+	temp += ts;
+	temp += "</td><td class=\"log\">";
 	temp += msg;
 	temp += "</td></tr>\n";
-	m_chat.Printf(temp.c_str());
+	m_chat.Printf("%s", temp.c_str());
 	m_chat.WriteAppend(*root, m_log_file_path.c_str());
 }
 
@@ -280,7 +307,7 @@ bool DedicatedLog::set_log_file_path (std::string path) {
 	m_log_file_path = path;
 
 	// Initialize the log file
-	m_chat.Printf("<tr><th>Widelands dedicated server log:</th></tr>\n");
+	m_chat.Printf("<tr><th></th><th>Widelands dedicated server log:</th></tr>\n");
 	m_chat.Write(*root, m_log_file_path.c_str()); // Not WriteAppend, to make sure the file is cleared
 	return true;
 }

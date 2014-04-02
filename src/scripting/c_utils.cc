@@ -18,14 +18,14 @@
  */
 
 
+#include "scripting/c_utils.h"
+
 #include <cstdarg>
 #include <cstdio>
 #include <iostream>
 
-#include "factory.h"
-#include "scripting.h"
-
-#include "c_utils.h"
+#include "scripting/factory.h"
+#include "scripting/scripting.h"
 
 Factory & get_factory(lua_State * const L) {
 	lua_getfield(L, LUA_REGISTRYINDEX, "factory");
@@ -107,9 +107,8 @@ int report_error(lua_State * L, const char * const fmt, ...) {
 	vsnprintf(buffer, sizeof(buffer), fmt, va);
 	va_end(va);
 
-
 	// Also create a traceback
-	lua_getfield(L, LUA_GLOBALSINDEX, "debug");
+	lua_getglobal(L, "debug");
 	if (!lua_istable(L, -1)) {
 		lua_pop(L, 1);
 		return 1;
@@ -127,4 +126,3 @@ int report_error(lua_State * L, const char * const fmt, ...) {
 
 	return 0;
 }
-

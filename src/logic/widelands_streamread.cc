@@ -17,19 +17,16 @@
  *
  */
 
-#include "widelands_streamread.h"
+#include "logic/widelands_streamread.h"
 
-#include "tribe.h"
+#include "logic/tribe.h"
 
 namespace Widelands {
 
-Immovable_Descr const & StreamRead::Immovable_Type
-	(Tribe_Descr const & tribe)
+const Immovable_Descr & StreamRead::Immovable_Type
+	(const Tribe_Descr & tribe)
 {
 	std::string name = CString();
-	const std::vector<std::string> & compat = tribe.compatibility_immovable(name);
-	if (compat.size() == 2 && compat[0] == "replace")
-		name = compat[1];
 	int32_t const index = tribe.get_immovable_index(name);
 	if (index == -1)
 		throw tribe_immovable_nonexistent(tribe.name(), name);

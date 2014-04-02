@@ -17,25 +17,24 @@
  *
  */
 
-#include "request.h"
+#include "economy/request.h"
 
-// Package includes
-#include "economy.h"
-#include "transfer.h"
-#include "ware_instance.h"
-
+#include "economy/economy.h"
+#include "economy/portdock.h"
+#include "economy/transfer.h"
+#include "economy/ware_instance.h"
 #include "logic/constructionsite.h"
 #include "logic/game.h"
+#include "logic/legacy.h"
 #include "logic/player.h"
 #include "logic/productionsite.h"
 #include "logic/soldier.h"
 #include "logic/tribe.h"
-#include "upcast.h"
-#include "map_io/widelands_map_map_object_loader.h"
-#include "map_io/widelands_map_map_object_saver.h"
-#include "logic/legacy.h"
 #include "logic/warehouse.h"
 #include "logic/worker.h"
+#include "map_io/widelands_map_map_object_loader.h"
+#include "map_io/widelands_map_map_object_saver.h"
+#include "upcast.h"
 
 
 namespace Widelands {
@@ -108,12 +107,11 @@ Request::~Request()
 void Request::Read
 	(FileRead & fr, Game & game, Map_Map_Object_Loader & mol)
 {
-	bool fudged_type = false;
-
 	try {
 		uint16_t const version = fr.Unsigned16();
 		if (2 <= version and version <= REQUEST_VERSION) {
-			Tribe_Descr const & tribe = m_target.owner().tribe();
+			bool fudged_type = false;
+			const Tribe_Descr & tribe = m_target.owner().tribe();
 			if (version <= 3) {
 				//  Unfortunately, old versions wrote the index. The best thing
 				//  that we can do with that is to look it up in a table.
@@ -185,7 +183,7 @@ void Request::Read
 									throw wexception
 										("Request::Read: incompatible transfer type");
 								transfer->has_failed();
-								transfer = 0;
+								transfer = nullptr;
 							}
 						} else if (upcast(WareInstance, ware, obj)) {
 							transfer = ware->get_transfer();
@@ -195,7 +193,7 @@ void Request::Read
 									throw wexception
 										("Request::Read: incompatible transfer type");
 								transfer->has_failed();
-								transfer = 0;
+								transfer = nullptr;
 							}
 						} else
 							throw wexception
@@ -232,7 +230,7 @@ void Request::Read
 							if (fr.Unsigned8())
 								m_requirements.Read (fr, game, mol);
 					}
-				} catch (_wexception const & e) {
+				} catch (const _wexception & e) {
 					throw wexception("transfer %u: %s", i, e.what());
 				}
 			if (version >= 5)
@@ -240,8 +238,8 @@ void Request::Read
 			if (!is_open() && m_economy)
 				m_economy->remove_request(*this);
 		} else
-			throw game_data_error(_("unknown/unhandled version %u"), version);
-	} catch (_wexception const & e) {
+			throw game_data_error("unknown/unhandled version %u", version);
+	} catch (const _wexception & e) {
 		throw wexception("request: %s", e.what());
 	}
 }
@@ -257,7 +255,7 @@ void Request::Write
 	//  Target and econmy should be set. Same is true for callback stuff.
 
 	assert(m_type == wwWARE or m_type == wwWORKER);
-	Tribe_Descr const & tribe = m_target.owner().tribe();
+	const Tribe_Descr & tribe = m_target.owner().tribe();
 	assert(m_type != wwWARE   or m_index < tribe.get_nrwares  ());
 	assert(m_type != wwWORKER or m_index < tribe.get_nrworkers());
 	fw.CString
@@ -275,9 +273,9 @@ void Request::Write
 	fw.Unsigned16(m_transfers.size()); //  Write number of current transfers.
 	for (uint32_t i = 0; i < m_transfers.size(); ++i) {
 		Transfer & trans = *m_transfers[i];
-		if (trans.m_item) { //  write ware/worker
-			assert(mos.is_object_known(*trans.m_item));
-			fw.Unsigned32(mos.get_object_file_index(*trans.m_item));
+		if (trans.m_ware) { //  write ware/worker
+			assert(mos.is_object_known(*trans.m_ware));
+			fw.Unsigned32(mos.get_object_file_index(*trans.m_ware));
 		} else if (trans.m_worker) {
 			assert(mos.is_object_known(*trans.m_worker));
 			fw.Unsigned32(mos.get_object_file_index(*trans.m_worker));
@@ -295,7 +293,7 @@ Flag & Request::target_flag() const
 }
 
 /**
- * Return the point in time at which we want the item of the given number to
+ * Return the point in time at which we want the ware of the given number to
  * be delivered. nr is in the range [0..m_count[
 */
 int32_t Request::get_base_required_time
@@ -344,6 +342,10 @@ int32_t Request::get_required_time() const
 /**
  * Return the request priority used to sort requests or -1 to skip request
  */
+// TODO(sirver): this is pretty weird design: we ask the building for the
+// priority it assigns to the ware, at the same time, we also adjust the
+// priorities depending on the building type. Move all of this into the
+// building code.
 int32_t Request::get_priority (int32_t cost) const
 {
 	int MAX_IDLE_PRIORITY = 100;
@@ -357,16 +359,18 @@ int32_t Request::get_priority (int32_t cost) const
 		modifier = m_target_building->get_priority(get_type(), get_index());
 		if (m_target_constructionsite)
 			is_construction_site = true;
-		else if (m_target_warehouse)
-			// if warehouse calculated a priority use it
-			// else lower priority based on cost
-			return
-				modifier != 100 ? modifier :
-				std::max
-					(1,
-					 MAX_IDLE_PRIORITY
-					 -
-					 cost * MAX_IDLE_PRIORITY / PRIORITY_MAX_COST);
+		else if (m_target_warehouse) {
+			// If there is no expedition at this warehouse, use the default
+			// warehouse calculation. Otherwise we use the default priority for
+			// the ware.
+			if
+				(!m_target_warehouse->get_portdock() ||
+				 !m_target_warehouse->get_portdock()->expedition_bootstrap())
+			{
+				modifier =
+					std::max(1, MAX_IDLE_PRIORITY - cost * MAX_IDLE_PRIORITY / PRIORITY_MAX_COST);
+			}
+		}
 	}
 
 	if (cost > PRIORITY_MAX_COST)
@@ -396,6 +400,7 @@ int32_t Request::get_priority (int32_t cost) const
 /**
  * Return the transfer priority, based on the priority set at the destination
  */
+// TODO(sirver): Same comment as for Request::get_priority.
 uint32_t Request::get_transfer_priority() const
 {
 	uint32_t pri = 0;
@@ -452,7 +457,7 @@ void Request::set_count(uint32_t const count)
 }
 
 /**
- * Change the time at which the first item to be delivered is needed.
+ * Change the time at which the first ware to be delivered is needed.
  * Default is the gametime of the Request creation.
 */
 void Request::set_required_time(int32_t const time)
@@ -461,7 +466,7 @@ void Request::set_required_time(int32_t const time)
 }
 
 /**
- * Change the time between desired delivery of items.
+ * Change the time between desired delivery of wares.
 */
 void Request::set_required_interval(int32_t const interval)
 {
@@ -490,13 +495,13 @@ void Request::start_transfer(Game & game, Supply & supp)
 		ss.Unsigned32(s.serial());
 		t = new Transfer(game, *this, s);
 	} else {
-		//  Begin the transfer of an item. The item itself is passive.
-		//  launch_item() ensures the WareInstance is transported out of the
-		//  warehouse Once it's on the flag, the flag code will decide what to
+		//  Begin the transfer of an ware. The ware itself is passive.
+		//  launch_ware() ensures the WareInstance is transported out of the
+		//  warehouse. Once it's on the flag, the flag code will decide what to
 		//  do with it.
-		WareInstance & item = supp.launch_item(game, *this);
-		ss.Unsigned32(item.serial());
-		t = new Transfer(game, *this, item);
+		WareInstance & ware = supp.launch_ware(game, *this);
+		ss.Unsigned32(ware.serial());
+		t = new Transfer(game, *this, ware);
 	}
 
 	m_transfers.push_back(t);
@@ -513,11 +518,11 @@ void Request::transfer_finish(Game & game, Transfer & t)
 {
 	Worker * const w = t.m_worker;
 
-	if (t.m_item)
-		t.m_item->destroy(game);
+	if (t.m_ware)
+		t.m_ware->destroy(game);
 
-	t.m_worker = 0;
-	t.m_item = 0;
+	t.m_worker = nullptr;
+	t.m_ware = nullptr;
 
 	remove_transfer(find_transfer(t));
 
@@ -532,15 +537,15 @@ void Request::transfer_finish(Game & game, Transfer & t)
 
 /**
  * Callback from ware/worker code that the scheduled transfer has failed.
- * The calling code has already dealt with the worker/item.
+ * The calling code has already dealt with the worker/ware.
  *
  * Re-open the request.
 */
 void Request::transfer_fail(Game &, Transfer & t) {
 	bool const wasopen = is_open();
 
-	t.m_worker = 0;
-	t.m_item = 0;
+	t.m_worker = nullptr;
+	t.m_ware = nullptr;
 
 	remove_transfer(find_transfer(t));
 
@@ -559,7 +564,7 @@ void Request::cancel_transfer(uint32_t const idx)
 
 /**
  * Remove and free the transfer with the given index.
- * This does not update the Transfer's worker or item, and it does not update
+ * This does not update the Transfer's worker or ware, and it does not update
  * whether the Request is registered with the Economy.
  */
 void Request::remove_transfer(uint32_t const idx)

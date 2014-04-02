@@ -20,17 +20,14 @@
 #include "economy/flag.h"
 #include "economy/road.h"
 #include "economy/ware_instance.h"
+#include "graphic/rendertarget.h"
 #include "logic/editor_game_base.h"
 #include "logic/player.h"
-#include "graphic/rendertarget.h"
 
 namespace Widelands {
 
 void Flag::draw
-	(Editor_Game_Base const &       game,
-	 RenderTarget           &       dst,
-	 FCoords,
-	 Point                    const pos)
+	(const Editor_Game_Base& game, RenderTarget& dst, const FCoords&, const Point& pos)
 {
 	static struct {int32_t x, y;} ware_offsets[8] = {
 		{-5,  1},
@@ -46,8 +43,8 @@ void Flag::draw
 	dst.drawanim
 		(pos, owner().flag_anim(), game.get_gametime() - m_animstart, &owner());
 
-	const uint32_t item_filled = m_item_filled;
-	for (uint32_t i = 0; i < item_filled; ++i) { //  draw wares
+	const uint32_t ware_filled = m_ware_filled;
+	for (uint32_t i = 0; i < ware_filled; ++i) { //  draw wares
 		Point warepos = pos;
 		if (i < 8) {
 			warepos.x += ware_offsets[i].x;
@@ -56,13 +53,13 @@ void Flag::draw
 			warepos.y -= 6 + (i - 8) * 3;
 		dst.drawanim
 			(warepos,
-			 m_items[i].item->descr().get_animation("idle"),
+			 m_wares[i].ware->descr().get_animation("idle"),
 			 0,
 			 get_owner());
 	}
 }
 
 /** The road is drawn by the terrain renderer via marked fields. */
-void Road::draw(Editor_Game_Base const &, RenderTarget &, FCoords, Point) {}
+void Road::draw(const Editor_Game_Base &, RenderTarget &, const FCoords&, const Point&) {}
 
 }

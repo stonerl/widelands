@@ -18,6 +18,8 @@
  */
 
 
+#include "editor/tools/editor_make_infrastructure_tool.h"
+
 #include "editor/editorinteractive.h"
 #include "logic/editor_game_base.h"
 #include "logic/field.h"
@@ -25,19 +27,16 @@
 #include "logic/player.h"
 #include "wui/fieldaction.h"
 
-#include "editor_make_infrastructure_tool.h"
-
 /**
  * Callback function to calculate correct overlays
  */
-int32_t Editor_Make_Infrastructure_Tool_Callback
-	(Widelands::TCoords<Widelands::FCoords> const c,
-	void                    *                    data,
-	int32_t                                const player)
+int32_t
+Editor_Make_Infrastructure_Tool_Callback
+	(const Widelands::TCoords<Widelands::FCoords>& c,
+	 Widelands::Editor_Game_Base& egbase,
+	 int32_t const player)
 {
-	return
-	    static_cast<Widelands::Editor_Game_Base const *>(data)->player(player)
-	    .get_buildcaps(c);
+	return egbase.player(player).get_buildcaps(c);
 }
 
 
@@ -51,7 +50,7 @@ int32_t Editor_Make_Infrastructure_Tool::handle_click_impl
 	(Widelands::Map &,
 	Widelands::Node_and_Triangle<> const,
 	Editor_Interactive         &         parent,
-	Editor_Action_Args         &         args)
+	Editor_Action_Args         &         /* args */)
 {
 	show_field_action
 	(&parent, parent.egbase().get_player(m_player), &m_registry);

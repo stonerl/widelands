@@ -20,21 +20,20 @@
 #ifndef FULLSCREEN_MENU_MAPSELECT_H
 #define FULLSCREEN_MENU_MAPSELECT_H
 
-#include <string>
 #include <set>
+#include <string>
 
-#include "base.h"
+#include "ui_fsmenu/base.h"
+#include "logic/map.h"
 #include "ui_basic/button.h"
 #include "ui_basic/checkbox.h"
-#include "ui_basic/table.h"
 #include "ui_basic/multilinetextarea.h"
+#include "ui_basic/table.h"
 #include "ui_basic/textarea.h"
-
-#include "logic/map.h"
 
 
 using Widelands::Map;
-struct GameController;
+class GameController;
 struct GameSettingsProvider;
 
 namespace UI {
@@ -61,7 +60,7 @@ struct MapData {
 	bool scenario; // is this a scenario we should list?
 
 	MapData()
-		: width(0), height(0), nrplayers(0) {}
+		: width(0), height(0), nrplayers(0), scenario(false) {}
 };
 
 /**
@@ -73,7 +72,7 @@ struct Fullscreen_Menu_MapSelect : public Fullscreen_Menu_Base {
 
 	bool is_scenario();
 	MapData const * get_map() const;
-	void think();
+	void think() override;
 
 private:
 	void ok();

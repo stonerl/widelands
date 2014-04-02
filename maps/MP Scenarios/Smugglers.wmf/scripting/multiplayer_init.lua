@@ -1,28 +1,23 @@
 -- =================================
 -- Smugglers Fun Map
 -- =================================
-use("aux", "coroutine")
-use("aux", "infrastructure")
-use("aux", "formatting")
-use("aux", "objective_utils")
-use("aux", "set")
+include "scripting/coroutine.lua"
+include "scripting/infrastructure.lua"
+include "scripting/formatting.lua"
+include "scripting/objective_utils.lua"
+include "scripting/set.lua"
 
 -- ==========
--- Constants 
+-- Constants
 -- ==========
 set_textdomain("mp_scenario_smugglers.wmf")
 
 game = wl.Game()
 map = game.map
 
-points_to_win = 1000
+points_to_win = 2000
 
 route_descrs = {
-   { value = 0, send = map:get_field(33, 13):region(2), recv = map:get_field(123, 91):region(2) },
-   { value = 0, send = map:get_field(120, 97):region(2), recv = map:get_field(25, 19):region(2) },
-   { value = 0, send = map:get_field(110, 17):region(2), recv = map:get_field(36, 118):region(2) },
-   { value = 0, send = map:get_field(41, 119):region(2), recv = map:get_field(114, 20):region(2) },
-
    { value = 2, send = map:get_field(35, 52):region(2), recv = map:get_field(96, 77):region(2) },
    { value = 2, send = map:get_field(98, 55):region(2), recv = map:get_field(34, 76):region(2) },
 
@@ -36,7 +31,7 @@ route_descrs = {
 }
 
 -- =================
--- Global Variables 
+-- Global Variables
 -- =================
 points = { 0, 0 }
 
@@ -49,11 +44,11 @@ function send_to_all(text)
    end
 end
 
-use("map", "texts")
-use("map", "smuggling")
+include "map:scripting/texts.lua"
+include "map:scripting/smuggling.lua"
 
 -- ================
--- Initializations 
+-- Initializations
 -- ================
 function assign_teams()
    game.players[1].team = 1
@@ -68,12 +63,12 @@ function place_headquarters()
 
       prefilled_buildings(player, { "headquarters", sf.x, sf.y,
          wares = {
-            axe = 5,
-            bakingtray = 2,
+            ax = 5,
+            bread_paddle = 2,
             blackwood = 32,
             cloth = 5,
             coal = 12,
-            felling_axe = 4,
+            felling_ax = 4,
             fire_tongs = 2,
             fish = 6,
             fishing_rod = 2,
@@ -94,7 +89,7 @@ function place_headquarters()
             shovel = 4,
             snack = 3,
             thatchreed = 24,
-            trunk = 80,
+            log = 80,
          },
          workers = {
             blacksmith = 2,
@@ -102,7 +97,7 @@ function place_headquarters()
             builder = 10,
             burner = 1,
             carrier = 40,
-            ferner = 1,
+            gardener = 1,
             geologist = 4,
             ["lime-burner"] = 1,
             lumberjack = 3,
@@ -121,9 +116,9 @@ end
 function setup_statistics_hook()
 	if hooks == nil then hooks = {} end
 	hooks.custom_statistic = {
-      name = _ "Wares smuggled",
+      name = _ "Wares Smuggled",
       pic = "map:genstats_wares_smuggled.png",
-      calculator = function(p) 
+      calculator = function(p)
          return points[p.team]
       end,
    }
@@ -144,8 +139,7 @@ function initialize()
       end
    end
 
-
-   send_to_all(welcome_msg:format(points_to_win))
+   send_to_all(welcome_msg:format((ngettext("%i point", "%i points", points_to_win)):format(points_to_win)))
 
 
    for idx,descr in ipairs(route_descrs) do

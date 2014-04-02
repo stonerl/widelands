@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2002-2004, 2006-2010 by the Widelands Development Team
+ * Copyright (C) 2002-2004, 2006-2013 by the Widelands Development Team
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -17,24 +17,25 @@
  *
  */
 
-#include "critter_bob.h"
-
-#include "critter_bob_program.h"
-#include "field.h"
-#include "game.h"
-#include "game_data_error.h"
-#include "helper.h"
-#include "profile/profile.h"
-#include "tribe.h"
-#include "wexception.h"
+#include "logic/critter_bob.h"
 
 #include <cstdio>
+
+#include "helper.h"
+#include "logic/critter_bob_program.h"
+#include "logic/field.h"
+#include "logic/game.h"
+#include "logic/game_data_error.h"
+#include "logic/tribe.h"
+#include "profile/profile.h"
+#include "wexception.h"
+
 
 namespace Widelands {
 
 const Critter_BobProgram::ParseMap Critter_BobProgram::s_parsemap[] = {
 	{"remove",            &Critter_BobProgram::parse_remove},
-	{0,                   0}
+	{nullptr,                   nullptr}
 };
 
 
@@ -47,7 +48,7 @@ void Critter_BobProgram::parse(Parser * const parser, char const * const name)
 			char buffer[32];
 
 			snprintf(buffer, sizeof(buffer), "%i", idx);
-			char const * const string = program_s.get_string(buffer, 0);
+			char const * const string = program_s.get_string(buffer, nullptr);
 			if (!string)
 				break;
 
@@ -69,7 +70,7 @@ void Critter_BobProgram::parse(Parser * const parser, char const * const name)
 			(this->*s_parsemap[mapidx].function)(&act, parser, cmd);
 
 			m_actions.push_back(act);
-		} catch (std::exception const & e) {
+		} catch (const std::exception & e) {
 			throw wexception("Line %i: %s", idx, e.what());
 		}
 	}
@@ -97,7 +98,7 @@ Remove this critter
 ==============================
 */
 void Critter_BobProgram::parse_remove
-	(Critter_BobAction * act, Parser *, std::vector<std::string> const & cmd)
+	(Critter_BobAction * act, Parser *, const std::vector<std::string> & cmd)
 {
 	if (cmd.size() != 1)
 		throw wexception("Usage: remove");
@@ -106,7 +107,7 @@ void Critter_BobProgram::parse_remove
 }
 
 bool Critter_Bob::run_remove
-	(Game & game, State & state, Critter_BobAction const &)
+	(Game & game, State & state, const Critter_BobAction &)
 {
 	++state.ivar1;
 	// Bye, bye cruel world
@@ -125,25 +126,22 @@ bool Critter_Bob::run_remove
 
 Critter_Bob_Descr::Critter_Bob_Descr
 	(char const * const _name, char const * const _descname,
-	 std::string const & directory, Profile & prof, Section & global_s,
+	 const std::string & directory, Profile & prof, Section & global_s,
 	 Tribe_Descr const * const _tribe)
 	:
-	Bob::Descr(_name, _descname, directory, prof, global_s, _tribe),
+	BobDescr(_name, _descname, directory, prof, global_s, _tribe),
 	m_swimming(global_s.get_bool("swimming", false))
 {
-	m_walk_anims.parse
-		(*this,
-		 directory,
-		 prof,
-		 (name() + "_walk_??").c_str(),
-		 prof.get_section("walk"));
+	char defaultpics[256];
+	snprintf(defaultpics, sizeof(defaultpics), "%s_walk_!!_??.png", _name);
+	m_walk_anims.parse(*this, directory, prof, "walk", false, defaultpics);
 
 	while (Section::Value const * const v = global_s.get_next_val("program")) {
 		std::string program_name = v->get_string();
 		std::transform
 			(program_name.begin(), program_name.end(), program_name.begin(),
 			 tolower);
-		Critter_BobProgram * prog = 0;
+		Critter_BobProgram * prog = nullptr;
 		try {
 			if (m_programs.count(program_name))
 				throw wexception("this program has already been declared");
@@ -156,7 +154,7 @@ Critter_Bob_Descr::Critter_Bob_Descr
 			prog = new Critter_BobProgram(v->get_string());
 			prog->parse(&parser, v->get_string());
 			m_programs[program_name] = prog;
-		} catch (std::exception const & e) {
+		} catch (const std::exception & e) {
 			delete prog;
 			throw wexception
 				("Parse error in program %s: %s", v->get_string(), e.what());
@@ -177,7 +175,7 @@ Get a program from the workers description.
 ===============
 */
 Critter_BobProgram const * Critter_Bob_Descr::get_program
-	(std::string const & programname) const
+	(const std::string & programname) const
 {
 	Programs::const_iterator const it = m_programs.find(programname);
 	if (it == m_programs.end())
@@ -187,7 +185,7 @@ Critter_BobProgram const * Critter_Bob_Descr::get_program
 }
 
 
-uint32_t Critter_Bob_Descr::movecaps() const throw () {
+uint32_t Critter_Bob_Descr::movecaps() const {
 	return is_swimming() ? MOVECAPS_SWIM : MOVECAPS_WALK;
 }
 
@@ -229,14 +227,14 @@ coords is used to store target coordinates found by findspace
 Bob::Task const Critter_Bob::taskProgram = {
 	"program",
 	static_cast<Bob::Ptr>(&Critter_Bob::program_update),
-	0,
-	0,
+	nullptr,
+	nullptr,
 	true
 };
 
 
 void Critter_Bob::start_task_program
-	(Game & game, std::string const & programname)
+	(Game & game, const std::string & programname)
 {
 	push_task(game, taskProgram);
 	State & state = top_state();
@@ -253,14 +251,14 @@ void Critter_Bob::program_update(Game & game, State & state)
 	}
 
 	for (;;) {
-		Critter_BobProgram const & program =
+		const Critter_BobProgram & program =
 			ref_cast<Critter_BobProgram const, BobProgramBase const>
 				(*state.program);
 
 		if (state.ivar1 >= program.get_size())
 			return pop_task(game);
 
-		Critter_BobAction const & action = program[state.ivar1];
+		const Critter_BobAction & action = program[state.ivar1];
 
 		if ((this->*(action.function))(game, state, action))
 			return;
@@ -281,8 +279,8 @@ Simply roam the map
 Bob::Task const Critter_Bob::taskRoam = {
 	"roam",
 	static_cast<Bob::Ptr>(&Critter_Bob::roam_update),
-	0,
-	0,
+	nullptr,
+	nullptr,
 	true
 };
 
@@ -354,7 +352,7 @@ const BobProgramBase * Critter_Bob::Loader::get_program
 Map_Object::Loader * Critter_Bob::load
 	(Editor_Game_Base & egbase, Map_Map_Object_Loader & mol, FileRead & fr)
 {
-	std::auto_ptr<Loader> loader(new Loader);
+	std::unique_ptr<Loader> loader(new Loader);
 
 	try {
 		// The header has been peeled away by the caller
@@ -363,7 +361,7 @@ Map_Object::Loader * Critter_Bob::load
 		if (1 <= version && version <= CRITTER_SAVEGAME_VERSION) {
 			std::string owner = fr.CString();
 			std::string name = fr.CString();
-			const Critter_Bob_Descr * descr = 0;
+			const Critter_Bob_Descr * descr = nullptr;
 
 			if (owner == "world") {
 				descr = dynamic_cast<const Critter_Bob_Descr *>
@@ -383,9 +381,9 @@ Map_Object::Loader * Critter_Bob::load
 			loader->init(egbase, mol, descr->create_object());
 			loader->load(fr);
 		} else
-			throw game_data_error(_("unknown/unhandled version %u"), version);
+			throw game_data_error("unknown/unhandled version %u", version);
 	} catch (const std::exception & e) {
-		throw wexception(_("loading critter: %s"), e.what());
+		throw wexception("loading critter: %s", e.what());
 	}
 
 	return loader.release();

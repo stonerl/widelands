@@ -20,7 +20,7 @@
 #ifndef UI_PROGRESSBAR_H
 #define UI_PROGRESSBAR_H
 
-#include "panel.h"
+#include "ui_basic/panel.h"
 
 namespace UI {
 
@@ -51,7 +51,7 @@ public:
 	void set_total(uint32_t);
 
 protected:
-	virtual void draw(RenderTarget &);
+	virtual void draw(RenderTarget &) override;
 
 private:
 	uint32_t m_orientation;

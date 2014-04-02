@@ -17,46 +17,43 @@
  *
  */
 
-#include "disk_filesystem.h"
-
-#include "filesystem_exceptions.h"
-#include "wexception.h"
-#include "zip_filesystem.h"
-#include "log.h"
-
-#include <sys/stat.h>
+#include "io/filesystem/disk_filesystem.h"
 
 #include <cassert>
 #include <cerrno>
 
-#ifdef WIN32
-#include <windows.h>
+#include <sys/stat.h>
+
+#ifdef _WIN32
 #include <dos.h>
+#include <windows.h>
 #ifdef _MSC_VER
-#include <io.h>
 #include <direct.h>
+#include <io.h>
 #define S_ISDIR(x) ((x&_S_IFDIR)?1:0)
-#endif
-#else
-#include <sys/mman.h>
+#endif // _MSC_VER
+#else  // not _WIN32
+#include <fcntl.h>
 #include <glob.h>
+#include <sys/mman.h>
 #include <sys/statvfs.h>
 #include <sys/types.h>
-#include <fcntl.h>
-#ifndef _GNU_SOURCE
-#define _GNU_SOURCE // for O_NOATIME
-#endif
 #endif
 
+#include "compile_diagnostics.h"
+#include "io/filesystem/filesystem_exceptions.h"
+#include "io/filesystem/zip_filesystem.h"
 #include "io/streamread.h"
 #include "io/streamwrite.h"
+#include "log.h"
+#include "wexception.h"
 
 struct FileSystemPath: public std::string
 {
 	bool m_exists;
 	bool m_isDirectory;
 
-	FileSystemPath(std::string const & path)
+	FileSystemPath(const std::string & path)
 	: std::string(path)
 	{
 		struct stat st;
@@ -69,7 +66,7 @@ struct FileSystemPath: public std::string
 /**
  * Initialize the real file-system
  */
-RealFSImpl::RealFSImpl(std::string const & Directory)
+RealFSImpl::RealFSImpl(const std::string & Directory)
 : m_directory(Directory)
 {
 	// TODO: check OS permissions on whether the directory is writable!
@@ -86,7 +83,7 @@ bool RealFSImpl::IsWritable() const {
 }
 
 /// returns true, if the file is writeable
-bool RealFSImpl::FileIsWriteable(std::string const & path) {
+bool RealFSImpl::FileIsWriteable(const std::string & path) {
 	std::string fullname;
 	fullname = FS_CanonicalizeName(path);
 
@@ -99,84 +96,71 @@ bool RealFSImpl::FileIsWriteable(std::string const & path) {
 }
 
 
-/**
- * Returns the number of files found, and stores the filenames (without the
- * pathname) in the results. There doesn't seem to be an even remotely
- * cross-platform way of doing this
- */
-// note: the Win32 version may be broken, feel free to fix it
-int32_t RealFSImpl::FindFiles
-	(std::string const & path,
-	 std::string const & pattern,
-	 filenameset_t     * results,
-	 uint32_t)
+std::set<std::string> RealFSImpl::ListDirectory(const std::string & path)
 {
 #ifdef _WIN32
 	std::string buf;
 	struct _finddata_t c_file;
 	long hFile;
-	int32_t count;
 
 	if (path.size())
-		buf = m_directory + '\\' + path + '\\' + pattern;
+		buf = m_directory + '\\' + path + "\\*";
 	else
-		buf = m_directory + '\\' + pattern;
+		buf = m_directory + "\\*";
 
-	count = 0;
+	std::set<std::string> results;
 
 	hFile = _findfirst(buf.c_str(), &c_file);
 	if (hFile == -1)
-		return 0;
+		return results;
 
 	std::string realpath = path;
 
-	if (not pattern.compare(0, 3, "../")) {
-		// Workaround: If pattern is a relative we need to fix the path
-		std::string m_root_save(m_root); // save orginal m_root
-		m_root = FS_CanonicalizeName(path);
-		realpath = FS_CanonicalizeName(pattern);
-		realpath = realpath.substr(0, realpath.rfind('\\'));
-		m_root = m_root_save; // reset m_root
+	if (!realpath.empty()) {
+		realpath.append("\\");
 	}
-
-	if (!realpath.empty()) realpath.append("\\");
 	do {
-		results->insert(realpath + c_file.name);
+		if ((strcmp(c_file.name, ".") == 0) || (strcmp(c_file.name, "..") == 0)) {
+				continue;
+		}
+		const std::string filename = FS_CanonicalizeName(realpath + c_file.name);
+		const std::string result = filename.substr(m_root.size() + 1);
+		results.insert(result);
 	} while (_findnext(hFile, &c_file) == 0);
 
 	_findclose(hFile);
 
-	return results->size();
+	return results;
 #else
 	std::string buf;
 	glob_t gl;
-	int32_t i, count;
 	int32_t ofs;
 
 	if (path.size()) {
 		if (pathIsAbsolute(path)) {
-			buf = path + '/' + pattern;
+			buf = path + "/*";
 			ofs = 0;
 		} else {
-			buf = m_directory + '/' + path + '/' + pattern;
+			buf = m_directory + '/' + path + "/*";
 			ofs = m_directory.length() + 1;
 		}
 	} else {
-		buf = m_directory + '/' + pattern;
+		buf = m_directory + "/*";
 		ofs = m_directory.length() + 1;
 	}
-	if (glob(buf.c_str(), 0, 0, &gl))
-		return 0;
+	std::set<std::string> results;
 
-	count = gl.gl_pathc;
+	if (glob(buf.c_str(), 0, nullptr, &gl))
+		return results;
 
-	for (i = 0; i < count; ++i) {
-		results->insert(&gl.gl_pathv[i][ofs]);
+	for (size_t i = 0; i < gl.gl_pathc; ++i) {
+		const std::string filename(FS_CanonicalizeName(&gl.gl_pathv[i][ofs]));
+		results.insert(filename.substr(m_root.size() + 1));
 	}
 
 	globfree(&gl);
 
-	return count;
+	return results;
 #endif
 }
 
@@ -186,7 +170,7 @@ int32_t RealFSImpl::FindFiles
  * \e can't exist then)
  * \todo Can this be rewritten to just using exceptions? Should it?
  */
-bool RealFSImpl::FileExists(std::string const & path) {
+bool RealFSImpl::FileExists(const std::string & path) {
 	return FileSystemPath(FS_CanonicalizeName(path)).m_exists;
 }
 
@@ -195,30 +179,27 @@ bool RealFSImpl::FileExists(std::string const & path) {
  * Also returns false if the pathname is invalid (obviously, because the file
  * \e can't exist then)
  */
-bool RealFSImpl::IsDirectory(std::string const & path) {
+bool RealFSImpl::IsDirectory(const std::string & path) {
 	return FileSystemPath(FS_CanonicalizeName(path)).m_isDirectory;
 }
 
 /**
  * Create a sub filesystem out of this filesystem
  */
-FileSystem & RealFSImpl::MakeSubFileSystem(std::string const & path) {
+FileSystem * RealFSImpl::MakeSubFileSystem(const std::string & path) {
 	FileSystemPath fspath(FS_CanonicalizeName(path));
 	assert(fspath.m_exists); //TODO: throw an exception instead
-	//printf("RealFSImpl MakeSubFileSystem path %s fullname %s\n",
-	//path.c_str(), fspath.c_str());
 
 	if (fspath.m_isDirectory)
-		return *new RealFSImpl   (fspath);
+		return new RealFSImpl   (fspath);
 	else
-		return *new ZipFilesystem(fspath);
+		return new ZipFilesystem(fspath);
 }
 
 /**
  * Create a sub filesystem out of this filesystem
  */
-FileSystem & RealFSImpl::CreateSubFileSystem
-	(std::string const & path, Type const fs)
+FileSystem * RealFSImpl::CreateSubFileSystem(const std::string & path, Type const fs)
 {
 	FileSystemPath fspath(FS_CanonicalizeName(path));
 	if (fspath.m_exists)
@@ -228,15 +209,15 @@ FileSystem & RealFSImpl::CreateSubFileSystem
 
 	if (fs == FileSystem::DIR) {
 		EnsureDirectoryExists(path);
-		return *new RealFSImpl(fspath);
+		return new RealFSImpl(fspath);
 	} else
-		return *new ZipFilesystem(fspath);
+		return new ZipFilesystem(fspath);
 }
 
 /**
  * Remove a number of files
  */
-void RealFSImpl::Unlink(std::string const & file) {
+void RealFSImpl::Unlink(const std::string & file) {
 	FileSystemPath fspath(FS_CanonicalizeName(file));
 	if (!fspath.m_exists)
 		return;
@@ -250,12 +231,12 @@ void RealFSImpl::Unlink(std::string const & file) {
 /**
  * Remove a single directory or file
  */
-void RealFSImpl::m_unlink_file(std::string const & file) {
+void RealFSImpl::m_unlink_file(const std::string & file) {
 	FileSystemPath fspath(FS_CanonicalizeName(file));
 	assert(fspath.m_exists);  //TODO: throw an exception instead
 	assert(!fspath.m_isDirectory); //TODO: throw an exception instead
 
-#ifndef WIN32
+#ifndef _WIN32
 	unlink(fspath.c_str());
 #else
 	DeleteFile(fspath.c_str());
@@ -265,15 +246,12 @@ void RealFSImpl::m_unlink_file(std::string const & file) {
 /**
  * Recursively remove a directory
  */
-void RealFSImpl::m_unlink_directory(std::string const & file) {
+void RealFSImpl::m_unlink_directory(const std::string & file) {
 	FileSystemPath fspath(FS_CanonicalizeName(file));
 	assert(fspath.m_exists);  //TODO: throw an exception instead
 	assert(fspath.m_isDirectory);  //TODO: throw an exception instead
 
-	filenameset_t files;
-
-	FindFiles(file, "*", &files);
-
+	filenameset_t files = ListDirectory(file);
 	for
 		(filenameset_t::iterator pname = files.begin();
 		 pname != files.end();
@@ -293,7 +271,7 @@ void RealFSImpl::m_unlink_directory(std::string const & file) {
 
 	// NOTE: this might fail if this directory contains CVS dir,
 	// so no error checking here
-#ifndef WIN32
+#ifndef _WIN32
 	rmdir(fspath.c_str());
 #else
 	RemoveDirectory(fspath.c_str());
@@ -304,12 +282,12 @@ void RealFSImpl::m_unlink_directory(std::string const & file) {
  * Create this directory if it doesn't exist, throws an error
  * if the dir can't be created or if a file with this name exists
  */
-void RealFSImpl::EnsureDirectoryExists(std::string const & dirname)
+void RealFSImpl::EnsureDirectoryExists(const std::string & dirname)
 {
 	try {
 		std::string::size_type it = 0;
 		while (it < dirname.size()) {
-			it = dirname.find('/', it);
+			it = dirname.find(m_filesep, it);
 
 			FileSystemPath fspath(FS_CanonicalizeName(dirname.substr(0, it)));
 			if (fspath.m_exists and !fspath.m_isDirectory)
@@ -338,7 +316,7 @@ void RealFSImpl::EnsureDirectoryExists(std::string const & dirname)
  * MakeDirectory("onedir/otherdir/onemoredir") will fail
  * if either onedir or otherdir is missing
  */
-void RealFSImpl::MakeDirectory(std::string const & dirname) {
+void RealFSImpl::MakeDirectory(const std::string & dirname) {
 	FileSystemPath fspath(FS_CanonicalizeName(dirname));
 	if (fspath.m_exists)
 		throw wexception
@@ -346,7 +324,7 @@ void RealFSImpl::MakeDirectory(std::string const & dirname) {
 
 	if
 		(mkdir
-#ifdef WIN32
+#ifdef _WIN32
 		 	(fspath.c_str())
 #else
 		 	(fspath.c_str(), 0x1FF)
@@ -366,8 +344,8 @@ void RealFSImpl::MakeDirectory(std::string const & dirname) {
 void * RealFSImpl::Load(const std::string & fname, size_t & length) {
 	const std::string fullname = FS_CanonicalizeName(fname);
 
-	FILE * file = 0;
-	void * data = 0;
+	FILE * file = nullptr;
+	void * data = nullptr;
 
 	try {
 		//debug info
@@ -391,7 +369,7 @@ void * RealFSImpl::Load(const std::string & fname, size_t & length) {
 			if (ftell_pos < 0)
 				throw wexception
 					("RealFSImpl::Load: error when loading \"%s\" (\"%s\"): file "
-					 "size calculation yieded negative value %i",
+					 "size calculation yielded negative value %i",
 					 fname.c_str(), fullname.c_str(), ftell_pos);
 			size = ftell_pos;
 		}
@@ -403,46 +381,39 @@ void * RealFSImpl::Load(const std::string & fname, size_t & length) {
 		if (size and (result != 1)) {
 			assert(false);
 			throw wexception
-				("RealFSImpl::Load: read failed for %s (%s) with size %lu",
-				 fname.c_str(), fullname.c_str(),
-				 static_cast<long unsigned int>(size));
+				("RealFSImpl::Load: read failed for %s (%s) with size %" PRIuS "",
+				 fname.c_str(), fullname.c_str(), size);
 		}
 		static_cast<int8_t *>(data)[size] = 0;
 
 		fclose(file);
-		file = 0;
+		file = nullptr;
 
 		length = size;
-
-		return data;
 	} catch (...) {
 		if (file)
 			fclose(file);
 		free(data);
 		throw;
 	}
+
+	return data;
 }
 
-#ifndef _MSC_VER
-/// \note The MAP_FAILED macro from glibc uses old-style cast. We can not fix
-/// this ourselves, so we temporarily turn the error into a warning. It is
-/// turned back into an error after this function.
-#pragma GCC diagnostic warning "-Wold-style-cast"
-#endif
 void * RealFSImpl::fastLoad
 	(const std::string & fname, size_t & length, bool & fast)
 {
-#ifdef WIN32
+#ifdef _WIN32
 	fast = false;
 	return Load(fname, length);
 #else
 	const std::string fullname = FS_CanonicalizeName(fname);
 	int file = 0;
-	void * data = 0;
+	void * data = nullptr;
 
 #ifdef __APPLE__
 	file = open(fullname.c_str(), O_RDONLY);
-#elif defined (__FreeBSD__)
+#elif defined (__FreeBSD__) || defined (__OpenBSD__)
 	file = open(fullname.c_str(), O_RDONLY);
 #else
 	file = open(fullname.c_str(), O_RDONLY|O_NOATIME);
@@ -450,25 +421,27 @@ void * RealFSImpl::fastLoad
 	length = lseek(file, 0, SEEK_END);
 	lseek(file, 0, SEEK_SET);
 
-	data = mmap(0, length, PROT_READ, MAP_PRIVATE, file, 0);
+	data = mmap(nullptr, length, PROT_READ, MAP_PRIVATE, file, 0);
 
 	//if mmap doesn't work for some strange reason try the old way
-	if (data == MAP_FAILED)
+GCC_DIAG_OFF("-Wold-style-cast")
+	if (data == MAP_FAILED) {
+GCC_DIAG_ON("-Wold-style-cast")
 		return Load(fname, length);
+	}
 
 	fast = true;
 
 	assert(data);
+GCC_DIAG_OFF("-Wold-style-cast")
 	assert(data != MAP_FAILED);
+GCC_DIAG_ON("-Wold-style-cast")
 
 	close(file);
 
 	return data;
 #endif
 }
-#ifndef _MSC_VER
-#pragma GCC diagnostic error "-Wold-style-cast"
-#endif
 
 /**
  * Write the given block of memory to the repository.
@@ -476,7 +449,7 @@ void * RealFSImpl::fastLoad
  * that file.
  * Throws an exception if it fails.
  */
-void RealFSImpl::Write(std::string const & fname, void const * const data, int32_t const length, bool append)
+void RealFSImpl::Write(const std::string & fname, void const * const data, int32_t const length, bool append)
 {
 	std::string fullname;
 
@@ -497,7 +470,7 @@ void RealFSImpl::Write(std::string const & fname, void const * const data, int32
 
 // rename a file or directory
 void RealFSImpl::Rename
-	(std::string const & old_name, std::string const & new_name)
+	(const std::string & old_name, const std::string & new_name)
 {
 	const std::string fullname1 = FS_CanonicalizeName(old_name);
 	const std::string fullname2 = FS_CanonicalizeName(new_name);
@@ -514,7 +487,7 @@ Implementation of OpenStreamRead
 namespace {
 
 struct RealFSStreamRead : public StreamRead {
-	RealFSStreamRead(std::string const & fname)
+	RealFSStreamRead(const std::string & fname)
 		: m_file(fopen(fname.c_str(), "rb"))
 	{
 		if (!m_file)
@@ -526,11 +499,11 @@ struct RealFSStreamRead : public StreamRead {
 		fclose(m_file);
 	}
 
-	size_t Data(void * const data, size_t const bufsize) {
+	size_t Data(void * data, size_t const bufsize) override {
 		return fread(data, 1, bufsize, m_file);
 	}
 
-	bool EndOfFile() const
+	bool EndOfFile() const override
 	{
 		return feof(m_file);
 	}
@@ -541,7 +514,7 @@ private:
 
 };
 
-StreamRead * RealFSImpl::OpenStreamRead(std::string const & fname) {
+StreamRead * RealFSImpl::OpenStreamRead(const std::string & fname) {
 	const std::string fullname = FS_CanonicalizeName(fname);
 
 	return new RealFSStreamRead(fullname);
@@ -557,7 +530,7 @@ Implementation of OpenStreamWrite
 namespace {
 
 struct RealFSStreamWrite : public StreamWrite {
-	RealFSStreamWrite(std::string const & fname)
+	RealFSStreamWrite(const std::string & fname)
 		: m_filename(fname)
 	{
 		m_file = fopen(fname.c_str(), "wb");
@@ -567,7 +540,7 @@ struct RealFSStreamWrite : public StreamWrite {
 
 	~RealFSStreamWrite() {fclose(m_file);}
 
-	void Data(const void * const data, const size_t size)
+	void Data(const void * const data, const size_t size) override
 	{
 		size_t ret = fwrite(data, 1, size, m_file);
 
@@ -575,7 +548,7 @@ struct RealFSStreamWrite : public StreamWrite {
 			throw wexception("Write to %s failed", m_filename.c_str());
 	}
 
-	void Flush()
+	void Flush() override
 	{
 		fflush(m_file);
 	}
@@ -587,14 +560,14 @@ private:
 
 };
 
-StreamWrite * RealFSImpl::OpenStreamWrite(std::string const & fname) {
+StreamWrite * RealFSImpl::OpenStreamWrite(const std::string & fname) {
 	const std::string fullname = FS_CanonicalizeName(fname);
 
 	return new RealFSStreamWrite(fullname);
 }
 
 unsigned long long RealFSImpl::DiskSpace() {
-#ifdef WIN32
+#ifdef _WIN32
 	ULARGE_INTEGER freeavailable;
 	return
 		GetDiskFreeSpaceEx

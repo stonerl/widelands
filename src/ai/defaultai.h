@@ -20,12 +20,11 @@
 #ifndef DEFAULTAI_H
 #define DEFAULTAI_H
 
-#include "ai_help_structs.h"
+#include <map>
 
+#include "ai/ai_help_structs.h"
 #include "computer_player.h"
 #include "i18n.h"
-
-#include <map>
 
 namespace Widelands {
 struct Road;
@@ -69,10 +68,10 @@ struct Flag;
 struct DefaultAI : Computer_Player {
 	DefaultAI(Widelands::Game &, const Widelands::Player_Number, uint8_t);
 	~DefaultAI();
-	virtual void think ();
+	virtual void think () override;
 
-	virtual void receive(Widelands::NoteImmovable const &);
-	virtual void receive(Widelands::NoteFieldPossession     const &);
+	virtual void receive(const Widelands::NoteImmovable &) override;
+	virtual void receive(const Widelands::NoteFieldPossession     &) override;
 
 	enum {
 		AGGRESSIVE = 2,
@@ -84,7 +83,7 @@ struct DefaultAI : Computer_Player {
 	struct AggressiveImpl : public Computer_Player::Implementation {
 		AggressiveImpl() {name = _("Aggressive");}
 		Computer_Player * instantiate
-			(Widelands::Game & game, Widelands::Player_Number const p) const
+			(Widelands::Game & game, Widelands::Player_Number const p) const override
 		{
 			return new DefaultAI(game, p, AGGRESSIVE);
 		}
@@ -93,7 +92,7 @@ struct DefaultAI : Computer_Player {
 	struct NormalImpl : public Computer_Player::Implementation {
 		NormalImpl() {name = _("Normal");}
 		Computer_Player * instantiate
-			(Widelands::Game & game, Widelands::Player_Number const p) const
+			(Widelands::Game & game, Widelands::Player_Number const p) const override
 		{
 			return new DefaultAI(game, p, NORMAL);
 		}
@@ -102,7 +101,7 @@ struct DefaultAI : Computer_Player {
 	struct DefensiveImpl : public Computer_Player::Implementation {
 		DefensiveImpl() {name = _("Defensive");}
 		Computer_Player * instantiate
-			(Widelands::Game & game, Widelands::Player_Number const p) const
+			(Widelands::Game & game, Widelands::Player_Number const p) const override
 		{
 			return new DefaultAI(game, p, DEFENSIVE);
 		}
@@ -140,17 +139,17 @@ private:
 	int32_t calculate_need_for_ps(BuildingObserver &, int32_t);
 
 	void consider_productionsite_influence
-		(BuildableField &, Widelands::Coords, BuildingObserver const &);
+		(BuildableField &, Widelands::Coords, const BuildingObserver &);
 
 	EconomyObserver  * get_economy_observer (Widelands::Economy &);
 	BuildingObserver & get_building_observer(char const *);
 
 	void gain_immovable (Widelands::PlayerImmovable       &);
-	void lose_immovable (Widelands::PlayerImmovable const &);
+	void lose_immovable (const Widelands::PlayerImmovable &);
 	void gain_building  (Widelands::Building              &);
-	void lose_building  (Widelands::Building        const &);
+	void lose_building  (const Widelands::Building        &);
 
-	bool check_supply (BuildingObserver const &);
+	bool check_supply (const BuildingObserver &);
 
 	bool consider_attack (int32_t);
 
@@ -170,7 +169,7 @@ private:
 
 	std::list<Widelands::FCoords>      unusable_fields;
 	std::list<BuildableField *>        buildable_fields;
-	std::list<BlockedField *>          blocked_fields;
+	std::list<BlockedField>          blocked_fields;
 	std::list<MineableField *>         mineable_fields;
 	std::list<Widelands::Flag const *> new_flags;
 	std::list<Widelands::Coords>       flags_to_be_removed;

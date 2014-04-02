@@ -17,20 +17,20 @@
  *
  */
 
-#include "editor_decrease_height_tool.h"
+#include "editor/tools/editor_decrease_height_tool.h"
 
-#include "editor_increase_height_tool.h"
-#include "editor_set_height_tool.h"
-#include "logic/map.h"
-#include "logic/field.h"
-#include "logic/mapregion.h"
 #include "editor/editorinteractive.h"
+#include "editor/tools/editor_increase_height_tool.h"
+#include "editor/tools/editor_set_height_tool.h"
+#include "logic/field.h"
+#include "logic/map.h"
+#include "logic/mapregion.h"
 
 /// Decreases the heights by a value. Chages surrounding nodes if necessary.
 int32_t Editor_Decrease_Height_Tool::handle_click_impl
 	(Widelands::Map & map,
 	Widelands::Node_and_Triangle<> center,
-	Editor_Interactive & parent,
+	Editor_Interactive & /* parent */,
 	Editor_Action_Args & args)
 {
 	if (args.origHights.empty()) {
@@ -52,7 +52,7 @@ int32_t Editor_Decrease_Height_Tool::handle_click_impl
 int32_t Editor_Decrease_Height_Tool::handle_undo_impl
 	(Widelands::Map & map,
 	Widelands::Node_and_Triangle<> center,
-	Editor_Interactive & parent,
+	Editor_Interactive & /* parent */,
 	Editor_Action_Args & args)
 {
 	Widelands::MapRegion<Widelands::Area<Widelands::FCoords> > mr
@@ -62,7 +62,7 @@ int32_t Editor_Decrease_Height_Tool::handle_undo_impl
 	std::list<Widelands::Field::Height>::iterator i = args.origHights.begin();
 
 	do {
-		mr.location().field->set_height(*i); i++;
+		mr.location().field->set_height(*i); ++i;
 	} while (mr.advance(map));
 
 	map.recalc_for_field_area

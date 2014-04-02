@@ -20,109 +20,73 @@
 #ifndef SCRIPTING_H
 #define SCRIPTING_H
 
-#include "wexception.h"
-
 #include <map>
-#include <stdint.h>
 #include <string>
 
-#include <boost/shared_ptr.hpp>
+#include <stdint.h>
 
-#include <lua.hpp>
-
-#include "logic/widelands_filewrite.h"
 #include "logic/widelands_fileread.h"
+#include "logic/widelands_filewrite.h"
+#include "scripting/eris/lua.hpp"
+#include "scripting/lua_errors.h"
 
 namespace Widelands {
-	struct Editor_Game_Base;
-	struct Game;
-	struct Map_Map_Object_Loader;
+	class Editor_Game_Base;
+	class Game;
+	class Map_Map_Object_Loader;
 	struct Map_Map_Object_Saver;
-	struct Player;
+	class Player;
 }
 
-struct LuaError : public _wexception {
-	LuaError(std::string const & reason) : wexception("%s", reason.c_str()) {}
-};
-struct LuaValueError : public LuaError {
-	LuaValueError(std::string const & wanted) :
-		LuaError("Variable not of expected type: " + wanted)
-	{}
-};
-struct LuaTableKeyError : public LuaError {
-	LuaTableKeyError(std::string const & wanted) :
-		LuaError(wanted + " is not a field in this table.")
-	{}
-};
-struct LuaScriptNotExistingError : public LuaError {
-	LuaScriptNotExistingError(std::string ns, std::string name) :
-		LuaError("The script '" + ns + ":" + name + "' was not found!") {}
-};
+class EditorFactory;
+class GameFactory;
+class LuaCoroutine;
+class LuaTable;
 
-/**
- * Easy handling of LuaCoroutines
- */
-struct LuaCoroutine {
-	virtual ~LuaCoroutine() {}
+// Provides an interface to call and execute Lua Code.
+class LuaInterface {
+public:
+	LuaInterface();
+	virtual ~LuaInterface();
 
-	enum {
-		DONE = 0,
-		YIELDED = LUA_YIELD,
-	};
+	// Interpret the given string, will throw 'LuaError' on any error.
+	void interpret_string(const std::string&);
 
-	virtual int get_status() = 0;
-	virtual int resume(uint32_t * = 0) = 0;
+	std::unique_ptr<LuaTable> run_script(const std::string& script);
+	std::unique_ptr<LuaTable> get_hook(const std::string& name);
 
-	virtual void push_arg(const Widelands::Player *) = 0;
-	virtual void push_arg(const Widelands::Coords &) = 0;
+protected:
+	lua_State * m_L;
 };
 
-/*
- * Easy handling of return values from Wideland's Lua configurations
- * scripts: they return a Lua table with (string,value) pairs.
- */
-struct LuaTable {
-	virtual ~LuaTable() {}
+class LuaEditorInterface : public LuaInterface {
+public:
+	LuaEditorInterface(Widelands::Editor_Game_Base * g);
+	virtual ~LuaEditorInterface();
 
-	virtual std::string get_string(std::string) = 0;
-	virtual LuaCoroutine * get_coroutine(std::string) = 0;
+private:
+	std::unique_ptr<EditorFactory> m_factory;
 };
 
-/*
- * This is the thin class that is used to execute code
- */
-typedef std::map<std::string, std::string> ScriptContainer;
-struct LuaInterface {
-	virtual ~LuaInterface() {}
+class LuaGameInterface : public LuaInterface {
+public:
+	LuaGameInterface(Widelands::Game * g);
+	virtual ~LuaGameInterface();
 
-	virtual void interpret_string(std::string) = 0;
-	virtual std::string const & get_last_error() const = 0;
+	// Input/output for coroutines.
+	LuaCoroutine * read_coroutine
+		(Widelands::FileRead &, Widelands::Map_Map_Object_Loader &, uint32_t);
+	uint32_t write_coroutine
+		(Widelands::FileWrite &, Widelands::Map_Map_Object_Saver &, LuaCoroutine *);
 
-	virtual void register_scripts
-		(FileSystem &, std::string, std::string = "scripting") = 0;
-	virtual ScriptContainer & get_scripts_for(std::string) = 0;
+	// Input output for the global game state.
+	void read_global_env
+		(Widelands::FileRead &, Widelands::Map_Map_Object_Loader &, uint32_t);
+	uint32_t write_global_env
+		(Widelands::FileWrite &, Widelands::Map_Map_Object_Saver &);
 
-	virtual boost::shared_ptr<LuaTable> run_script(std::string, std::string) = 0;
-	virtual boost::shared_ptr<LuaTable> run_script
-			(FileSystem &, std::string, std::string) = 0;
-
-	virtual boost::shared_ptr<LuaTable> get_hook(std::string name) = 0;
+private:
+	std::unique_ptr<GameFactory> m_factory;
 };
-
-struct LuaGameInterface : public virtual LuaInterface {
-	virtual LuaCoroutine * read_coroutine
-		(Widelands::FileRead &, Widelands::Map_Map_Object_Loader &, uint32_t) = 0;
-	virtual uint32_t write_coroutine
-		(Widelands::FileWrite &, Widelands::Map_Map_Object_Saver &, LuaCoroutine *) = 0;
-
-	virtual void read_global_env
-		(Widelands::FileRead &, Widelands::Map_Map_Object_Loader &, uint32_t) = 0;
-	virtual uint32_t write_global_env
-		(Widelands::FileWrite &, Widelands::Map_Map_Object_Saver &) = 0;
-};
-
-LuaGameInterface * create_LuaGameInterface(Widelands::Game *);
-LuaInterface * create_LuaEditorInterface(Widelands::Editor_Game_Base *);
-LuaInterface * create_LuaInterface();
 
 #endif

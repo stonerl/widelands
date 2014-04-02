@@ -2,18 +2,18 @@
 --                   Territorial Lord Win condition
 -- =======================================================================
 
-use("aux", "coroutine") -- for sleep
-use("aux", "table")
-use("aux", "win_condition_functions")
+include "scripting/coroutine.lua" -- for sleep
+include "scripting/table.lua"
+include "scripting/win_condition_functions.lua"
 
 set_textdomain("win_conditions")
 
-use("aux", "win_condition_texts")
+include "scripting/win_condition_texts.lua"
 
 local wc_name = _ "Territorial Lord"
 local wc_version = 2
 local wc_desc = _ (
-	"Each player or team tries to obtain more than half of the maps' " ..
+	"Each player or team tries to obtain more than half of the map’s " ..
 	"area. The winner will be the player or the team that is able to keep " ..
 	"that area for at least 20 minutes."
 )
@@ -140,29 +140,38 @@ return {
 				end
 			end
 			if not foundcandidate then
+				currentcandidate = ""
+				candidateisteam = false
 				remaining_time = 10
 			end
 		end
 
 		function _send_state()
-			local msg1 = game_status_territoral_lord.other1:format(currentcandidate)
+			set_textdomain("win_conditions")
+			local candidate = currentcandidate
 			if candidateisteam then
-				local teamstr = game_status_territoral_lord.team:format(currentcandidate)
-				msg1 = game_status_territoral_lord.other1:format(teamstr)
+				candidate = (_"Team %i"):format(currentcandidate)
 			end
+			local msg1 = (_"%s owns more than half of the map’s area."):format(candidate)
 			msg1 = msg1 .. "\n"
-			msg1 = msg1 .. game_status_territoral_lord.other2:format(remaining_time / 60)
+			msg1 = msg1 .. (ngettext("You’ve still got %i minute to prevent a victory.",
+						 "You’ve still got %i minutes to prevent a victory.",
+						 remaining_time / 60))
+					:format(remaining_time / 60)
 
-			local msg2 = game_status_territoral_lord.player1
+			local msg2 = _"You own more than half of the map’s area."
 			msg2 = msg2 .. "\n"
-			msg2 = msg2 .. game_status_territoral_lord.player2:format(remaining_time / 60)
+			msg2 = msg2 .. (ngettext("Keep it for %i more minute to win the game.",
+						 "Keep it for %i more minutes to win the game.",
+						 remaining_time / 60))
+					:format(remaining_time / 60)
 
 			for idx, p in ipairs(plrs) do
 				if candidateisteam and currentcandidate == p.team
 					or not candidateisteam and currentcandidate == p.name then
-					p:send_message(game_status.title, msg2, {popup = true})
+					p:send_message(game_status.title, msg2)
 				else
-					p:send_message(game_status.title, msg1, {popup = true})
+					p:send_message(game_status.title, msg1)
 				end
 			end
 		end
@@ -187,11 +196,11 @@ return {
 					p.see_all = 1
 					if candidateisteam and currentcandidate == p.team
 						or not candidateisteam and currentcandidate == p.name then
-						p:send_message(won_game_over.title, won_game_over.body, {popup = true})
-						wl.game.report_result(p, true, _landsizes[p.number], make_extra_data(p, wc_name, wc_version))
+						p:send_message(won_game_over.title, won_game_over.body)
+						wl.game.report_result(p, 1, make_extra_data(p, wc_name, wc_version, {score=_landsizes[p.number]}))
 					else
-						p:send_message(lost_game_over.title, lost_game_over.body, {popup = true})
-						wl.game.report_result(p, false, _landsizes[p.number], make_extra_data(p, wc_name, wc_version))
+						p:send_message(lost_game_over.title, lost_game_over.body)
+						wl.game.report_result(p, 0, make_extra_data(p, wc_name, wc_version, {score=_landsizes[p.number]}))
 					end
 				end
 				break

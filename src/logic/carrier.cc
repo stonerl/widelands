@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2002-2004, 2006-2010 by the Widelands Development Team
+ * Copyright (C) 2002-2004, 2006-2013 by the Widelands Development Team
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -17,16 +17,15 @@
  *
  */
 
-#include "carrier.h"
-#include "game.h"
-#include "game_data_error.h"
-#include "wexception.h"
+#include "logic/carrier.h"
 
+#include "economy/flag.h"
 #include "economy/road.h"
 #include "economy/ware_instance.h"
-#include "economy/flag.h"
-
+#include "logic/game.h"
+#include "logic/game_data_error.h"
 #include "upcast.h"
+#include "wexception.h"
 
 namespace Widelands {
 
@@ -37,7 +36,7 @@ namespace Widelands {
 Bob::Task const Carrier::taskRoad = {
 	"road",
 	static_cast<Bob::Ptr>(&Carrier::road_update),
-	0,
+	nullptr,
 	static_cast<Bob::Ptr>(&Carrier::road_pop),
 	true
 };
@@ -85,9 +84,9 @@ void Carrier::road_update(Game & game, State & state)
 
 	Road & road = ref_cast<Road, PlayerImmovable>(*get_location(game));
 
-	// Check for pending items
+	// Check for pending wares
 	if (m_promised_pickup_to == NOONE)
-		find_pending_item(game);
+		find_pending_ware(game);
 
 	if (m_promised_pickup_to != NOONE) {
 		if (state.ivar1) {
@@ -123,7 +122,7 @@ void Carrier::road_update(Game & game, State & state)
  * a second carrier (ox or something). If we promised a flag that we would pick up
  * a ware there, we have to make sure that they do not count on us anymore.
  */
-void Carrier::road_pop(Game & game, State & state)
+void Carrier::road_pop(Game & game, State & /* state */)
 {
 	if (m_promised_pickup_to != NOONE && get_location(game)) {
 		Road & road      = ref_cast<Road, PlayerImmovable>(*get_location(game));
@@ -135,7 +134,7 @@ void Carrier::road_pop(Game & game, State & state)
 }
 
 /**
- * Fetch an item from a flag, drop it on the other flag.
+ * Fetch an ware from a flag, drop it on the other flag.
  * ivar1 is the flag we fetch from, or -1 when we're in the target building.
  *
  * Signal "update" when the road has been split etc.
@@ -143,8 +142,8 @@ void Carrier::road_pop(Game & game, State & state)
 Bob::Task const Carrier::taskTransport = {
 	"transport",
 	static_cast<Bob::Ptr>(&Carrier::transport_update),
-	0,
-	0,
+	nullptr,
+	nullptr,
 	true
 };
 
@@ -186,27 +185,27 @@ void Carrier::transport_update(Game & game, State & state)
 		pickup_from_flag(game, state);
 
 	else {
-		// If the item should go to the building attached to our flag, walk
+		// If the ware should go to the building attached to our flag, walk
 		// directly into said building
 		Flag & flag = road.get_flag(static_cast<Road::FlagId>(state.ivar1 ^ 1));
 
-		WareInstance & item = *get_carried_item(game);
-		assert(item.get_location(game) == this);
+		WareInstance & ware = *get_carried_ware(game);
+		assert(ware.get_location(game) == this);
 
 		// A sanity check is necessary, in case the building has been destroyed
-		PlayerImmovable * const next = item.get_next_move_step(game);
+		PlayerImmovable * const next = ware.get_next_move_step(game);
 
 		if (next && next != &flag && &next->base_flag() == &flag)
 			enter_building(game, state);
 
-		// If the flag is overloaded we are allowed to drop items as
+		// If the flag is overloaded we are allowed to drop wares as
 		// long as we can pick another up. Otherwise we have to wait.
 		else if
 			((flag.has_capacity() || !swap_or_wait(game, state))
 			 &&
 			 !start_task_walktoflag(game, state.ivar1 ^ 1))
-			// Drop the item, possible exchanging it with another one
-			drop_item(game, state);
+			// Drop the ware, possible exchanging it with another one
+			drop_ware(game, state);
 	}
 }
 
@@ -226,17 +225,16 @@ void Carrier::deliver_to_building(Game & game, State & state)
 	if (dynamic_cast<Flag const *>(pos))
 		return pop_task(game); //  we are done
 	else if (upcast(Building, building, pos)) {
-		// Drop all items addresed to this building
-		while (WareInstance * const item = get_carried_item(game)) {
+		// Drop all wares addressed to this building
+		while (WareInstance * const ware = get_carried_ware(game)) {
 			// If the building has disappeared and immediately been replaced
 			// with another building, we might have to return without dropping
-			// the item.
-			PlayerImmovable const * const next = item->get_next_move_step(game);
+			// the ware.
+			PlayerImmovable const * const next = ware->get_next_move_step(game);
 
 			if (next == pos) {
-				fetch_carried_item(game);
-				item->set_location(game, building);
-				item->update      (game);
+				fetch_carried_ware(game);
+				ware->enter_building(game, *building);
 			} else {
 				molog
 					("[Carrier]: Building switch from under us, return to road.\n");
@@ -250,17 +248,17 @@ void Carrier::deliver_to_building(Game & game, State & state)
 			}
 		}
 
-		// No more deliverable items. Walk out to the flag.
+		// No more deliverable wares. Walk out to the flag.
 		return
 			start_task_move
 				(game,
 				 WALK_SE,
-				 &descr().get_right_walk_anims(does_carry_ware()),
+				 descr().get_right_walk_anims(does_carry_ware()),
 				 true);
 	} else {
 		//  tough luck, the building has disappeared
 		molog("[Carrier]: Building disappeared while in building.\n");
-		set_location(0);
+		set_location(nullptr);
 	}
 }
 
@@ -282,10 +280,10 @@ void Carrier::pickup_from_flag(Game & game, State & state)
 		Flag & flag      = road.get_flag(static_cast<Road::FlagId>(ivar1));
 		Flag & otherflag = road.get_flag(static_cast<Road::FlagId>(ivar1 ^ 1));
 
-		// Are there items to move between our flags?
-		if (WareInstance * const item = flag.fetch_pending_item(game, otherflag))
+		// Are there wares to move between our flags?
+		if (WareInstance * const ware = flag.fetch_pending_ware(game, otherflag))
 		{
-			set_carried_item(game, item);
+			set_carried_ware(game, ware);
 
 			set_animation(game, descr().get_animation("idle"));
 			return schedule_act(game, 20);
@@ -298,22 +296,22 @@ void Carrier::pickup_from_flag(Game & game, State & state)
 
 
 /**
- * Drop one item in a flag, and pick up a new one if we acked it
+ * Drop one ware in a flag, and pick up a new one if we acked it
  *
  * \param g Game the carrier lives on.
  * \param s Flags sent to the task
  */
-void Carrier::drop_item(Game & game, State & state)
+void Carrier::drop_ware(Game & game, State & state)
 {
-	WareInstance * other = 0;
+	WareInstance * other = nullptr;
 	Road & road = ref_cast<Road, PlayerImmovable>(*get_location(game));
 	Flag & flag = road.get_flag(static_cast<Road::FlagId>(state.ivar1 ^ 1));
 
 	if (m_promised_pickup_to == (state.ivar1 ^ 1)) {
-		// If there's an item we acked, we can drop ours even if the flag is
+		// If there's an ware we acked, we can drop ours even if the flag is
 		// flooded
 		other =
-			flag.fetch_pending_item
+			flag.fetch_pending_ware
 				(game, road.get_flag(static_cast<Road::FlagId>(state.ivar1)));
 
 		if (!other && !flag.has_capacity()) {
@@ -330,12 +328,12 @@ void Carrier::drop_item(Game & game, State & state)
 		m_promised_pickup_to = NOONE;
 	}
 
-	// Drop our item
-	flag.add_item(game, *fetch_carried_item(game));
+	// Drop our ware
+	flag.add_ware(game, *fetch_carried_ware(game));
 
 	// Pick up new load, if any
 	if (other) {
-		set_carried_item(game, other);
+		set_carried_ware(game, other);
 
 		set_animation(game, descr().get_animation("idle"));
 		return schedule_act(game, 20);
@@ -345,7 +343,7 @@ void Carrier::drop_item(Game & game, State & state)
 
 
 /**
- * When picking up items, if some of them is targeted to the building attached
+ * When picking up wares, if some of them is targeted to the building attached
  * to target flag walk straight into it and deliver.
  *
  * \param g Game the carrier lives on.
@@ -359,15 +357,15 @@ void Carrier::enter_building(Game & game, State & state)
 			start_task_move
 				(game,
 				 WALK_NW,
-				 &descr().get_right_walk_anims(does_carry_ware()),
+				 descr().get_right_walk_anims(does_carry_ware()),
 				 true);
 	}
 }
 
 
 /**
- * Swaps items from an overloaded flag for as long as the carrier can pick
- * up new items from it. Otherwise, changes the carrier state to wait.
+ * Swaps wares from an overloaded flag for as long as the carrier can pick
+ * up new wares from it. Otherwise, changes the carrier state to wait.
  *
  * \param g Game the carrier lives on.
  * \param s Flags sent to the task.
@@ -385,10 +383,10 @@ bool Carrier::swap_or_wait(Game & game, State & state)
 
 
 	if (m_promised_pickup_to == (state.ivar1 ^ 1)) {
-		// All is well, we already acked an item that we can pick up
+		// All is well, we already acked an ware that we can pick up
 		// from this flag
 		return false;
-	} else if (flag.has_pending_item(game, otherflag)) {
+	} else if (flag.has_pending_ware(game, otherflag)) {
 		if (!flag.ack_pickup(game, otherflag))
 			throw wexception
 				("MO(%u): transport: overload exchange: flag %u is fucked up",
@@ -404,7 +402,7 @@ bool Carrier::swap_or_wait(Game & game, State & state)
 
 
 /**
- * Called by Road code to indicate that a new item has arrived on a flag
+ * Called by Road code to indicate that a new ware has arrived on a flag
  * (0 = start, 1 = end).
  * \return true if the carrier is going to fetch it.
  */
@@ -422,13 +420,13 @@ bool Carrier::notify_ware(Game & game, int32_t const flag)
 	//     (the transport code does not have priorities for the actual
 	//     carrier that is notified)
 	//  b) the transport task has logic that allows it to
-	//     drop an item on an overloaded flag iff it can pick up an item
+	//     drop an ware on an overloaded flag iff it can pick up an ware
 	//     at the same time.
-	//     We should ack said item to avoid more confusion before we move
+	//     We should ack said ware to avoid more confusion before we move
 	//     onto the flag, but we can't do that if we have already acked
 	//     something.
 	//  c) we might ack for a flag that we are actually moving away from;
-	//     this will get us into trouble if items have arrived on the other
+	//     this will get us into trouble if wares have arrived on the other
 	//     flag while we couldn't ack them.
 	//
 	// (Maybe the need for this lengthy explanation is proof that the
@@ -452,47 +450,47 @@ bool Carrier::notify_ware(Game & game, int32_t const flag)
 
 
 /**
- * Find a pending item on one of the road's flags, ack it and set m_promised_pickup_to
+ * Find a pending ware on one of the road's flags, ack it and set m_promised_pickup_to
  * accordingly.
  */
-void Carrier::find_pending_item(Game & game)
+void Carrier::find_pending_ware(Game & game)
 {
 	Road & road = ref_cast<Road, PlayerImmovable>(*get_location(game));
-	uint32_t haveitembits = 0;
+	uint32_t havewarebits = 0;
 
 	assert(m_promised_pickup_to == NOONE);
 
 	if
-		(road.get_flag(Road::FlagStart).has_pending_item
+		(road.get_flag(Road::FlagStart).has_pending_ware
 		 	(game, road.get_flag(Road::FlagEnd)))
-		haveitembits |= 1;
+		havewarebits |= 1;
 
 	if
-		(road.get_flag(Road::FlagEnd).has_pending_item
+		(road.get_flag(Road::FlagEnd).has_pending_ware
 		 	(game, road.get_flag(Road::FlagStart)))
-		haveitembits |= 2;
+		havewarebits |= 2;
 
-	//  If both flags have an item, we pick the one closer to us.
-	if (haveitembits == 3)
-		haveitembits = 1 << find_closest_flag(game);
+	//  If both flags have an ware, we pick the one closer to us.
+	if (havewarebits == 3)
+		havewarebits = 1 << find_closest_flag(game);
 
 	// Ack our decision
-	if (haveitembits == 1) {
+	if (havewarebits == 1) {
 		m_promised_pickup_to = START_FLAG;
 		if
 			(!
 			 road.get_flag(Road::FlagStart).ack_pickup
 			 	(game, road.get_flag(Road::FlagEnd)))
 			throw wexception
-				("Carrier::find_pending_item: start flag is messed up");
+				("Carrier::find_pending_ware: start flag is messed up");
 
-	} else if (haveitembits == 2) {
+	} else if (havewarebits == 2) {
 		m_promised_pickup_to = END_FLAG;
 		if
 			(!
 			 road.get_flag(Road::FlagEnd).ack_pickup
 			 	(game, road.get_flag(Road::FlagStart)))
-			throw wexception("Carrier::find_pending_item: end flag is messed up");
+			throw wexception("Carrier::find_pending_ware: end flag is messed up");
 	}
 }
 
@@ -508,9 +506,7 @@ int32_t Carrier::find_closest_flag(Game & game)
 
 	CoordPath endpath;
 	int32_t startcost, endcost;
-	int32_t curidx = -1;
-
-	curidx = startpath.get_index(get_position());
+	int32_t curidx = startpath.get_index(get_position());
 
 	// Apparently, we're in a building
 	if (curidx < 0) {
@@ -537,8 +533,8 @@ int32_t Carrier::find_closest_flag(Game & game)
 
 	endpath.starttrim(curidx);
 
-	map.calc_cost(startpath, &startcost, 0);
-	map.calc_cost(endpath,   &endcost,   0);
+	map.calc_cost(startpath, &startcost, nullptr);
+	map.calc_cost(endpath,   &endcost,   nullptr);
 
 	return endcost < startcost;
 }
@@ -553,7 +549,7 @@ int32_t Carrier::find_closest_flag(Game & game)
 bool Carrier::start_task_walktoflag
 	(Game & game, int32_t const flag, bool const offset)
 {
-	Path const & path =
+	const Path & path =
 		ref_cast<Road, PlayerImmovable>(*get_location(game)).get_path();
 	int32_t idx;
 

@@ -21,9 +21,9 @@
 #define UI_HELPWINDOW_H
 
 #include "align.h"
-#include "multilinetextarea.h"
-#include "unique_window.h"
-#include "window.h"
+#include "ui_basic/multilinetextarea.h"
+#include "ui_basic/unique_window.h"
+#include "ui_basic/window.h"
 
 namespace UI {
 
@@ -50,8 +50,8 @@ struct HelpWindow : public Window {
 		 uint32_t width = 0, uint32_t height = 0);
 	~HelpWindow();
 
-	bool handle_mousepress  (uint8_t btn, int32_t mx, int32_t my);
-	bool handle_mouserelease(uint8_t btn, int32_t mx, int32_t my);
+	bool handle_mousepress  (uint8_t btn, int32_t mx, int32_t my) override;
+	bool handle_mouserelease(uint8_t btn, int32_t mx, int32_t my) override;
 
 	void add_heading   (std::string text);
 	void add_paragraph (std::string text);

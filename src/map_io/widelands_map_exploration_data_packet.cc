@@ -17,16 +17,15 @@
  *
  */
 
-#include "widelands_map_exploration_data_packet.h"
+#include "map_io/widelands_map_exploration_data_packet.h"
 
+#include "log.h"
 #include "logic/editor_game_base.h"
 #include "logic/game_data_error.h"
 #include "logic/map.h"
 #include "logic/player.h"
 #include "logic/widelands_fileread.h"
 #include "logic/widelands_filewrite.h"
-
-#include "log.h"
 
 namespace Widelands {
 
@@ -38,7 +37,6 @@ void Map_Exploration_Data_Packet::Read
 	 Editor_Game_Base      &       egbase,
 	 bool                    const skip,
 	 Map_Map_Object_Loader &)
-throw (_wexception)
 {
 	if (skip)
 		return;
@@ -54,7 +52,7 @@ throw (_wexception)
 		}
 	}
 
-	compile_assert(MAX_PLAYERS < 32);
+	static_assert(MAX_PLAYERS < 32, "assert(MAX_PLAYERS < 32) failed.");
 	Map & map = egbase.map();
 	Player_Number const nr_players = map.get_nrplayers();
 	Map_Index const max_index = map.max_index();
@@ -90,22 +88,21 @@ throw (_wexception)
 			}
 		else
 			throw game_data_error
-				(_("unknown/unhandled version %u"), packet_version);
-	} catch (_wexception const & e) {
-		throw game_data_error(_("seen: %s"), e.what());
+				("unknown/unhandled version %u", packet_version);
+	} catch (const _wexception & e) {
+		throw game_data_error("seen: %s", e.what());
 	}
 }
 
 
 void Map_Exploration_Data_Packet::Write
 	(FileSystem & fs, Editor_Game_Base & egbase, Map_Map_Object_Saver &)
-throw (_wexception)
 {
 	FileWrite fw;
 
 	fw.Unsigned16(CURRENT_PACKET_VERSION);
 
-	compile_assert(MAX_PLAYERS < 32);
+	static_assert(MAX_PLAYERS < 32, "assert(MAX_PLAYERS < 32) failed.");
 	Map & map = egbase.map();
 	Player_Number const nr_players = map.get_nrplayers();
 	Map_Index const max_index = map.max_index();

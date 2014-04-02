@@ -20,19 +20,15 @@
 #ifndef FIELD_H
 #define FIELD_H
 
-#include "widelands_geometry.h"
-#include "compile_assert.h"
-#include "constants.h"
-#include "nodecaps.h"
-#include "world.h"
-
-#include "roadtype.h"
-
-#include "widelands.h"
-
 #include <cassert>
 #include <limits>
 
+#include "constants.h"
+#include "logic/nodecaps.h"
+#include "logic/roadtype.h"
+#include "logic/widelands.h"
+#include "logic/widelands_geometry.h"
+#include "logic/world.h"
 
 namespace Widelands {
 
@@ -53,14 +49,16 @@ namespace Widelands {
 // class all around the code
 
 struct Terrain_Descr;
-struct Bob;
+class Bob;
 struct BaseImmovable;
 
+// Field is used so often, make sure it is as small as possible.
+#pragma pack(push, 1)
 /// a field like it is represented in the game
 /// \todo This is all one evil hack :(
 struct Field {
-	friend struct Map;
-	friend struct Bob;
+	friend class Map;
+	friend class Bob;
 	friend struct BaseImmovable;
 
 	enum Buildhelp_Index {
@@ -77,17 +75,13 @@ struct Field {
 	typedef uint8_t Resource_Amount;
 
 	struct Terrains         {Terrain_Index   d : 4, r : 4;};
+	static_assert(sizeof(Terrains) == 1, "assert(sizeof(Terrains) == 1) failed.");
 	struct Resources        {Resource_Index  d : 4, r : 4;};
+	static_assert(sizeof(Resources) == 1, "assert(sizeof(Resources) == 1) failed.");
 	struct Resource_Amounts {Resource_Amount d : 4, r : 4;};
+	static_assert(sizeof(Resource_Amounts) == 1, "assert(sizeof(Resource_Amounts) == 1) failed.");
 
 private:
-	Height height;
-	int8_t brightness;
-
-	uint16_t caps                    : 7;
-	uint16_t buildhelp_overlay_index : 3;
-	uint16_t roads                   : 6;
-
 	/**
 	 * A field can be selected in one of 2 selections. This allows the user to
 	 * use selection tools to select a set of fields and then perform a command
@@ -112,7 +106,20 @@ private:
 		Border_Bitmask - 1;
 	static const Owner_Info_and_Selections_Type Owner_Info_Bitmask =
 		Player_Number_Bitmask + Border_Bitmask;
-	compile_assert(MAX_PLAYERS <= Player_Number_Bitmask);
+	static_assert(MAX_PLAYERS <= Player_Number_Bitmask, "Bitmask is too big.");
+
+	// Data Members
+	/** linked list, \sa Bob::m_linknext*/
+	Bob           * bobs;
+	BaseImmovable * immovable;
+
+	uint8_t caps                    : 7;
+	uint8_t buildhelp_overlay_index : 3;
+	uint8_t roads                   : 6;
+
+	Height height;
+	int8_t brightness;
+
 	Owner_Info_and_Selections_Type owner_info_and_selections;
 
 	Resource_Index m_resources; ///< Resource type on this field, if any
@@ -121,31 +128,27 @@ private:
 
 	Terrains terrains;
 
-	/** linked list, \sa Bob::m_linknext*/
-	Bob           * bobs;
-	BaseImmovable * immovable;
-
 public:
-	Height get_height() const throw () {return height;}
+	Height get_height() const {return height;}
 	NodeCaps nodecaps() const {return static_cast<NodeCaps>(caps);}
 	uint16_t get_caps()     const {return caps;}
 
-	Terrains      get_terrains() const throw () {return terrains;}
-	Terrain_Index terrain_d   () const throw () {return terrains.d;}
-	Terrain_Index terrain_r   () const throw () {return terrains.r;}
-	void          set_terrains(const Terrains & i) throw () {terrains = i;}
+	Terrains      get_terrains() const {return terrains;}
+	Terrain_Index terrain_d   () const {return terrains.d;}
+	Terrain_Index terrain_r   () const {return terrains.r;}
+	void          set_terrains(const Terrains & i) {terrains = i;}
 	void set_terrain
-		(const TCoords<FCoords>::TriangleIndex t, Terrain_Index const i)
-		throw ()
+		(const TCoords<FCoords>::TriangleIndex& t, Terrain_Index const i)
+
 	{
 		if (t == TCoords<FCoords>::D) set_terrain_d(i);
 		else set_terrain_r(i);
 	}
-	void set_terrain_d(Terrain_Index const i) throw () {terrains.d = i;}
-	void set_terrain_r(Terrain_Index const i) throw () {terrains.r = i;}
+	void set_terrain_d(Terrain_Index const i) {terrains.d = i;}
+	void set_terrain_r(Terrain_Index const i) {terrains.r = i;}
 
-	Bob * get_first_bob() const throw () {return bobs;}
-	const BaseImmovable * get_immovable() const throw () {return immovable;}
+	Bob * get_first_bob() const {return bobs;}
+	const BaseImmovable * get_immovable() const {return immovable;}
 	BaseImmovable * get_immovable() {return immovable;}
 
 	void set_brightness
@@ -156,13 +159,13 @@ public:
 	 * Does not change the border bit of this or neighbouring fields. That must
 	 * be done separately.
 	 */
-	void set_owned_by(const Player_Number n) throw () {
+	void set_owned_by(const Player_Number n) {
 		assert(n <= MAX_PLAYERS);
 		owner_info_and_selections =
 			n | (owner_info_and_selections & ~Player_Number_Bitmask);
 	}
 
-	Player_Number get_owned_by() const throw () {
+	Player_Number get_owned_by() const {
 		assert
 			((owner_info_and_selections & Player_Number_Bitmask) <= MAX_PLAYERS);
 		return owner_info_and_selections & Player_Number_Bitmask;
@@ -176,13 +179,13 @@ public:
 	///
 	/// player_number must be in the range 1 .. Player_Number_Bitmask or the
 	/// behaviour is undefined.
-	bool is_interior(const Player_Number player_number) const throw () {
+	bool is_interior(const Player_Number player_number) const {
 		assert(0 < player_number);
 		assert    (player_number <= Player_Number_Bitmask);
 		return player_number == (owner_info_and_selections & Owner_Info_Bitmask);
 	}
 
-	void set_border(const bool b) throw () {
+	void set_border(const bool b) {
 		owner_info_and_selections =
 			(owner_info_and_selections & ~Border_Bitmask) | (b << Border_Bit);
 	}
@@ -226,7 +229,10 @@ public:
 			MAX_FIELD_HEIGHT       < h ? MAX_FIELD_HEIGHT : h;
 	}
 };
+#pragma pack(pop)
 
+// Check that Field is tightly packed.
+static_assert(sizeof(Field) <= sizeof(void *) * 2 + 10, "Field is not tightly packed.");
 }
 
 #endif

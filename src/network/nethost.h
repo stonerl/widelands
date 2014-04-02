@@ -20,10 +20,10 @@
 #ifndef NETHOST_H
 #define NETHOST_H
 
-#include "logic/widelands.h"
 #include "gamecontroller.h"
 #include "gamesettings.h"
-#include "network.h"
+#include "logic/widelands.h"
+#include "network/network.h"
 
 struct ChatMessage;
 struct NetHostImpl;
@@ -37,47 +37,47 @@ struct Client;
  * launch, as well as dealing with the actual network protocol.
  */
 struct NetHost : public GameController, private SyncCallback {
-	NetHost (std::string const & playername, bool internet = false);
+	NetHost (const std::string & playername, bool internet = false);
 	virtual ~NetHost ();
 
 	void run(bool autostart = false);
-	std::string const & getLocalPlayername() const;
+	const std::string & getLocalPlayername() const;
 	int16_t getLocalPlayerposition();
 
 	// GameController interface
-	void think();
-	void sendPlayerCommand(Widelands::PlayerCommand &);
-	int32_t getFrametime();
-	std::string getGameDescription();
+	void think() override;
+	void sendPlayerCommand(Widelands::PlayerCommand &) override;
+	int32_t getFrametime() override;
+	std::string getGameDescription() override;
 
-	uint32_t realSpeed();
-	uint32_t desiredSpeed();
-	void setDesiredSpeed(uint32_t speed);
-	bool isPaused();
-	void setPaused(bool paused);
+	uint32_t realSpeed() override;
+	uint32_t desiredSpeed() override;
+	void setDesiredSpeed(uint32_t speed) override;
+	bool isPaused() override;
+	void setPaused(bool paused) override;
 	// End GameController interface
 
 	// Pregame-related stuff
-	GameSettings const & settings();
+	const GameSettings & settings();
 	bool canLaunch();
 	void setScenario(bool);
 	void setMap
-		(std::string const & mapname,
-		 std::string const & mapfilename,
+		(const std::string & mapname,
+		 const std::string & mapfilename,
 		 uint32_t            maxplayers,
 		 bool                savegame = false);
 	void setPlayerState    (uint8_t number, PlayerSettings::State state, bool host = false);
-	void setPlayerTribe    (uint8_t number, std::string const & tribe, bool const random_tribe = false);
+	void setPlayerTribe    (uint8_t number, const std::string & tribe, bool const random_tribe = false);
 	void setPlayerInit     (uint8_t number, uint8_t index);
-	void setPlayerAI       (uint8_t number, std::string const & name, bool const random_ai = false);
-	void setPlayerName     (uint8_t number, std::string const & name);
+	void setPlayerAI       (uint8_t number, const std::string & name, bool const random_ai = false);
+	void setPlayerName     (uint8_t number, const std::string & name);
 	void setPlayer         (uint8_t number, PlayerSettings);
 	void setPlayerNumber   (uint8_t number);
 	void setPlayerTeam     (uint8_t number, Widelands::TeamNumber team);
 	void setPlayerCloseable(uint8_t number, bool closeable);
 	void setPlayerShared   (uint8_t number, uint8_t shared);
 	void switchToPlayer    (uint32_t user,  uint8_t number);
-	void setWinCondition   (std::string);
+	void setWinConditionScript   (std::string);
 
 	// just visible stuff for the select mapmenu
 	void setMultiplayerGameSettings();
@@ -93,7 +93,7 @@ struct NetHost : public GameController, private SyncCallback {
 	void handle_dserver_command(std::string, std::string);
 	void dserver_send_maps_and_saves(Client &);
 
-	void report_result(uint8_t player, int32_t points, bool win, std::string extra);
+	void report_result(uint8_t player, Widelands::PlayerEndResult result, const std::string & info) override;
 
 	void forcePause() {
 		m_forced_pause = true;
@@ -113,11 +113,11 @@ private:
 	NetTransferFile * file;
 
 	void sendSystemMessageCode
-		(std::string const &,
-		 std::string const & a = "", std::string const & b = "", std::string const & c = "");
+		(const std::string &,
+		 const std::string & a = "", const std::string & b = "", const std::string & c = "");
 	void requestSyncReports();
 	void checkSyncReports();
-	void syncreport();
+	void syncreport() override;
 
 	void clearComputerPlayers();
 	void initComputerPlayer(Widelands::Player_Number p);
@@ -133,9 +133,9 @@ private:
 
 	std::string getComputerPlayerName(uint8_t playernum);
 	bool haveUserName
-		(std::string const & name,
+		(const std::string & name,
 		 uint8_t             ignoreplayer = UserSettings::none());
-	void welcomeClient(uint32_t number, std::string const & playername);
+	void welcomeClient(uint32_t number, std::string & playername);
 	void committedNetworkTime(int32_t time);
 	void recvClientTime(uint32_t number, int32_t time);
 
@@ -149,12 +149,12 @@ private:
 
 	void disconnectPlayerController
 		(uint8_t number,
-		 std::string const & name);
+		 const std::string & name);
 	void disconnectClient
 		(uint32_t number,
-		 std::string const & reason,
+		 const std::string & reason,
 		 bool sendreason = true,
-		 std::string const & arg = "");
+		 const std::string & arg = "");
 	void reaper();
 
 	NetHostImpl * d;

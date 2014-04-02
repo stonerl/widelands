@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010 by the Widelands Development Team
+ * Copyright (C) 2010-2013 by the Widelands Development Team
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -17,11 +17,12 @@
  *
  */
 
-#include "widelands_map_players_messages_data_packet.h"
+#include "map_io/widelands_map_players_messages_data_packet.h"
 
 #include "logic/game_data_error.h"
 #include "logic/player.h"
-#include "widelands_map_map_object_saver.h"
+#include "map_io/widelands_map_map_object_loader.h"
+#include "map_io/widelands_map_map_object_saver.h"
 #include "profile/profile.h"
 
 namespace Widelands {
@@ -32,11 +33,11 @@ namespace Widelands {
 #define FILENAME_SIZE 19
 
 void Map_Players_Messages_Data_Packet::Read
-	(FileSystem & fs, Editor_Game_Base & egbase, bool, Map_Map_Object_Loader &)
-	throw (_wexception)
+	(FileSystem & fs, Editor_Game_Base & egbase, bool, Map_Map_Object_Loader & mol)
+
 {
 	uint32_t      const gametime   = egbase.get_gametime ();
-	Map   const &       map        = egbase.map          ();
+	const Map   &       map        = egbase.map          ();
 	Extent        const extent     = map   .extent       ();
 	Player_Number const nr_players = map   .get_nrplayers();
 	iterate_players_existing(p, nr_players, egbase, player)
@@ -44,7 +45,7 @@ void Map_Players_Messages_Data_Packet::Read
 			char filename[FILENAME_SIZE];
 			snprintf(filename, sizeof(filename), FILENAME_TEMPLATE, p);
 			Profile prof;
-			try {prof.read(filename, 0, fs);} catch (...) {continue;}
+			try {prof.read(filename, nullptr, fs);} catch (...) {continue;}
 			prof.get_safe_section("global").get_positive
 				("packet_version", CURRENT_PACKET_VERSION);
 			MessageQueue & messages = player->messages();
@@ -84,42 +85,42 @@ void Map_Players_Messages_Data_Packet::Read
 					uint32_t const sent    = s->get_safe_int("sent");
 					if (sent < previous_message_sent)
 						throw game_data_error
-							(_
-							 	("messages are not ordered: sent at %u but previous "
-							 	 "message sent at %u"),
+							(
+							 "messages are not ordered: sent at %u but previous "
+							 "message sent at %u",
 							 sent, previous_message_sent);
 					if (gametime < sent)
 						throw game_data_error
-							(_
-							 	("message is sent in the future: sent at %u but "
-							 	 "gametime is only %u"),
+							(
+							 "message is sent in the future: sent at %u but "
+							 "gametime is only %u",
 							 sent, gametime);
 					uint32_t duration = Forever(); //  default duration
 					if (Section::Value const * const dv = s->get_val("duration")) {
 						duration = dv->get_positive();
 						if (duration == Forever())
 							throw game_data_error
-								(_
-								 	("the value %u is not allowed as duration; it is "
-								 	 "a special value meaning forever, which is the "
-								 	 "default; omit the duration key to make the "
-								 	 "message exist forever"),
+								(
+								 "the value %u is not allowed as duration; it is "
+								 "a special value meaning forever, which is the "
+								 "default; omit the duration key to make the "
+								 "message exist forever",
 								 Forever());
 						if (sent + duration < sent)
 							throw game_data_error
-								(_
-								 	("duration %u is too large; causes numeric "
-								 	 "overflow when added to sent time %u"),
+								(
+								 "duration %u is too large; causes numeric "
+								 "overflow when added to sent time %u",
 								 duration, sent);
 						if (sent + duration < gametime)
 							throw game_data_error
-								(_
-								 	("message should have expired at %u; sent at %u "
-								 	 "with duration %u but gametime is already %u"),
+								(
+								 "message should have expired at %u; sent at %u "
+								 "with duration %u but gametime is already %u",
 								 sent + duration, sent, duration, gametime);
 					}
 					Message::Status status = Message::Archived; //  default status
-					if (char const * const status_string = s->get_string("status"))
+					if (char const * const status_string = s->get_string("status")) {
 						try {
 							if      (not strcmp(status_string, "new"))
 								status = Message::New;
@@ -127,11 +128,20 @@ void Map_Players_Messages_Data_Packet::Read
 								status = Message::Read;
 							else
 								throw game_data_error
-									(_("expected %s but found \"%s\""),
+									("expected %s but found \"%s\"",
 									 "{new|read}", status_string);
-						} catch (_wexception const & e) {
+						} catch (const _wexception & e) {
 							throw game_data_error("status: %s", e.what());
 						}
+					}
+					Serial serial = s->get_int("serial", 0);
+					if (serial > 0) {
+						assert(mol.is_object_known(serial));
+						Map_Object & mo = mol.get<Map_Object>(serial);
+						assert(mol.is_object_loaded(mo));
+						serial = mo.serial();
+					}
+
 					messages.add_message
 						(*new Message
 						 	(s->get_string     ("sender", ""),
@@ -140,25 +150,25 @@ void Map_Players_Messages_Data_Packet::Read
 						 	 s->get_name       (),
 						 	 s->get_safe_string("body"),
 						 	 s->get_Coords     ("position", extent, Coords::Null()),
+							 serial,
 						 	 status));
 					//  Expiration is scheduled for all messages (with finite
 					//  duration) after the command queue has been loaded (in
 					//  Game_Loader::load_game).
 					previous_message_sent = sent;
-				} catch (_wexception const & e) {
+				} catch (const _wexception & e) {
 					throw game_data_error
-						(_("\"%s\": %s"), s->get_name(), e.what());
+						("\"%s\": %s", s->get_name(), e.what());
 				}
 				prof.check_used();
-		} catch (_wexception const & e) {
+		} catch (const _wexception & e) {
 			throw game_data_error
-				(_("messages for player %u: %s"), p, e.what());
+				("messages for player %u: %s", p, e.what());
 		}
 }
 
 void Map_Players_Messages_Data_Packet::Write
 	(FileSystem & fs, Editor_Game_Base & egbase, Map_Map_Object_Saver & mos)
-throw (_wexception)
 {
 	fs.EnsureDirectoryExists("player");
 	Player_Number const nr_players = egbase.map().get_nrplayers();
@@ -166,11 +176,11 @@ throw (_wexception)
 		Profile prof;
 		prof.create_section("global").set_int
 			("packet_version", CURRENT_PACKET_VERSION);
-		MessageQueue const & messages = player->messages();
+		const MessageQueue & messages = player->messages();
 		Map_Message_Saver & message_saver = mos.message_savers[p - 1];
 		container_iterate_const(MessageQueue, messages, i) {
 			message_saver.add         (i.current->first);
-			Message const & message = *i.current->second;
+			const Message & message = *i.current->second;
 			assert(message.sent() <= static_cast<uint32_t>(egbase.get_gametime()));
 			assert
 				(message.duration() == Forever() or
@@ -222,6 +232,13 @@ throw (_wexception)
 				break;
 			case Message::Archived: //  The default status. Do not write.
 				break;
+			default:
+				assert(false);
+			}
+			if (message.serial()) {
+				const Map_Object* mo = egbase.objects().get_object(message.serial());
+				uint32_t fileindex = mos.get_object_file_index_or_zero(mo);
+				s.set_int       ("serial",    fileindex);
 			}
 		}
 		char filename[FILENAME_SIZE];

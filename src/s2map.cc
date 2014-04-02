@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2002, 2003, 2006-2010 by the Widelands Development Team
+ * Copyright (C) 2002, 2003, 2006-2010, 2011-2013 by the Widelands Development Team
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -19,26 +19,32 @@
 
 #include "s2map.h"
 
+#include <iomanip>
+#include <iostream>
+
+#include <boost/foreach.hpp>
+#include <libintl.h>
+
+#include "constants.h"
 #include "i18n.h"
 #include "io/filesystem/layered_filesystem.h"
 #include "log.h"
 #include "logic/editor_game_base.h"
 #include "logic/field.h"
+#include "logic/game.h"
 #include "logic/map.h"
-#include "logic/mapfringeregion.h"
+#include "logic/mapregion.h"
+#include "logic/message.h"
+#include "logic/player.h"
 #include "logic/world.h"
 #include "map_io/map_loader.h"
+#include "upcast.h"
 #include "wexception.h"
 
-#include <iostream>
-
 using std::cerr;
-using std::ios;
 using std::endl;
-
-// TEMP
-#define hex ios::hex
-#define dec ios::dec
+using std::ios;
+using std::setiosflags;
 
 // this is a detail of S2 maps
 #define CRITTER_PER_DEFINITION   1
@@ -122,6 +128,8 @@ int32_t S2_Map_Loader::load_map_complete
 
 	m_map.recalc_whole_map();
 
+	postload_fix_conversion(egbase);
+
 	set_state(STATE_LOADED);
 
 	return 0;
@@ -151,7 +159,7 @@ uint8_t * S2_Map_Loader::load_s2mf_section
 		 buffer[5] != 0x00)
 	{
 		cerr << "Section marker not found" << endl;
-		return 0;
+		return nullptr;
 	}
 
 	uint16_t const dw = fr.Unsigned16();
@@ -168,7 +176,7 @@ uint8_t * S2_Map_Loader::load_s2mf_section
 
 	if (dw < width || dh < height) {
 		cerr << "Section not big enough" << endl;
-		return 0;
+		return nullptr;
 	}
 
 	uint8_t * const section = static_cast<uint8_t *>(malloc(size));
@@ -231,6 +239,7 @@ void S2_Map_Loader::load_s2mf_header()
 	case 2: m_map.set_world_name("winterland"); break;
 	default:
 		assert(false);
+		break;
 	}
 }
 
@@ -240,9 +249,9 @@ void S2_Map_Loader::load_s2mf_header()
  */
 void S2_Map_Loader::load_s2mf(Widelands::Editor_Game_Base & egbase)
 {
-	uint8_t * section   = 0;
-	uint8_t * bobs      = 0;
-	uint8_t * buildings = 0;
+	uint8_t * section   = nullptr;
+	uint8_t * bobs      = nullptr;
+	uint8_t * buildings = nullptr;
 
 	uint8_t * pc;
 
@@ -283,7 +292,7 @@ void S2_Map_Loader::load_s2mf(Widelands::Editor_Game_Base & egbase)
 			for (Widelands::X_Coordinate x = 0; x < mapwidth; ++x, ++f, ++pc)
 				f->set_height(*pc);
 		free(section);
-		section = 0;
+		section = nullptr;
 
 
 		//  SWD-SECTION 2: Terrain 1
@@ -327,13 +336,16 @@ void S2_Map_Loader::load_s2mf(Widelands::Editor_Game_Base & egbase)
 				default:
 					c = 7;
 					cerr
-						<< "ERROR: Unknown texture1: " << hex << c << dec << " ("
+						<< "ERROR: Unknown texture1: "
+						<< setiosflags(ios::hex) << c
+						<< setiosflags(ios::dec) << " ("
 						<< x << "," << y << ") (defaults to water!)" << endl;
+						break;
 				}
 				f->set_terrain_d(c);
 			}
 		free(section);
-		section = 0;
+		section = nullptr;
 
 
 		//  SWD-SECTION 3: Terrain 2
@@ -378,13 +390,16 @@ void S2_Map_Loader::load_s2mf(Widelands::Editor_Game_Base & egbase)
 				default:
 					c = 7;
 					cerr
-						<< "ERROR: Unknown texture1: " << hex << c << dec << " ("
+						<< "ERROR: Unknown texture1: "
+						<< setiosflags(ios::hex) << c
+						<< setiosflags(ios::dec) << " ("
 						<< x << "," << y << ") (defaults to water!)" << endl;
+					break;
 				}
 				f->set_terrain_r(c);
 			}
 		free(section);
-		section = 0;
+		section = nullptr;
 
 
 		//  SWD-SECTION 4: Existing Roads
@@ -394,7 +409,7 @@ void S2_Map_Loader::load_s2mf(Widelands::Editor_Game_Base & egbase)
 		if (!section)
 			throw wexception("Section 4 (Existing Roads) not found");
 		free(section);
-		section = 0;
+		section = nullptr;
 
 
 		//  SWD-SECTION 5: Bobs
@@ -430,7 +445,7 @@ void S2_Map_Loader::load_s2mf(Widelands::Editor_Game_Base & egbase)
 			}
 		}
 		free(section);
-		section = 0;
+		section = nullptr;
 
 
 		//  SWD-SECTION 7: Animals
@@ -448,7 +463,7 @@ void S2_Map_Loader::load_s2mf(Widelands::Editor_Game_Base & egbase)
 		for (Widelands::Y_Coordinate y = 0; y < mapheight; ++y) {
 			uint32_t i = y * mapwidth;
 			for (Widelands::X_Coordinate x = 0; x < mapwidth; ++x, ++i) {
-				char const * bobname = 0;
+				char const * bobname = nullptr;
 
 				switch (section[i]) {
 				case 0: break;
@@ -478,7 +493,7 @@ void S2_Map_Loader::load_s2mf(Widelands::Editor_Game_Base & egbase)
 			}
 		}
 		free(section);
-		section = 0;
+		section = nullptr;
 
 
 		//  SWD-SECTION 8: Unknown
@@ -487,7 +502,7 @@ void S2_Map_Loader::load_s2mf(Widelands::Editor_Game_Base & egbase)
 		if (!section)
 			throw wexception("Section 8 (Unknown) not found");
 		free(section);
-		section = 0;
+		section = nullptr;
 
 
 		//  SWD-SECTION 9: Buildings
@@ -512,7 +527,7 @@ void S2_Map_Loader::load_s2mf(Widelands::Editor_Game_Base & egbase)
 		if (!section)
 			throw wexception("Section 10 (Unknown) not found");
 		free(section);
-		section = 0;
+		section = nullptr;
 
 
 		//  SWD-SECTION 11: Settlers2 Mapeditor tool position
@@ -523,7 +538,7 @@ void S2_Map_Loader::load_s2mf(Widelands::Editor_Game_Base & egbase)
 		if (!section)
 			throw wexception("Section 11 (Tool Position) not found");
 		free(section);
-		section = 0;
+		section = nullptr;
 
 
 		//  SWD-SECTION 12: Resources
@@ -552,7 +567,7 @@ void S2_Map_Loader::load_s2mf(Widelands::Editor_Game_Base & egbase)
 				case 0x48: res = "iron";   amount = c & 7; break;
 				case 0x50: res = "gold";   amount = c & 7; break;
 				case 0x59: res = "granit"; amount = c & 7; break;
-				default:   res = "";       amount = 0;
+				default:   res = "";       amount = 0; break;
 				};
 
 				int32_t nres = 0;
@@ -571,7 +586,7 @@ void S2_Map_Loader::load_s2mf(Widelands::Editor_Game_Base & egbase)
 			}
 
 		free(section);
-		section = 0;
+		section = nullptr;
 
 
 		//  SWD-SECTION 13: Higlights and Shadows
@@ -582,7 +597,7 @@ void S2_Map_Loader::load_s2mf(Widelands::Editor_Game_Base & egbase)
 		if (!section)
 			throw wexception("Section 13 (Highlights and Shadows) not found");
 		free(section);
-		section = 0;
+		section = nullptr;
 
 
 		//  SWD-SECTION 14: Fieldcount
@@ -599,7 +614,7 @@ void S2_Map_Loader::load_s2mf(Widelands::Editor_Game_Base & egbase)
 		if (!section)
 			throw wexception("Section 14 (Island id) not found");
 		free(section);
-		section = 0;
+		section = nullptr;
 
 		fr.Close();
 
@@ -609,7 +624,7 @@ void S2_Map_Loader::load_s2mf(Widelands::Editor_Game_Base & egbase)
 		uint8_t c;
 		for (Widelands::Y_Coordinate y = 0; y < mapheight; ++y)
 			for (Widelands::X_Coordinate x = 0; x < mapwidth; ++x) {
-				char const * bobname = 0;
+				char const * bobname = nullptr;
 
 				Widelands::Coords const location(x, y);
 				Widelands::Map_Index const index =
@@ -631,7 +646,7 @@ void S2_Map_Loader::load_s2mf(Widelands::Editor_Game_Base & egbase)
 							m_map.world().get_immovable_index(bobname);
 						if (idx < 0)
 							throw wexception("Missing immovable type %s", bobname);
-						egbase.create_immovable(Widelands::Coords(x, y), idx, 0);
+						egbase.create_immovable(Widelands::Coords(x, y), idx, nullptr);
 						continue;
 					}
 				}
@@ -737,7 +752,7 @@ void S2_Map_Loader::load_s2mf(Widelands::Editor_Game_Base & egbase)
 					int32_t idx = m_map.world().get_immovable_index(bobname);
 					if (idx < 0)
 						throw wexception("Missing immovable type %s", bobname);
-					egbase.create_immovable(Widelands::Coords(x, y), idx, 0);
+					egbase.create_immovable(Widelands::Coords(x, y), idx, nullptr);
 				}
 			}
 
@@ -764,15 +779,18 @@ void S2_Map_Loader::load_s2mf(Widelands::Editor_Game_Base & egbase)
 			}
 			Widelands::FCoords fpos = m_map.get_fcoords(starting_pos);
 
-			if (!(fpos.field->nodecaps() & Widelands::BUILDCAPS_BIG)) {
-				log("wrong size - trying to fix it:\n");
+			if (!(m_map.get_max_nodecaps(fpos) & Widelands::BUILDCAPS_BIG)) {
+				log("wrong size - trying to fix it: ");
 				bool fixed = false;
 
-
-				Widelands::MapFringeRegion<Widelands::Area<Widelands::FCoords> >
+				Widelands::MapRegion<Widelands::Area<Widelands::FCoords> >
 					mr(m_map, Widelands::Area<Widelands::FCoords>(fpos, 3));
 				do {
-					if (mr.location().field->get_caps() & Widelands::BUILDCAPS_BIG) {
+					if
+						(m_map.get_max_nodecaps(const_cast<Widelands::FCoords &>(mr.location()))
+						 &
+						 Widelands::BUILDCAPS_BIG)
+					{
 						m_map.set_starting_pos(p, mr.location());
 						fixed = true;
 						break;
@@ -782,11 +800,12 @@ void S2_Map_Loader::load_s2mf(Widelands::Editor_Game_Base & egbase)
 
 				// check whether starting position was fixed.
 				if (fixed)
-					log("   Fixed!\n");
+					log("Fixed!\n");
 				else {
 					//  Do not throw exception, else map will not be loadable in
 					//  the editor. Player initialization will keep track of
 					//  wrong starting positions.
+					log("FAILED!\n");
 					log("   Invalid starting position, that could not be fixed.\n");
 					log("   Please try to fix it manually in the editor.\n");
 				}
@@ -802,4 +821,77 @@ void S2_Map_Loader::load_s2mf(Widelands::Editor_Game_Base & egbase)
 
 	free(bobs);
 	free(buildings);
+}
+
+
+/// Try to fix data, which is incompatible between S2 and Widelands
+void S2_Map_Loader::postload_fix_conversion(Widelands::Editor_Game_Base & egbase) {
+
+/*
+ * 1: Try to fix port spaces
+ */
+	const Widelands::Map::PortSpacesSet ports(m_map.get_port_spaces());
+	uint16_t num_failed = 0;
+	char buf[256];
+
+	// Check if port spaces are valid
+	BOOST_FOREACH(const Widelands::Coords & c, ports) {
+		Widelands::FCoords fc = m_map.get_fcoords(c);
+		Widelands::NodeCaps nc = m_map.get_max_nodecaps(fc);
+		if
+			((nc & Widelands::BUILDCAPS_SIZEMASK) != Widelands::BUILDCAPS_BIG
+			 ||
+			 m_map.find_portdock(fc).empty())
+		{
+			log("Invalid port build space: ");
+			m_map.set_port_space(c, false);
+
+			bool fixed = false;
+			Widelands::MapRegion<Widelands::Area<Widelands::FCoords> >
+				mr(m_map, Widelands::Area<Widelands::FCoords>(fc, 3));
+			do {
+				// Check whether the maximum theoretical possible NodeCap of the field is big + port
+				Widelands::NodeCaps nc2 = m_map.get_max_nodecaps(const_cast<Widelands::FCoords &>(mr.location()));
+				if
+					((nc2 & Widelands::BUILDCAPS_SIZEMASK) == Widelands::BUILDCAPS_BIG
+					 &&
+					 (!m_map.find_portdock(mr.location()).empty()))
+				{
+					m_map.set_port_space(Widelands::Coords(mr.location().x, mr.location().y), true);
+					fixed = true;
+				}
+			} while (mr.advance(m_map) && !fixed);
+			if (!fixed) {
+				++num_failed;
+				log("FAILED! No alternative port buildspace for (%i, %i) found!\n", fc.x, fc.y);
+			}
+			else
+				log("Fixed!\n");
+		}
+	}
+
+	sprintf(buf, "%i %s %s", num_failed,
+		ngettext("WARNING: %i invalid port building space could not be fixed and has been removed! "
+				"Some islands might be unreachable now. Please consider fixing the map in the map editor.",
+				"WARNING: %i invalid port building spaces could not be fixed and have been removed! "
+				"Some islands might be unreachable now. Please consider fixing the map in the map editor.",
+				num_failed),
+		"\n\n");
+	fputs(buf, stdout);
+
+	// If fixing failed and this is a game, inform the players about the problem
+	if (num_failed > 0)
+		if (upcast(Widelands::Game, game, &egbase)) {
+			std::string rt_description = "<rt image=pics/port.png><p font-size=14 font-face=DejaVuSerif>";
+			rt_description += buf;
+			rt_description += "</p></rt>";
+
+			Widelands::Message m = Widelands::Message("S2_Map_Loader", 0, 3600000, _("WARNING"), rt_description);
+
+			for (uint8_t i = 0; i < MAX_PLAYERS; ++i) {
+				Widelands::Player * p = game->get_player(i + 1);
+				if (p)
+					p->add_message(*game, *(new Widelands::Message(m)));
+			}
+		}
 }

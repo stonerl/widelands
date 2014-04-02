@@ -17,14 +17,14 @@
  *
  */
 
-#include "editor_set_resources_tool.h"
+#include "editor/tools/editor_set_resources_tool.h"
 
-#include "editor_increase_resources_tool.h"
-#include "editor_decrease_resources_tool.h"
-#include "graphic/graphic.h"
-#include "logic/mapregion.h"
-#include "logic/field.h"
 #include "editor/editorinteractive.h"
+#include "editor/tools/editor_decrease_resources_tool.h"
+#include "editor/tools/editor_increase_resources_tool.h"
+#include "graphic/graphic.h"
+#include "logic/field.h"
+#include "logic/mapregion.h"
 #include "logic/world.h"
 #include "wui/overlay_manager.h"
 
@@ -34,10 +34,10 @@
 int32_t Editor_Set_Resources_Tool::handle_click_impl
 	(Widelands::Map           &          map,
 	Widelands::Node_and_Triangle<> const center,
-	Editor_Interactive        &          parent,
+	Editor_Interactive        &          /* parent */,
 	Editor_Action_Args        &          args)
 {
-	Widelands::World const & world = map.world();
+	const Widelands::World & world = map.world();
 	Overlay_Manager & overlay_manager = map.overlay_manager();
 	Widelands::MapRegion<Widelands::Area<Widelands::FCoords> > mr
 	(map,
@@ -56,14 +56,11 @@ int32_t Editor_Set_Resources_Tool::handle_click_impl
 		args.orgResT.push_back(res);
 		args.orgRes.push_back(mr.location().field->get_resources_amount());
 
-		if (Editor_Change_Resource_Tool_Callback(mr.location(), &map, args.cur_res)) {
+		if (Editor_Change_Resource_Tool_Callback(mr.location(), map, args.cur_res)) {
 			//  Ok, we're doing something. First remove the current overlays.
-			PictureID picid =
-			    g_gr->get_picture
-			    (PicMod_Menu,
-			     world.get_resource(res)->get_editor_pic
-			     (mr.location().field->get_resources_amount()).c_str());
-			overlay_manager.remove_overlay(mr.location(), picid);
+			const Image* pic = g_gr->images().get
+				(world.get_resource(res)->get_editor_pic (mr.location().field->get_resources_amount()));
+			overlay_manager.remove_overlay(mr.location(), pic);
 
 			if (not amount) {
 				mr.location().field->set_resources(0, 0);
@@ -72,12 +69,9 @@ int32_t Editor_Set_Resources_Tool::handle_click_impl
 				mr.location().field->set_resources(args.cur_res, amount);
 				mr.location().field->set_starting_res_amount(amount);
 				//  set new overlay
-				picid =
-				    g_gr->get_picture
-				    (PicMod_Menu,
-				     world.get_resource(args.cur_res)->get_editor_pic(amount)
-				     .c_str());
-				overlay_manager.register_overlay(mr.location(), picid, 4);
+				pic =
+				    g_gr->images().get(world.get_resource(args.cur_res)->get_editor_pic(amount));
+				overlay_manager.register_overlay(mr.location(), pic, 4);
 				map.recalc_for_field_area
 				(Widelands::Area<Widelands::FCoords>(mr.location(), 0));
 			}
@@ -88,9 +82,9 @@ int32_t Editor_Set_Resources_Tool::handle_click_impl
 
 int32_t Editor_Set_Resources_Tool::handle_undo_impl
 	(Widelands::Map & map, Widelands::Node_and_Triangle< Widelands::Coords > center,
-	Editor_Interactive & parent, Editor_Action_Args & args)
+	Editor_Interactive & /* parent */, Editor_Action_Args & args)
 {
-	Widelands::World const & world = map.world();
+	const Widelands::World & world = map.world();
 	Overlay_Manager & overlay_manager = map.overlay_manager();
 	Widelands::MapRegion<Widelands::Area<Widelands::FCoords> > mr
 	(map,
@@ -107,12 +101,10 @@ int32_t Editor_Set_Resources_Tool::handle_undo_impl
 		if (amount > max_amount)
 			amount = max_amount;
 
-		PictureID picid =
-		    g_gr->get_picture
-		    (PicMod_Menu,
-		     world.get_resource(res)->get_editor_pic
-		     (mr.location().field->get_resources_amount()).c_str());
-		overlay_manager.remove_overlay(mr.location(), picid);
+		const Image* pic =
+		    g_gr->images().get
+		    (world.get_resource(res)->get_editor_pic(mr.location().field->get_resources_amount()));
+		overlay_manager.remove_overlay(mr.location(), pic);
 
 		if (not amount) {
 			mr.location().field->set_resources(0, 0);
@@ -121,17 +113,13 @@ int32_t Editor_Set_Resources_Tool::handle_undo_impl
 			mr.location().field->set_resources(*it, amount);
 			mr.location().field->set_starting_res_amount(amount);
 			//  set new overlay
-			picid =
-			    g_gr->get_picture
-			    (PicMod_Menu,
-			     world.get_resource(*it)->get_editor_pic(amount)
-			     .c_str());
-			overlay_manager.register_overlay(mr.location(), picid, 4);
+			pic = g_gr->images().get(world.get_resource(*it)->get_editor_pic(amount));
+			overlay_manager.register_overlay(mr.location(), pic, 4);
 			map.recalc_for_field_area
 			(Widelands::Area<Widelands::FCoords>(mr.location(), 0));
 		}
-		ir++;
-		it++;
+		++ir;
+		++it;
 	} while (mr.advance(map));
 	args.orgRes.clear();
 	args.orgResT.clear();
@@ -145,5 +133,3 @@ Editor_Action_Args Editor_Set_Resources_Tool::format_args_impl(Editor_Interactiv
 	a.set_to = m_set_to;
 	return a;
 }
-
-

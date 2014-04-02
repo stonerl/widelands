@@ -20,7 +20,7 @@
 #ifndef MAPREGION_H
 #define MAPREGION_H
 
-#include "map.h"
+#include "logic/map.h"
 
 namespace Widelands {
 
@@ -41,7 +41,7 @@ template <typename Area_type = Area<> > struct MapRegion {
 		m_left = m_area;
 	}
 
-	typename Area_type::Coords_type const & location() const {return m_area;}
+	const typename Area_type::Coords_type & location() const {return m_area;}
 
 	/// Moves on to the next location. The return value indicates whether the
 	/// new location has not yet been reached during this iteration. Note that
@@ -49,7 +49,7 @@ template <typename Area_type = Area<> > struct MapRegion {
 	/// the same location may be reached several times during an iteration,
 	/// while advance keeps returning true. When finally advance returns false,
 	/// it means that the iteration is done.
-	bool advance(const Map & map) throw () {
+	bool advance(const Map & map) {
 		if (--m_remaining_in_row)
 			map.get_rn(m_area, &m_area);
 		else if (m_area.radius < --m_remaining_rows) {

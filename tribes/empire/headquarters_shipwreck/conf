@@ -1,4 +1,3 @@
-# soundfx=../../../sound/spoken/warehouse-bringitin
 size=big
 buildable=no
 destructible=no
@@ -9,4 +8,3 @@ conquers=9
 # sfx=0 ../../../sound/spoken/warehouse-bringitin
 pics=headquarters_shipwreck_i_??.png
 hotspot=93 40
-playercolor=true

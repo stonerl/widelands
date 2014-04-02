@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2004, 2006-2011 by the Widelands Development Team
+ * Copyright (C) 2004, 2006-2013 by the Widelands Development Team
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -17,13 +17,14 @@
  *
  */
 
-#include "ware_instance.h"
+#include "economy/ware_instance.h"
 
-// Package includes
-#include "economy.h"
-#include "flag.h"
-#include "transfer.h"
-
+#include "economy/economy.h"
+#include "economy/flag.h"
+#include "economy/fleet.h"
+#include "economy/portdock.h"
+#include "economy/request.h"
+#include "economy/transfer.h"
 #include "logic/game.h"
 #include "logic/ship.h"
 #include "logic/tribe.h"
@@ -31,11 +32,8 @@
 #include "logic/worker.h"
 #include "map_io/widelands_map_map_object_loader.h"
 #include "map_io/widelands_map_map_object_saver.h"
-#include "request.h"
-#include "wexception.h"
 #include "upcast.h"
-#include "portdock.h"
-#include "fleet.h"
+#include "wexception.h"
 
 namespace Widelands {
 
@@ -52,16 +50,15 @@ struct IdleWareSupply : public Supply {
 	void set_economy(Economy *);
 
 	//  implementation of Supply
-	virtual PlayerImmovable * get_position(Game &);
-	virtual bool is_active() const throw ();
-	virtual bool has_storage() const throw ();
-	virtual void get_ware_type(WareWorker & type, Ware_Index & ware) const;
-	virtual void send_to_storage(Game &, Warehouse * wh);
+	virtual PlayerImmovable * get_position(Game &) override;
+	virtual bool is_active() const override;
+	virtual bool has_storage() const override;
+	virtual void get_ware_type(WareWorker & type, Ware_Index & ware) const override;
+	virtual void send_to_storage(Game &, Warehouse * wh) override;
 
-	virtual uint32_t nr_supplies(Game const &, Request const &) const;
-	virtual WareInstance & launch_item(Game &, Request const &);
-	virtual Worker & launch_worker(Game &, Request const &)
-		__attribute__ ((noreturn));
+	virtual uint32_t nr_supplies(const Game &, const Request &) const override;
+	virtual WareInstance & launch_ware(Game &, const Request &) override;
+	virtual Worker & launch_worker(Game &, const Request &) override;
 
 private:
 	WareInstance & m_ware;
@@ -72,7 +69,7 @@ private:
  * Initialize the Supply and update the economy.
 */
 IdleWareSupply::IdleWareSupply(WareInstance & ware) :
-	m_ware(ware), m_economy(0)
+	m_ware(ware), m_economy(nullptr)
 {
 	set_economy(ware.get_economy());
 }
@@ -82,7 +79,7 @@ IdleWareSupply::IdleWareSupply(WareInstance & ware) :
 */
 IdleWareSupply::~IdleWareSupply()
 {
-	set_economy(0);
+	set_economy(nullptr);
 }
 
 /**
@@ -118,15 +115,15 @@ PlayerImmovable * IdleWareSupply::get_position(Game & game)
 		return ship->get_fleet()->get_arbitrary_dock();
 	}
 
-	return 0;
+	return nullptr;
 }
 
-bool IdleWareSupply::is_active() const throw ()
+bool IdleWareSupply::is_active() const
 {
 	return true;
 }
 
-bool IdleWareSupply::has_storage()  const throw ()
+bool IdleWareSupply::has_storage()  const
 {
 	return m_ware.is_moving();
 }
@@ -137,7 +134,7 @@ void IdleWareSupply::get_ware_type(WareWorker & type, Ware_Index & ware) const
 	ware = m_ware.descr_index();
 }
 
-uint32_t IdleWareSupply::nr_supplies(Game const &, Request const & req) const
+uint32_t IdleWareSupply::nr_supplies(const Game &, const Request & req) const
 {
 	if
 		(req.get_type() == wwWARE &&
@@ -148,12 +145,12 @@ uint32_t IdleWareSupply::nr_supplies(Game const &, Request const & req) const
 }
 
 /**
- * The item is already "launched", so we only need to return it.
+ * The ware is already "launched", so we only need to return it.
 */
-WareInstance & IdleWareSupply::launch_item(Game &, Request const & req) {
+WareInstance & IdleWareSupply::launch_ware(Game &, const Request & req) {
 	if (req.get_type() != wwWARE)
 		throw wexception
-			("IdleWareSupply::launch_item : called for non-item request");
+			("IdleWareSupply::launch_ware : called for non-ware request");
 	if (req.get_index() != m_ware.descr_index())
 		throw wexception
 			("IdleWareSupply: ware(%u) (type = %i) requested for %i",
@@ -164,7 +161,7 @@ WareInstance & IdleWareSupply::launch_item(Game &, Request const & req) {
 	return m_ware;
 }
 
-Worker & IdleWareSupply::launch_worker(Game &, Request const &)
+Worker & IdleWareSupply::launch_worker(Game &, const Request &)
 {
 	throw wexception("IdleWareSupply::launch_worker makes no sense");
 }
@@ -183,13 +180,13 @@ void IdleWareSupply::send_to_storage(Game & game, Warehouse * wh)
 /*                     Ware Instance Implementation                      */
 /*************************************************************************/
 WareInstance::WareInstance
-	(Ware_Index const i, const Item_Ware_Descr * const ware_descr)
+	(Ware_Index const i, const WareDescr * const ware_descr)
 :
 Map_Object   (ware_descr),
-m_economy    (0),
+m_economy    (nullptr),
 m_descr_index(i),
-m_supply     (0),
-m_transfer   (0)
+m_supply     (nullptr),
+m_transfer   (nullptr)
 {}
 
 WareInstance::~WareInstance()
@@ -200,7 +197,7 @@ WareInstance::~WareInstance()
 	}
 }
 
-int32_t WareInstance::get_type() const throw ()
+int32_t WareInstance::get_type() const
 {
 	return WARE;
 }
@@ -214,13 +211,13 @@ void WareInstance::cleanup(Editor_Game_Base & egbase)
 {
 	// Unlink from our current location, if necessary
 	if (upcast(Flag, flag, m_location.get(egbase)))
-		flag->remove_item(egbase, this);
+		flag->remove_ware(egbase, this);
 
 	delete m_supply;
-	m_supply = 0;
+	m_supply = nullptr;
 
 	cancel_moving();
-	set_location(egbase, 0);
+	set_location(egbase, nullptr);
 
 	Map_Object::cleanup(egbase);
 }
@@ -249,8 +246,7 @@ void WareInstance::set_economy(Economy * const e)
  * Once you've assigned a ware to its new location, you usually have to call
  * \ref update() as well.
 */
-void WareInstance::set_location
-	(Editor_Game_Base & egbase, Map_Object * const location)
+void WareInstance::set_location(Editor_Game_Base & egbase, Map_Object * const location)
 {
 	Map_Object * const oldlocation = m_location.get(egbase);
 
@@ -260,26 +256,27 @@ void WareInstance::set_location
 	m_location = location;
 
 	if (location) {
-		Economy * eco = 0;
+		Economy * eco = nullptr;
 
-		if (upcast(PlayerImmovable const, playerimmovable, location))
-			eco = playerimmovable->get_economy();
+		if (upcast(Flag const, flag, location))
+			eco = flag->get_economy();
 		else if (upcast(Worker const, worker, location))
 			eco = worker->get_economy();
+		else if (upcast(PortDock const, portdock, location))
+			eco = portdock->get_economy();
 		else if (upcast(Ship const, ship, location))
 			eco = ship->get_economy();
+		else
+			throw wexception("WareInstance delivered to bad location %u", location->serial());
 
 		if (oldlocation && get_economy()) {
 			if (get_economy() != eco)
-				throw wexception
-					("WareInstance::set_location() implies change of economy");
+				throw wexception("WareInstance::set_location() implies change of economy");
 		} else {
 			set_economy(eco);
 		}
-	}
-	else
-	{
-		set_economy(0);
+	} else {
+		set_economy(nullptr);
 	}
 }
 
@@ -305,10 +302,10 @@ void WareInstance::act(Game & game, uint32_t)
  */
 void WareInstance::update(Game & game)
 {
-	Map_Object * const loc = m_location.get(game);
-
-	if (!m_descr) // Upsy, we're not even intialized. Happens on load
+	if (!m_descr) // Upsy, we're not even initialized. Happens on load
 		return;
+
+	Map_Object * const loc = m_location.get(game);
 
 	// Reset our state if we're not on location or outside an economy
 	if (!get_economy()) {
@@ -317,8 +314,11 @@ void WareInstance::update(Game & game)
 	}
 
 	if (!loc) {
-		remove(game);
-		return;
+		// Before dying, output as much information as we can.
+		log_general_info(game);
+
+		// If our location gets lost, our owner is supposed to destroy us
+		throw wexception("WARE(%u): WareInstance::update has no location\n", serial());
 	}
 
 	// Update whether we have a Supply or not
@@ -327,14 +327,16 @@ void WareInstance::update(Game & game)
 			m_supply = new IdleWareSupply(*this);
 	} else {
 		delete m_supply;
-		m_supply = 0;
+		m_supply = nullptr;
 	}
 
 	// Deal with transfers
 	if (m_transfer) {
 		upcast(PlayerImmovable, location, loc);
-		if (not location)
-			return; // wait
+
+		if (!location) {
+			return;  // wait
+		}
 
 		bool success;
 		PlayerImmovable * const nextstep =
@@ -343,12 +345,12 @@ void WareInstance::update(Game & game)
 
 		if (!nextstep) {
 			if (upcast(Flag, flag, location))
-				flag->call_carrier(game, *this, 0);
+				flag->call_carrier(game, *this, nullptr);
 
 			Transfer * const t = m_transfer;
 
-			m_transfer = 0;
-			m_transfer_nextstep = 0;
+			m_transfer = nullptr;
+			m_transfer_nextstep = nullptr;
 
 			if (success) {
 				t->has_finished();
@@ -362,38 +364,7 @@ void WareInstance::update(Game & game)
 			}
 		}
 
-		if (upcast(Building, building, location)) {
-			if (nextstep != &location->base_flag()) {
-				if (upcast(PortDock, pd, nextstep)) {
-					pd->add_shippingitem(game, *this);
-					return;
-				}
-
-				throw wexception
-					("MO(%u): ware: move from building to non-baseflag", serial());
-			}
-
-			// There are some situations where we might end up in a warehouse
-			// as part of a requested route, and we need to move out of it
-			// again, e.g.:
-			//  - we were requested just when we were being carried into the
-			//    warehouse
-			//  - we were carried into a harbour/warehouse to be
-			//    shipped across the sea, but a better, land-based route has been
-			//    found
-			if (upcast(Warehouse, warehouse, building)) {
-				warehouse->do_launch_item(game, *this);
-				return;
-			}
-
-			throw wexception
-				("MO(%u): ware(%s): can not move from building %u (%s at (%u,%u)) "
-				 "to %u (%s) -> not a warehouse!",
-				 serial(), m_descr->name().c_str(), location->serial(),
-				 building->name().c_str(), building->get_position().x,
-				 building->get_position().y, nextstep->serial(),
-				 nextstep->name().c_str());
-		} else if (upcast(Flag, flag, location)) {
+		if (upcast(Flag, flag, location)) {
 			flag->call_carrier
 				(game,
 				 *this,
@@ -404,7 +375,82 @@ void WareInstance::update(Game & game)
 				 &nextstep->base_flag() : nextstep);
 		} else if (upcast(PortDock, pd, location)) {
 			pd->update_shippingitem(game, *this);
+		} else {
+			throw wexception("Ware_Instance::update in bad type of PlayerImmovable %u", location->serial());
 		}
+	}
+}
+
+/**
+ * Called by a worker when it carries the ware into the given building.
+ */
+void WareInstance::enter_building(Game & game, Building & building)
+{
+	if (m_transfer) {
+		if (m_transfer->get_destination(game) == &building) {
+			Transfer * t = m_transfer;
+
+			m_transfer = nullptr;
+			m_transfer_nextstep = nullptr;
+
+			t->has_finished();
+			return;
+		}
+
+		bool success;
+		PlayerImmovable * const nextstep =
+			m_transfer->get_next_step(&building, success);
+		m_transfer_nextstep = nextstep;
+
+		if (success) {
+			assert(nextstep);
+
+			if (upcast(PortDock, pd, nextstep)) {
+				pd->add_shippingitem(game, *this);
+				return;
+			}
+
+			// There are some situations where we might end up in a warehouse
+			// as part of a requested route, and we need to move out of it
+			// again, e.g.:
+			//  - we were requested just when we were being carried into the
+			//    warehouse
+			//  - we were carried into a harbour/warehouse to be
+			//    shipped across the sea, but a better, land-based route has been
+			//    found
+			if (upcast(Warehouse, warehouse, &building)) {
+				warehouse->do_launch_ware(game, *this);
+				return;
+			}
+
+			throw wexception
+				("MO(%u): ware(%s): do not know how to move from building %u (%s at (%u,%u)) "
+				 "to %u (%s) -> not a warehouse!",
+				 serial(), m_descr->name().c_str(), building.serial(),
+				 building.name().c_str(), building.get_position().x,
+				 building.get_position().y, nextstep->serial(),
+				 nextstep->name().c_str());
+		} else {
+			Transfer * t = m_transfer;
+
+			m_transfer = nullptr;
+			m_transfer_nextstep = nullptr;
+
+			t->has_failed();
+			cancel_moving();
+
+			if (is_a(Warehouse, &building)) {
+				building.receive_ware(game, m_descr_index);
+				remove(game);
+			} else {
+				update(game);
+			}
+			return;
+		}
+	} else {
+		// We don't have a transfer, so just enter the building
+		building.receive_ware(game, m_descr_index);
+		remove(game);
 	}
 }
 
@@ -416,19 +462,19 @@ void WareInstance::update(Game & game)
  */
 void WareInstance::set_transfer(Game & game, Transfer & t)
 {
-	m_transfer_nextstep = 0;
+	m_transfer_nextstep = nullptr;
 
 	// Reset current transfer
 	if (m_transfer) {
 		m_transfer->has_failed();
-		m_transfer = 0;
+		m_transfer = nullptr;
 	}
 
 	// Set transfer state
 	m_transfer = &t;
 
 	delete m_supply;
-	m_supply = 0;
+	m_supply = nullptr;
 
 	// Schedule an update.
 	// Do not update immediately, because update() could try to reference
@@ -443,8 +489,8 @@ void WareInstance::set_transfer(Game & game, Transfer & t)
 */
 void WareInstance::cancel_transfer(Game & game)
 {
-	m_transfer = 0;
-	m_transfer_nextstep = 0;
+	m_transfer = nullptr;
+	m_transfer_nextstep = nullptr;
 
 	update(game);
 }
@@ -452,7 +498,7 @@ void WareInstance::cancel_transfer(Game & game)
 /**
  * We are moving when there's a transfer, it's that simple.
 */
-bool WareInstance::is_moving() const throw ()
+bool WareInstance::is_moving() const
 {
 	return m_transfer;
 }
@@ -467,8 +513,8 @@ void WareInstance::cancel_moving()
 
 	if (m_transfer) {
 		m_transfer->has_failed();
-		m_transfer = 0;
-		m_transfer_nextstep = 0;
+		m_transfer = nullptr;
+		m_transfer_nextstep = nullptr;
 	}
 }
 
@@ -480,7 +526,7 @@ PlayerImmovable * WareInstance::get_next_move_step(Game & game)
 {
 	return
 		m_transfer ?
-		dynamic_cast<PlayerImmovable *>(m_transfer_nextstep.get(game)) : 0;
+		dynamic_cast<PlayerImmovable *>(m_transfer_nextstep.get(game)) : nullptr;
 }
 
 void WareInstance::log_general_info(const Editor_Game_Base & egbase)
@@ -502,7 +548,9 @@ Load/save support
 
 #define WAREINSTANCE_SAVEGAME_VERSION 1
 
-WareInstance::Loader::Loader()
+WareInstance::Loader::Loader() :
+	m_location(0),
+	m_transfer_nextstep(0)
 {
 }
 
@@ -579,8 +627,8 @@ Map_Object::Loader * WareInstance::load
 		if (version != WAREINSTANCE_SAVEGAME_VERSION)
 			throw wexception("unknown/unhandled version %i", version);
 
-		std::string tribename = fr.CString();
-		std::string warename = fr.CString();
+		const std::string tribename = fr.CString();
+		const std::string warename = fr.CString();
 
 		egbase.manually_load_tribe(tribename);
 
@@ -588,37 +636,19 @@ Map_Object::Loader * WareInstance::load
 		if (!tribe)
 			throw wexception("unknown tribe '%s'", tribename.c_str());
 
-		bool kill = false;
 		Ware_Index wareindex = tribe->ware_index(warename);
-		if (!wareindex) {
-			// Old savegame, using a ware that no longer exists
-			// We need to do the loading anyway to ensure that the
-			// correct number of bytes is read, but we will mark
-			// the object for immediate removal.
-			log("WARNING: Tribe %s has no ware %s\n", tribename.c_str(), warename.c_str());
-			wareindex = Ware_Index::First();
-			kill = true;
-		}
-		const Item_Ware_Descr * descr = tribe->get_ware_descr(wareindex);
+		const WareDescr * descr = tribe->get_ware_descr(wareindex);
 
-		std::auto_ptr<Loader> loader(new Loader);
+		std::unique_ptr<Loader> loader(new Loader);
 		loader->init(egbase, mol, *new WareInstance(wareindex, descr));
 		loader->load(fr);
-
-		if (kill) {
-			if (upcast(Game, game, &egbase))
-				loader->add_finish
-					(boost::bind
-					 (&Map_Object::schedule_destroy,
-					  loader->get_object(),
-					  boost::ref(*game)));
-		}
 
 		return loader.release();
 	} catch (const std::exception & e) {
 		throw wexception("WareInstance: %s", e.what());
 	}
+
+	return nullptr; // Should never be reached
 }
 
 }
-

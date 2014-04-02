@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2007-2009 by the Widelands Development Team
+ * Copyright (C) 2007-2009,2013 by the Widelands Development Team
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -17,21 +17,20 @@
  *
  */
 
-#include "replay.h"
+#include "logic/replay.h"
 
-#include "game.h"
-#include "game_data_error.h"
 #include "game_io/game_loader.h"
 #include "gamecontroller.h"
 #include "io/filesystem/layered_filesystem.h"
+#include "io/streamwrite.h"
+#include "log.h"
+#include "logic/game.h"
+#include "logic/game_data_error.h"
+#include "logic/playercommand.h"
 #include "md5.h"
-#include "playercommand.h"
 #include "random.h"
 #include "save_handler.h"
-#include "io/streamwrite.h"
 #include "wexception.h"
-
-#include "log.h"
 
 namespace Widelands {
 
@@ -48,16 +47,17 @@ enum {
 #define SYNC_INTERVAL 200
 
 
-struct Cmd_ReplaySyncRead : public Command {
-	Cmd_ReplaySyncRead(uint32_t const _duetime, md5_checksum const & hash)
+class Cmd_ReplaySyncRead : public Command {
+public:
+	Cmd_ReplaySyncRead(const uint32_t _duetime, const md5_checksum & hash)
 		: Command(_duetime), m_hash(hash)
 	{}
 
-	virtual uint8_t id() const {return QUEUE_CMD_REPLAYSYNCREAD;}
+	virtual uint8_t id() const override {return QUEUE_CMD_REPLAYSYNCREAD;}
 
-	void execute(Game & game)
+	void execute(Game & game) override
 	{
-		md5_checksum const myhash = game.get_sync_hash();
+		const md5_checksum myhash = game.get_sync_hash();
 
 		if (m_hash != myhash) {
 			log
@@ -71,8 +71,6 @@ struct Cmd_ReplaySyncRead : public Command {
 
 			// There has to be a better way to do this.
 			game.gameController()->setDesiredSpeed(0);
-		} else {
-			log("REPLAY: Sync checked successfully.\n");
 		}
 	}
 
@@ -84,8 +82,7 @@ private:
 /**
  * Load the savegame part of the given replay and open the command log.
  */
-ReplayReader::ReplayReader(Game & game, std::string const & filename)
-	: m_game(game)
+ReplayReader::ReplayReader(Game & game, const std::string & filename)
 {
 	m_replaytime = 0;
 
@@ -98,7 +95,7 @@ ReplayReader::ReplayReader(Game & game, std::string const & filename)
 		static_cast<Widelands::StreamRead *>(g_fs->OpenStreamRead(filename));
 
 	try {
-		uint32_t const magic = m_cmdlog->Unsigned32();
+		const uint32_t magic = m_cmdlog->Unsigned32();
 		if (magic == 0x2E21A100)
 			// Note: This was never released as part of a build
 			throw wexception
@@ -109,12 +106,12 @@ ReplayReader::ReplayReader(Game & game, std::string const & filename)
 			throw wexception
 				("%s apparently not a valid replay file", filename.c_str());
 
-		uint8_t const version = m_cmdlog->Unsigned8();
+		const uint8_t version = m_cmdlog->Unsigned8();
 		if (version < REPLAY_VERSION)
 			throw wexception
 				("Replay of version %u is known to have desync problems", version);
 		if (version != REPLAY_VERSION)
-			throw game_data_error(_("unknown/unhandled version %u"), version);
+			throw game_data_error("unknown/unhandled version %u", version);
 
 		game.rng().ReadState(*m_cmdlog);
 	}
@@ -141,13 +138,13 @@ ReplayReader::~ReplayReader()
  * \return a \ref Command that should be enqueued in the command queue
  * or 0 if there are no remaining commands before the given time.
  */
-Command * ReplayReader::GetNextCommand(uint32_t const time)
+Command * ReplayReader::GetNextCommand(const uint32_t time)
 {
 	if (!m_cmdlog)
-		return 0;
+		return nullptr;
 
 	if (static_cast<int32_t>(m_replaytime - time) > 0)
-		return 0;
+		return nullptr;
 
 	try {
 		uint8_t pkt = m_cmdlog->Unsigned8();
@@ -177,20 +174,20 @@ Command * ReplayReader::GetNextCommand(uint32_t const time)
 			uint32_t endtime = m_cmdlog->Unsigned32();
 			log("REPLAY: End of replay (gametime: %u)\n", endtime);
 			delete m_cmdlog;
-			m_cmdlog = 0;
-			return 0;
-			break;
+			m_cmdlog = nullptr;
+			return nullptr;
 		}
 
 		default:
 			throw wexception("Unknown packet %u", pkt);
 		}
-	} catch (_wexception const & e) {
+	} catch (const _wexception & e) {
 		log("REPLAY: Caught exception %s\n", e.what());
 		delete m_cmdlog;
-		m_cmdlog = 0;
-		return 0;
+		m_cmdlog = nullptr;
 	}
+
+	return nullptr;
 }
 
 
@@ -199,7 +196,7 @@ Command * ReplayReader::GetNextCommand(uint32_t const time)
  */
 bool ReplayReader::EndOfReplay()
 {
-	return m_cmdlog == 0;
+	return m_cmdlog == nullptr;
 }
 
 
@@ -207,12 +204,13 @@ bool ReplayReader::EndOfReplay()
  * Command / timer that regularly inserts synchronization hashes into
  * the replay.
  */
-struct Cmd_ReplaySyncWrite : public Command {
-	Cmd_ReplaySyncWrite(uint32_t const _duetime) : Command(_duetime) {}
+class Cmd_ReplaySyncWrite : public Command {
+public:
+	Cmd_ReplaySyncWrite(const uint32_t _duetime) : Command(_duetime) {}
 
-	virtual uint8_t id() const {return QUEUE_CMD_REPLAYSYNCWRITE;}
+	virtual uint8_t id() const override {return QUEUE_CMD_REPLAYSYNCWRITE;}
 
-	void execute(Game & game) {
+	void execute(Game & game) override {
 		if (ReplayWriter * const rw = game.get_replaywriter()) {
 			rw->SendSync (game.get_sync_hash());
 
@@ -229,7 +227,7 @@ struct Cmd_ReplaySyncWrite : public Command {
  * This is expected to be called just after game load has completed
  * and the game has changed into running state.
  */
-ReplayWriter::ReplayWriter(Game & game, std::string const & filename)
+ReplayWriter::ReplayWriter(Game & game, const std::string & filename)
 	: m_game(game), m_filename(filename)
 {
 	g_fs->EnsureDirectoryExists(REPLAY_DIR);
@@ -241,7 +239,7 @@ ReplayWriter::ReplayWriter(Game & game, std::string const & filename)
 		throw wexception("Failed to save game for replay: %s", error.c_str());
 
 	log("Reloading the game from replay\n");
-	game.cleanup_for_load(true, true);
+	game.cleanup_for_load();
 	{
 		Game_Loader gl(m_filename + WLGF_SUFFIX, game);
 		gl.load_game();
@@ -294,7 +292,7 @@ void ReplayWriter::SendPlayerCommand(PlayerCommand * cmd)
 /**
  * Store a synchronization hash for the current game time in the replay.
  */
-void ReplayWriter::SendSync(md5_checksum const & hash)
+void ReplayWriter::SendSync(const md5_checksum & hash)
 {
 	m_cmdlog->Unsigned8(pkt_syncreport);
 	m_cmdlog->Unsigned32(m_game.get_gametime());

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2004-2006, 2008-2009, 2012 by the Widelands Development Team
+ * Copyright (C) 2004-2006, 2008-2009, 2012-2013 by the Widelands Development Team
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -20,20 +20,19 @@
 #ifndef INTERNET_GAMING_H
 #define INTERNET_GAMING_H
 
-#include "build_info.h"
-#include "chat.h"
-#include "internet_gaming_protocol.h"
-#include "network.h"
-#include "network_lan_promotion.h"
-
-#include <stdint.h>
 #include <string>
 #include <vector>
 
-#ifdef WIN32
-#include <winsock2.h>
+#ifdef _WIN32
 #include <io.h>
+#include <winsock2.h>
 #endif
+
+#include "build_info.h"
+#include "chat.h"
+#include "network/internet_gaming_protocol.h"
+#include "network/network.h"
+#include "network/network_lan_promotion.h"
 
 
 /// A simple network client struct
@@ -65,10 +64,10 @@ struct InternetGaming : public ChatProvider {
 	// Login and logout
 	void initialiseConnection();
 	bool login
-		(std::string const & nick, std::string const & pwd, bool registered,
-		 std::string const & metaserver, uint32_t port);
+		(const std::string & nick, const std::string & pwd, bool registered,
+		 const std::string & metaserver, uint32_t port);
 	bool relogin();
-	void logout(std::string const & msgcode = "CONNECTION_CLOSED");
+	void logout(const std::string & msgcode = "CONNECTION_CLOSED");
 
 	/// \returns whether the client is logged in
 	bool logged_in() {return (m_state == LOBBY) || (m_state == CONNECTING) || (m_state == IN_GAME);}
@@ -79,7 +78,7 @@ struct InternetGaming : public ChatProvider {
 
 	// Game specific functions
 	const std::string & ip();
-	void join_game(std::string const & gamename);
+	void join_game(const std::string & gamename);
 	void open_game();
 	void set_game_playing();
 	void set_game_done();
@@ -87,9 +86,9 @@ struct InternetGaming : public ChatProvider {
 
 	// Informative functions for lobby
 	bool updateForGames();
-	std::vector<INet_Game>   const & games();
+	const std::vector<INet_Game>   & games();
 	bool updateForClients();
-	std::vector<INet_Client> const & clients();
+	const std::vector<INet_Client> & clients();
 
 	/// \returns the maximum allowed number of clients in a game (players + spectators)
 	uint32_t max_clients() {return INTERNET_GAMING_MAX_CLIENTS_PER_GAME;}
@@ -98,7 +97,7 @@ struct InternetGaming : public ChatProvider {
 	void set_local_maxclients(uint32_t mp) {m_maxclients = mp;}
 
 	/// sets the name of the local server as shown in the games list
-	void set_local_servername(std::string const & name) {m_gamename = name;}
+	void set_local_servername(const std::string & name) {m_gamename = name;}
 
 
 	/// \returns the name of the local server
@@ -111,20 +110,22 @@ struct InternetGaming : public ChatProvider {
 	std::string & get_local_clientrights() {return m_clientrights;}
 
 
-	// ChatProvider: sends a message via the metaserver.
-	void send(std::string const &);
+	/// ChatProvider: sends a message via the metaserver.
+	void send(const std::string &) override;
 
 	/// ChatProvider: adds the message to the message list and calls parent.
-	void receive(ChatMessage const & msg) {messages.push_back(msg); ChatProvider::send(msg);}
+	void receive(const ChatMessage & msg) {messages.push_back(msg); ChatProvider::send(msg);}
 
 	/// ChatProvider: returns the list of chatmessages.
-	std::vector<ChatMessage> const & getMessages() const {return messages;}
+	const std::vector<ChatMessage> & getMessages() const override {return messages;}
 
-	/// \returns and resets the ingame_system_chat messages
-	std::vector<ChatMessage> const & getIngameSystemMessages() {
-		std::vector<ChatMessage> const * temp = new std::vector<ChatMessage>(ingame_system_chat);
+	/// Silence the internet lobby chat if we are in game as we do not see the messages anyways
+	bool sound_off() override {return m_state == IN_GAME;}
+
+	/// writes the ingame_system_chat messages to \arg msg and resets it afterwards
+	void getIngameSystemMessages(std::vector<ChatMessage> & msg) {
+		msg = ingame_system_chat;
 		ingame_system_chat.clear();
-		return *temp;
 	}
 
 private:
@@ -186,8 +187,12 @@ private:
 	std::vector<ChatMessage> ingame_system_chat;
 
 	/// An important response of the metaserver, the client is waiting for.
-	std::string               waitcmd;
-	int32_t                   waittimeout;
+	std::string              waitcmd;
+	int32_t                  waittimeout;
+
+	/// Connection tracking specific variables
+	time_t                   lastbrokensocket[2];
+	time_t                   lastping;
 
 };
 

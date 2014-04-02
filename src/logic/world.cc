@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2002, 2004, 2006-2010 by the Widelands Development Team
+ * Copyright (C) 2002, 2004, 2006-2013 by the Widelands Development Team
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -17,27 +17,26 @@
  *
  */
 
-#include "world.h"
-
-#include "constants.h"
-#include "critter_bob.h"
-#include "game_data_error.h"
-#include "graphic/graphic.h"
-#include "helper.h"
-#include "log.h"
-#include "i18n.h"
-#include "io/filesystem/layered_filesystem.h"
-#include "parse_map_object_types.h"
-#include "profile/profile.h"
-#include "wexception.h"
-#include "widelands_fileread.h"
-#include "widelands_filewrite.h"
-#include "worlddata.h"
-
-#include "container_iterate.h"
+#include "logic/world.h"
 
 #include <iostream>
 #include <sstream>
+
+#include "constants.h"
+#include "container_iterate.h"
+#include "graphic/graphic.h"
+#include "helper.h"
+#include "i18n.h"
+#include "io/filesystem/layered_filesystem.h"
+#include "log.h"
+#include "logic/critter_bob.h"
+#include "logic/game_data_error.h"
+#include "logic/widelands_fileread.h"
+#include "logic/widelands_filewrite.h"
+#include "logic/worlddata.h"
+#include "parse_map_object_types.h"
+#include "profile/profile.h"
+#include "wexception.h"
 
 using std::cerr;
 using std::endl;
@@ -50,7 +49,7 @@ namespace Widelands {
 Parse a resource description section.
 ==============
 */
-void Resource_Descr::parse(Section & s, std::string const & basedir)
+void Resource_Descr::parse(Section & s, const std::string & basedir)
 {
 	m_name = s.get_name();
 	m_descname = s.get_string("name", s.get_name());
@@ -186,9 +185,9 @@ const MapGenBobKind * MapGenBobArea::getBobKind
 		case MapGenAreaInfo::ttWastelandOuter:
 			return m_WastelandOuterBobKind;
 		default:
-			return 0;
+			return nullptr;
 	};
-	return 0;
+	return nullptr;
 }
 
 void MapGenBobArea::parseSection (Section & s, MapGenInfo & mapGenInfo)
@@ -204,19 +203,19 @@ void MapGenBobArea::parseSection (Section & s, MapGenInfo & mapGenInfo)
 	std::string str;
 
 	str = s.get_safe_string("land_coast_bobs");
-	m_LandCoastBobKind      = str.size() ? mapGenInfo.getBobKind(str) : 0;
+	m_LandCoastBobKind      = str.size() ? mapGenInfo.getBobKind(str) : nullptr;
 
 	str = s.get_safe_string("land_inner_bobs");
-	m_LandInnerBobKind      = str.size() ? mapGenInfo.getBobKind(str) : 0;
+	m_LandInnerBobKind      = str.size() ? mapGenInfo.getBobKind(str) : nullptr;
 
 	str = s.get_safe_string("land_upper_bobs");
-	m_LandUpperBobKind      = str.size() ? mapGenInfo.getBobKind(str) : 0;
+	m_LandUpperBobKind      = str.size() ? mapGenInfo.getBobKind(str) : nullptr;
 
 	str = s.get_safe_string("wasteland_inner_bobs");
-	m_WastelandInnerBobKind = str.size() ? mapGenInfo.getBobKind(str) : 0;
+	m_WastelandInnerBobKind = str.size() ? mapGenInfo.getBobKind(str) : nullptr;
 
 	str = s.get_safe_string("wasteland_outer_bobs");
-	m_WastelandOuterBobKind = str.size() ? mapGenInfo.getBobKind(str) : 0;
+	m_WastelandOuterBobKind = str.size() ? mapGenInfo.getBobKind(str) : nullptr;
 }
 
 int MapGenAreaInfo::split_string
@@ -256,7 +255,6 @@ void MapGenAreaInfo::readTerrains
 void MapGenAreaInfo::parseSection
 	(World * const world, Section & s, MapGenAreaType const areaType)
 {
-	std::string res_str = s.get_string("resources", "");
 	m_weight = s.get_positive("weight", 1);
 	m_world = world;
 	switch (areaType) {
@@ -279,6 +277,8 @@ void MapGenAreaInfo::parseSection
 			readTerrains(m_Terrains1, s, "inner_terrains");
 			readTerrains(m_Terrains2, s, "outer_terrains");
 			break;
+		default:
+			throw wexception("MapGenAreaInfo::parseSection: bad areaType");
 	}
 }
 
@@ -342,7 +342,7 @@ uint32_t MapGenInfo::getSumLandWeight() const
 	return m_land_weight;
 }
 
-MapGenBobArea const & MapGenInfo::getBobArea(size_t index) const
+const MapGenBobArea & MapGenInfo::getBobArea(size_t index) const
 {
 	return m_BobAreas[index];
 }
@@ -374,11 +374,12 @@ size_t MapGenInfo::getNumAreas
 	case MapGenAreaInfo::atLand:      return m_LandAreas     .size();
 	case MapGenAreaInfo::atMountains: return m_MountainAreas .size();
 	case MapGenAreaInfo::atWasteland: return m_WasteLandAreas.size();
+	default:
+		throw wexception("invalid MapGenAreaType %u", areaType);
 	}
-	throw wexception("invalid MapGenAreaType %u", areaType);
 }
 
-MapGenAreaInfo const & MapGenInfo::getArea
+const MapGenAreaInfo & MapGenInfo::getArea
 	(MapGenAreaInfo::MapGenAreaType const areaType,
 	 uint32_t const index)
 	const
@@ -388,12 +389,13 @@ MapGenAreaInfo const & MapGenInfo::getArea
 	case MapGenAreaInfo::atLand:      return m_LandAreas     .at(index);
 	case MapGenAreaInfo::atMountains: return m_MountainAreas .at(index);
 	case MapGenAreaInfo::atWasteland: return m_WasteLandAreas.at(index);
+	default:
+		throw wexception("invalid MapGenAreaType %u", areaType);
 	}
-	throw wexception("invalid MapGenAreaType %u", areaType);
 }
 
 const MapGenBobKind * MapGenInfo::getBobKind
-	(std::string const & bobKindName) const
+	(const std::string & bobKindName) const
 {
 	if (m_BobKinds.find(bobKindName) == m_BobKinds.end())
 		throw wexception("invalid MapGenBobKind %s", bobKindName.c_str());
@@ -517,11 +519,11 @@ World
 =============================================================================
 */
 
-World::World(std::string const & name) : m_basedir("worlds/" + name + '/') {
+World::World(const std::string & name) : m_basedir("worlds/" + name + '/') {
 	try {
 		i18n::Textdomain textdomain("world_" + name);
 
-		std::auto_ptr<FileSystem> fs(&g_fs->MakeSubFileSystem(m_basedir));
+		std::unique_ptr<FileSystem> fs(g_fs->MakeSubFileSystem(m_basedir));
 		FileSystemLayer filesystemlayer(*fs);
 
 		{
@@ -546,7 +548,7 @@ World::World(std::string const & name) : m_basedir("worlds/" + name + '/') {
 			log("Parsing map gen info...\n");
 			parse_mapgen();
 		}
-	} catch (std::exception const & e) {
+	} catch (const std::exception & e) {
 		throw game_data_error("world %s: %s", name.c_str(), e.what());
 	}
 }
@@ -560,6 +562,8 @@ Load graphics data here
 void World::load_graphics()
 {
 	int32_t i;
+
+	g_gr->flush_maptextures();
 
 	// Load terrain graphics
 	for (i = 0; i < ters.get_nitems(); ++i)
@@ -576,7 +580,7 @@ void World::load_graphics()
 /**
  * Read the <world-directory>/conf
  */
-void World::parse_root_conf(std::string const & name, Profile & root_conf)
+void World::parse_root_conf(const std::string & name, Profile & root_conf)
 {
 	Section & s = root_conf.get_safe_section("world");
 	snprintf
@@ -595,12 +599,12 @@ void World::parse_resources()
 
 	try {
 		Profile prof(fname);
-		while (Section * const section = prof.get_next_section(0)) {
+		while (Section * const section = prof.get_next_section(nullptr)) {
 			Resource_Descr & descr = *new Resource_Descr();
 			descr.parse(*section, m_basedir);
 			m_resources.add(&descr);
 		}
-	} catch (std::exception const & e) {
+	} catch (const std::exception & e) {
 		throw game_data_error("%s: %s", fname, e.what());
 	}
 }
@@ -615,18 +619,18 @@ void World::parse_terrains()
 		Profile prof(fname);
 
 		for (Terrain_Index i = 0;; ++i) {
-			Section * const s = prof.get_next_section(0);
+			Section * const s = prof.get_next_section(nullptr);
 			if (not s)
 				break;
 			if (i == 0x10)
 				throw game_data_error
-					(_("%s: too many terrain types, can not be more than 16"),
+					("%s: too many terrain types, cannot be more than 16",
 					 fname);
 			ters.add(new Terrain_Descr(m_basedir.c_str(), s, &m_resources));
 		}
 
 		prof.check_used();
-	} catch (game_data_error const & e) {
+	} catch (const game_data_error & e) {
 		throw game_data_error("%s: %s", fname, e.what());
 	}
 }
@@ -638,13 +642,13 @@ void World::parse_bobs(std::string & path, Profile & root_conf) {
 	PARSE_MAP_OBJECT_TYPES_BEGIN("immovable")
 		immovables.add
 			(new Immovable_Descr
-			 	(_name, _descname, path, prof, global_s, *this, 0));
+			 	(_name, _descname, path, prof, global_s, *this, nullptr));
 	PARSE_MAP_OBJECT_TYPES_END;
 
 	PARSE_MAP_OBJECT_TYPES_BEGIN("critter bob")
 		bobs      .add
 			(new Critter_Bob_Descr
-			 	(_name, _descname, path, prof, global_s, 0));
+			 	(_name, _descname, path, prof, global_s, nullptr));
 	PARSE_MAP_OBJECT_TYPES_END;
 }
 
@@ -752,7 +756,7 @@ void World::parse_mapgen   ()
 			throw game_data_error("missing a land/land terrain type");
 
 		prof.check_used();
-	} catch (_wexception const & e) {
+	} catch (const _wexception & e) {
 		throw game_data_error("%s: %s", fname, e.what());
 	}
 }
@@ -766,8 +770,8 @@ bool World::exists_world(std::string worldname)
 	return
 		f.TryOpen
 			(*
-			 std::auto_ptr<FileSystem>
-			 	(&g_fs->MakeSubFileSystem("worlds/" + worldname)),
+			 std::unique_ptr<FileSystem>
+				(g_fs->MakeSubFileSystem("worlds/" + worldname)),
 			 "conf");
 }
 
@@ -775,8 +779,7 @@ void World::get_all_worlds(std::vector<std::string> & result) {
 	result.clear();
 
 	//  get all worlds
-	filenameset_t m_worlds;
-	g_fs->FindFiles("worlds", "*", &m_worlds);
+	filenameset_t m_worlds = g_fs->ListDirectory("worlds");
 	for
 		(filenameset_t::iterator pname = m_worlds.begin();
 		 pname != m_worlds.end();
@@ -813,17 +816,16 @@ Terrain_Descr
 
 ==============================================================================
 */
-
 Terrain_Descr::Terrain_Descr
 	(char                       const * const directory,
 	 Section                          * const s,
-	 Descr_Maintainer<Resource_Descr> * const resources)
+	 DescriptionMaintainer<Resource_Descr> * const resources)
 :
 m_name              (s->get_name()),
 m_descname          (s->get_string("name", s->get_name())),
-m_picnametempl      (0),
 m_frametime         (FRAME_LENGTH),
-m_valid_resources   (0),
+m_dither_layer   (0),
+m_valid_resources   (nullptr),
 m_nr_valid_resources(0),
 m_default_resources (-1),
 m_default_amount    (0),
@@ -831,7 +833,7 @@ m_texture           (0)
 {
 
 	// Parse the default resource
-	if (const char * str = s->get_string("def_resources", 0)) {
+	if (const char * str = s->get_string("def_resources", nullptr)) {
 		std::istringstream str1(str);
 		std::string resource;
 		int32_t amount;
@@ -857,15 +859,10 @@ m_texture           (0)
 		m_nr_valid_resources = nres;
 		m_valid_resources    = new uint8_t[nres];
 		std::string curres;
-		uint32_t i = 0;
 		int32_t cur_res = 0;
-		while (i <= str1.size()) {
-			if (str1[i] == ' ' || str1[i] == ' ' || str1[i] == '\t') {
-				++i;
-				continue;
-			}
-			if (str1[i] == ',' || i == str1.size()) {
-				const int32_t res = resources->get_index(curres.c_str());;
+		for (uint32_t i = 0; i <= str1.size(); ++i) {
+			if (i == str1.size() || str1[i] == ',') {
+				const int32_t res = resources->get_index(curres.c_str());
 				if (res == -1)
 					throw game_data_error
 						("terrain type %s has valid resource type %s which does not "
@@ -873,9 +870,9 @@ m_texture           (0)
 						 s->get_name(), curres.c_str());
 				m_valid_resources[cur_res++] = res;
 				curres = "";
-			} else
+			} else if (str1[i] != ' ' && str1[i] != '\t') {
 				curres.append(1, str1[i]);
-			++i;
+			}
 		}
 	}
 
@@ -903,25 +900,26 @@ m_texture           (0)
 			throw game_data_error("%s: invalid type '%s'", m_name.c_str(), is);
 	}
 
+	m_dither_layer = s->get_int("dither_layer", 0);
+
 	// Determine template of the texture animation pictures
 	char fnametmpl[256];
 
-	if (const char * const texture = s->get_string("texture", 0))
+	if (const char * const texture = s->get_string("texture", nullptr))
 		snprintf(fnametmpl, sizeof(fnametmpl), "%s/%s", directory, texture);
 	else
 		snprintf
 			(fnametmpl, sizeof(fnametmpl),
 			 "%s/pics/%s_??.png", directory, m_name.c_str());
 
-	m_picnametempl = strdup(fnametmpl);
+	m_picnametempl = fnametmpl;
 }
 
 Terrain_Descr::~Terrain_Descr()
 {
-	free(m_picnametempl);
 	delete[] m_valid_resources;
 	m_nr_valid_resources = 0;
-	m_valid_resources    = 0;
+	m_valid_resources    = nullptr;
 }
 
 
@@ -930,10 +928,9 @@ Terrain_Descr::~Terrain_Descr()
 Trigger load of the actual animation frames.
 ===============
 */
-void Terrain_Descr::load_graphics()
-{
-	if (m_picnametempl)
-		m_texture = g_gr->get_maptexture(*m_picnametempl, m_frametime);
+void Terrain_Descr::load_graphics() {
+	if (!m_picnametempl.empty())
+		m_texture = g_gr->get_maptexture(m_picnametempl, m_frametime);
 }
 
 }

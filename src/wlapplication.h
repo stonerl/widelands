@@ -20,24 +20,29 @@
 #ifndef WLAPPLICATION_H
 #define WLAPPLICATION_H
 
-#include "point.h"
+//Workaround for bug http://sourceforge.net/p/mingw/bugs/2152/
+#ifdef __MINGW32__
+#define _USE_32BIT_TIME_T 1
+#endif
+
+#include <cstring>
+#include <map>
+#include <stdexcept>
+#include <string>
 
 #include <SDL_events.h>
 #include <SDL_keyboard.h>
 #include <SDL_types.h>
 
-#include <map>
-#include <stdexcept>
-#include <string>
-#include <cstring>
+#include "point.h"
 
-namespace Widelands {struct Game;}
-struct Journal;
+
+namespace Widelands {class Game;}
 
 ///Thrown if a commandline parameter is faulty
 struct Parameter_error : public std::runtime_error {
-	explicit Parameter_error() throw () : std::runtime_error("") {}
-	explicit Parameter_error(std::string text) throw ()
+	explicit Parameter_error() : std::runtime_error("") {}
+	explicit Parameter_error(std::string text)
 		: std::runtime_error(text)
 	{}
 	virtual ~Parameter_error() throw () {}
@@ -103,19 +108,6 @@ struct InputCallback {
 /// Forking does not work on windows, but nobody cares enough to investigate.
 /// It is only a debugging convenience anyway.
 ///
-/// \par Session recording and playback
-///
-/// For debugging, e.g. profiling a real game without incurring the speed
-/// disadvantage while playing, the WLApplication can record (and of course
-/// play back) a complete game session. To do so with guaranteed repeatability,
-/// every single event - including low level stuff like mouse movement - gets
-/// recorded or played back.
-///
-/// During playback, external events are ignored to avoid interference with the
-/// playback (exception: F10 will cancel the playback immediately).
-///
-/// Recording/Playback does not work with --double. It could be made possible
-/// but that feature would not be very useful.
 ///
 /// \par The mouse cursor
 ///
@@ -129,23 +121,14 @@ struct InputCallback {
 /// always available.
 /// \todo Actually do grab the mouse when it is locked
 ///
-/// \todo What happens if a playback is canceled? Does the game continue or
-/// quit?
-/// \todo Can recording be canceled?
-/// \todo Should we allow to trigger recording ingame, starting with a snapshot
-/// savegame? Preferably, the log would be stored inside the savegame. A new
-/// user interface for starting / stopping playback may bue useful with this.
-/// \todo How about a "pause" button during playback to examine the current
-/// game state?
 /// \todo Graphics are currently not handled by WLApplication, and it is
 /// non essential for playback anyway. Additionally, we will want several
 /// rendering backends (software and OpenGL). Maybe the graphics backend loader
 /// code should be in System, while the actual graphics work is done elsewhere.
 /// \todo Refactor the mainloop
 /// \todo Sensible use of exceptions (goes for whole game)
-/// \todo Default filenames for recording and playback
 struct WLApplication {
-	static WLApplication * get(int const argc = 0, char const * * argv = 0);
+	static WLApplication * get(int const argc = 0, char const * * argv = nullptr);
 	~WLApplication();
 
 	enum GameType {NONE, EDITOR, REPLAY, SCENARIO, LOADGAME, NETWORK, INTERNET};
@@ -159,17 +142,17 @@ struct WLApplication {
 
 	/// Get the state of the current KeyBoard Button
 	/// \warning This function doesn't check for dumbness
-	bool get_key_state(SDLKey const key) const {return SDL_GetKeyState(0)[key];}
+	bool get_key_state(SDLKey const key) const {return SDL_GetKeyState(nullptr)[key];}
 
 	//@{
 	void warp_mouse(Point);
 	void set_input_grab(bool grab);
 
 	/// The mouse's current coordinates
-	Point get_mouse_position() const throw () {return m_mouse_position;}
+	Point get_mouse_position() const {return m_mouse_position;}
 	//
 	/// Find out whether the mouse is currently pressed
-	bool is_mouse_pressed() const {return SDL_GetMouseState(NULL, NULL); }
+	bool is_mouse_pressed() const {return SDL_GetMouseState(nullptr, nullptr); }
 
 	/// Swap left and right mouse key?
 	void set_mouse_swap(const bool swap) {m_mouse_swapped = swap;}
@@ -178,9 +161,14 @@ struct WLApplication {
 	void set_mouse_lock(const bool locked) {m_mouse_locked = locked;}
 	//@}
 
-	void init_graphics
-		(int32_t w, int32_t h, int32_t bpp,
-		 bool fullscreen, bool opengl);
+	void init_graphics(int32_t w, int32_t h, bool fullscreen, bool opengl);
+
+	/**
+	 * Refresh the graphics from the latest options.
+	 *
+	 * \note See caveats for \ref init_graphics()
+	 */
+	void refresh_graphics();
 
 	void handle_input(InputCallback const *);
 
@@ -194,8 +182,8 @@ struct WLApplication {
 	bool campaign_game();
 	void replay();
 
-#ifdef DEBUG
-#ifndef WIN32
+#ifndef NDEBUG
+#ifndef _WIN32
 	//not all of these need to be public, but I consider signal handling
 	//a public interface
 	//@{
@@ -222,7 +210,7 @@ struct WLApplication {
 protected:
 	WLApplication(int argc, char const * const * argv);
 
-	bool poll_event(SDL_Event &, bool throttle);
+	bool poll_event(SDL_Event &);
 
 	bool init_settings();
 	void init_language();
@@ -234,7 +222,7 @@ protected:
 	void shutdown_hardware();
 
 	void parse_commandline(int argc, char const * const * argv);
-	void handle_commandline_parameters() throw (Parameter_error);
+	void handle_commandline_parameters();
 
 	void setup_searchpaths(std::string argv0);
 	void setup_homedir();
@@ -252,15 +240,21 @@ protected:
 
 	std::string m_filename;
 
+	/// Script to be run after the game was started with --editor,
+	/// --scenario or --loadgame.
+	std::string m_script_to_run;
+
 	//Log all output to this file if set, otherwise use cout
 	std::string m_logfile;
 
 	GameType m_game_type;
-	///the event recorder object
-	Journal * journal;
 
 	///True if left and right mouse button should be swapped
 	bool  m_mouse_swapped;
+
+	/// When apple is involved, the middle mouse button is sometimes send, even
+	/// if it wasn't pressed. We try to revert this and this helps.
+	bool  m_faking_middle_mouse_button;
 
 	///The current position of the mouse pointer
 	Point m_mouse_position;
@@ -276,18 +270,6 @@ protected:
 	///true if an external entity wants us to quit
 	bool   m_should_die;
 
-	///The Widelands window's width in pixels
-	int32_t    m_gfx_w;
-
-	///The Widelands window's height in pixels
-	int32_t    m_gfx_h;
-
-	///If true Widelands is (should be, we never know ;-) running
-	///in a fullscreen window
-	bool   m_gfx_fullscreen;
-
-	bool   m_gfx_opengl;
-
 	//do we want to search the default places for widelands installs
 	bool   m_default_datadirs;
 	std::string m_homedir;
@@ -296,9 +278,12 @@ protected:
 	bool m_redirected_stdio;
 private:
 	///Holds this process' one and only instance of WLApplication, if it was
-	///created already. NULL otherwise.
+	///created already. nullptr otherwise.
 	///\note This is private on purpose. Read the class documentation.
 	static WLApplication * the_singleton;
+
+	void _handle_mousebutton(SDL_Event &, InputCallback const *);
+
 };
 
 #endif
