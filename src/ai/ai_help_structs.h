@@ -436,6 +436,7 @@ struct BuildingObserver {
 	uint32_t current_stats;
 
 	uint32_t basic_amount;  // basic amount for basic economy as defined in init.lua
+	bool never_occupied;  //this switches
 
 	std::vector<Widelands::DescriptionIndex> inputs;
 	std::vector<Widelands::DescriptionIndex> outputs;

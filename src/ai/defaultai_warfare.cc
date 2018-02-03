@@ -575,6 +575,17 @@ bool DefaultAI::check_trainingsites(uint32_t gametime) {
 	TrainingSite* ts = trainingsites.front().site;
 	TrainingSiteObserver& tso = trainingsites.front();
 
+	// In case this trainingsite is among basic buildings
+	if (tso.bo->never_occupied && persistent_data->remaining_basic_buildings.count(tso.bo->id) > 0) {
+		printf ("DEBUG: %s first time occupied - erasing from basic economy list\n", tso.bo->name); //NOCOM
+		if (persistent_data->remaining_basic_buildings[tso.bo->id] > 1) {
+			--persistent_data->remaining_basic_buildings[tso.bo->id];
+		} else {
+			persistent_data->remaining_basic_buildings.erase(tso.bo->id);
+		}
+		tso.bo->never_occupied = false;
+	}
+
 	// Inform if we are above ai type limit.
 	if (tso.bo->total_count() > tso.bo->cnt_limit_by_aimode) {
 		log("AI check_trainingsites: AI player %d: count of %s exceeds an AI limit %d: actual count: "

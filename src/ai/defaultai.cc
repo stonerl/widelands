@@ -3702,6 +3702,16 @@ bool DefaultAI::check_productionsites(uint32_t gametime) {
 	// Get link to productionsite that should be checked
 	ProductionSiteObserver& site = productionsites.front();
 
+	if (site.bo->never_occupied && persistent_data->remaining_basic_buildings.count(site.bo->id) > 0) {
+		printf ("DEBUG: %s first time occupied\n", site.bo->name); // NOCOM
+		if (persistent_data->remaining_basic_buildings[site.bo->id] > 1) {
+			--persistent_data->remaining_basic_buildings[site.bo->id];
+		} else {
+			persistent_data->remaining_basic_buildings.erase(site.bo->id);
+		}
+		site.bo->never_occupied = false;
+	}
+
 	// Inform if we are above ai type limit.
 	if (site.bo->total_count() > site.bo->cnt_limit_by_aimode) {
 		log("AI check_productionsites: Too many %s: %d, ai limit: %d\n", site.bo->name,
@@ -4181,6 +4191,16 @@ bool DefaultAI::check_mines_(uint32_t const gametime) {
 
 	// Get link to productionsite that should be checked
 	ProductionSiteObserver& site = mines_.front();
+
+	if (site.bo->never_occupied && persistent_data->remaining_basic_buildings.count(site.bo->id) > 0) {
+		printf ("DEBUG: %s first time occupied\n", site.bo->name); // NOCOM
+		if (persistent_data->remaining_basic_buildings[site.bo->id] > 1) {
+			--persistent_data->remaining_basic_buildings[site.bo->id];
+		} else {
+			persistent_data->remaining_basic_buildings.erase(site.bo->id);
+		}
+		site.bo->never_occupied = false;
+	}
 
 	const bool connected_to_wh = !site.site->get_economy()->warehouses().empty();
 
@@ -5748,18 +5768,6 @@ void DefaultAI::gain_building(Building& b, const bool found_on_load) {
 		++bo.cnt_built;
 		const uint32_t gametime = game().get_gametime();
 		bo.last_building_built = gametime;
-		// erase building from remaining_basic_buildings, unless we are loading a saved game
-		if (!found_on_load && persistent_data->remaining_basic_buildings.count(bo.id) > 0) {
-			if (persistent_data->remaining_basic_buildings[bo.id] > 1) {
-				--persistent_data->remaining_basic_buildings[bo.id];
-			} else {
-				persistent_data->remaining_basic_buildings.erase(bo.id);
-			}
-		}
-		// Remaining basic buildings map contain either no entry for the building, or the number is
-		// nonzero
-		assert(persistent_data->remaining_basic_buildings.count(bo.id) == 0 ||
-		       persistent_data->remaining_basic_buildings[bo.id] > 0);
 
 		if (bo.type == BuildingObserver::Type::kProductionsite) {
 			productionsites.push_back(ProductionSiteObserver());
@@ -5786,6 +5794,14 @@ void DefaultAI::gain_building(Building& b, const bool found_on_load) {
 
 			for (uint32_t i = 0; i < bo.inputs.size(); ++i)
 				++wares.at(bo.inputs.at(i)).consumers;
+
+			if (!found_on_load) {
+				// If this is brand new building, setting as never occupied
+				bo.never_occupied = true;
+			} else {
+				// otherwise just find out
+				bo.never_occupied = !productionsites.back().site->can_start_working();
+			}
 		} else if (bo.type == BuildingObserver::Type::kMine) {
 			mines_.push_back(ProductionSiteObserver());
 			mines_.back().site = &dynamic_cast<ProductionSite&>(b);
@@ -5810,6 +5826,14 @@ void DefaultAI::gain_building(Building& b, const bool found_on_load) {
 
 			set_inputs_to_zero(mines_.back());
 
+
+			// If this is brand new building, setting as never occupied
+			if (!found_on_load) {
+				bo.never_occupied = false;
+			} else {
+				// otherwise just find out
+				bo.never_occupied = productionsites.back().site->can_start_working();
+			}
 		} else if (bo.type == BuildingObserver::Type::kMilitarysite) {
 			militarysites.push_back(MilitarySiteObserver());
 			militarysites.back().site = &dynamic_cast<MilitarySite&>(b);
@@ -5829,6 +5853,13 @@ void DefaultAI::gain_building(Building& b, const bool found_on_load) {
 			trainingsites.push_back(TrainingSiteObserver());
 			trainingsites.back().site = &dynamic_cast<TrainingSite&>(b);
 			trainingsites.back().bo = &bo;
+			// If this is brand new building, setting as never occupied
+			if (!found_on_load) {
+				bo.never_occupied = false;
+			} else {
+				// otherwise just find out
+				bo.never_occupied = productionsites.back().site->can_start_working();
+			}
 
 		} else if (bo.type == BuildingObserver::Type::kWarehouse) {
 			++numof_warehouses_;
