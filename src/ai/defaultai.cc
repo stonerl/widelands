@@ -3703,7 +3703,7 @@ bool DefaultAI::check_productionsites(uint32_t gametime) {
 	ProductionSiteObserver& site = productionsites.front();
 
 	if (site.bo->never_occupied && persistent_data->remaining_basic_buildings.count(site.bo->id) > 0) {
-		printf ("DEBUG: %s first time occupied\n", site.bo->name); // NOCOM
+		log ("DEBUG: %s first time occupied\n", site.bo->name); // NOCOM
 		if (persistent_data->remaining_basic_buildings[site.bo->id] > 1) {
 			--persistent_data->remaining_basic_buildings[site.bo->id];
 		} else {
@@ -4193,7 +4193,7 @@ bool DefaultAI::check_mines_(uint32_t const gametime) {
 	ProductionSiteObserver& site = mines_.front();
 
 	if (site.bo->never_occupied && persistent_data->remaining_basic_buildings.count(site.bo->id) > 0) {
-		printf ("DEBUG: %s first time occupied\n", site.bo->name); // NOCOM
+		log ("DEBUG: %s first time occupied\n", site.bo->name); // NOCOM
 		if (persistent_data->remaining_basic_buildings[site.bo->id] > 1) {
 			--persistent_data->remaining_basic_buildings[site.bo->id];
 		} else {

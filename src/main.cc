@@ -1,3 +1,12 @@
+#include <unistd.h>
+#include <unistd.h>
+#include <unistd.h>
+#include <unistd.h>
+#include <unistd.h>
+#include <unistd.h>
+#include <unistd.h>
+#include <unistd.h>
+#include <unistd.h>
 /*
  * Copyright (C) 2002-2017 by the Widelands Development Team
  *
