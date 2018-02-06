@@ -576,7 +576,7 @@ bool DefaultAI::check_trainingsites(uint32_t gametime) {
 	TrainingSiteObserver& tso = trainingsites.front();
 
 	// In case this trainingsite is among basic buildings
-	if (tso.bo->never_occupied && persistent_data->remaining_basic_buildings.count(tso.bo->id) > 0) {
+	if (tso.bo->never_occupied && persistent_data->remaining_basic_buildings.count(tso.bo->id) > 0 && tso.site->can_start_working()) {
 		printf ("DEBUG: %s first time occupied - erasing from basic economy list\n", tso.bo->name); //NOCOM
 		if (persistent_data->remaining_basic_buildings[tso.bo->id] > 1) {
 			--persistent_data->remaining_basic_buildings[tso.bo->id];
