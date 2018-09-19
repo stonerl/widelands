@@ -1,0 +1,28 @@
+# Automatically created by Widelands bzr8841[widelands] (Release)
+
+[global]
+packet_version="2"
+
+[player_1]
+name="Claus Lembeck"
+tribe="frisians"
+ai=
+closeable="false"
+
+[player_2]
+name="Waldemar Atterdag"
+tribe="empire"
+ai=
+closeable="false"
+
+[player_3]
+name="Henneke Lembeck"
+tribe="frisians"
+ai=
+closeable="false"
+
+[player_4]
+name="Hans Ravenstrupp"
+tribe="barbarians"
+ai=
+closeable="false"
