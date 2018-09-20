@@ -96,6 +96,7 @@ public:
 	 * Lua methods
 	 */
 	int place_immovable(lua_State*);
+	int place_critter(lua_State*);
 	int get_field(lua_State*);
 	int recalculate(lua_State*);
 	int recalculate_seafaring(lua_State*);

@@ -30,7 +30,8 @@ obj_wait_for_reinforcements = {
    title=_"Survive until help arrives",
    number = 1,
    body = objective_text(_"Wait For Help",
-      li(_[[Survive the attacks until Henneke Lembeck arrives with reinforcements.]])
+      li(_[[Survive the attacks until Henneke Lembeck arrives with reinforcements.]]) ..
+      li_arrow(_[[The enemies must not destroy your headquarters.]])
    ),
 }
 
@@ -49,6 +50,17 @@ obj_rescue = {
    number = 1,
    body = objective_text(_"Prevent the Enemies from Destroying the Castle",
       li(_[[Push back the enemies. They must not conquer Claus Lembeck’s headquarters.]])
+   ),
+}
+
+obj_witchhunt = {
+   name = "witchhunt",
+   title=_"Chase the witch",
+   number = 1,
+   body = objective_text(_"Kill or Capture the Evil Witch",
+      li(_[[A witch in animal shape is destroying your buildings. Either kill her or capture her.]]) ..
+      li_arrow(_[[To kill the witch, burn down a building when the witch is close to its flag.]]) ..
+      li_arrow(_[[To capture the witch, conjure the spirits residing within her. Hint: You need to make a circle.]])
    ),
 }
 
@@ -144,6 +156,33 @@ help_arrives_3 = {
       .. new_objectives(obj_rescue),
 }
 
+witchhunt_1 = {
+   title = _"Unexplicable Fires",
+   body=claus(_"Buildings are burning",
+      -- TRANSLATORS: Claus Lembeck – Witchhunt 1
+      _([[The enemies have been pushes back, but something strange is going on. Several buildings have burst into flame for no apparent reason! How can this be?]])),
+}
+witchhunt_2 = {
+   title = _"Unexplicable Fires",
+   body=henneke(_"Buildings are burning",
+      -- TRANSLATORS: Henneke Lembeck – Witchhunt 2
+      _([[It is rumoured among our people that there is a witch or wizard inside our fortifications. This evildoer, they say, is responsible for the fires. Sightings of ferocious animals that strolled through out town have been reported. I suspect the evil witch is disguised as one of these, and working havoc in our Castle!]])),
+}
+witchhunt_3 = {
+   title = _"Unexplicable Fires",
+   body=claus(_"Buildings are burning",
+      -- TRANSLATORS: Claus Lembeck – Witchhunt 3
+      _([[You think so? You know I am sceptical whether witches even exist, but the clerics seem to share your suspicions. Very well, let’s see if we can identify and kill the witch. Or perhaps, it might even be possible to capture her alive and make her fight our enemies for us! I have no idea how that could be done though…]]))
+      .. new_objectives(obj_witchhunt),
+}
+
+defeated_1 = {
+   title = _"You are Defeated",
+   -- TRANSLATORS: Narrator – Player was defeated
+   body=p(_([[You were defeated and may not continue playing. May you have better luck when you retry this scenario. Click OK to return to the main menu.]])),
+   w = 450,
+   h = 150,
+}
 victory_1 = {
    title = _"Victory",
    body=claus(_"We escaped!",

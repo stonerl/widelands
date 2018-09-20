@@ -1143,9 +1143,13 @@ Map
 */
 const char LuaMap::className[] = "Map";
 const MethodType<LuaMap> LuaMap::Methods[] = {
-   METHOD(LuaMap, place_immovable), METHOD(LuaMap, get_field),
-   METHOD(LuaMap, recalculate),     METHOD(LuaMap, recalculate_seafaring),
-   METHOD(LuaMap, set_port_space),  {nullptr, nullptr},
+   METHOD(LuaMap, place_immovable),
+   METHOD(LuaMap, place_critter),
+   METHOD(LuaMap, get_field),
+   METHOD(LuaMap, recalculate),
+   METHOD(LuaMap, recalculate_seafaring),
+   METHOD(LuaMap, set_port_space),
+   {nullptr, nullptr},
 };
 const PropertyType<LuaMap> LuaMap::Properties[] = {
    PROP_RO(LuaMap, allows_seafaring),
@@ -1284,6 +1288,33 @@ int LuaMap::place_immovable(lua_State* const L) {
 		   L, "There are no immovables for <%s>. Use \"world\" or \"tribes\"", from_where.c_str());
 	}
 
+	return LuaMaps::upcasted_map_object_to_lua(L, m);
+}
+/* RST
+   .. method:: place_critter(name, field)
+
+      Creates a critter that is defined by the world, that is, an animal.
+
+      :arg name: The name of the immovable to create
+      :type name: :class:`string`
+      :arg field: The immovable is created on this field.
+      :type field: :class:`wl.map.Field`
+
+      :returns: The created bob.
+*/
+
+int LuaMap::place_critter(lua_State* const L) {
+	const std::string objname = luaL_checkstring(L, 2);
+	LuaMaps::LuaField* c = *get_user_class<LuaMaps::LuaField>(L, 3);
+
+	EditorGameBase& egbase = get_egbase(L);
+
+	BaseImmovable* m = nullptr;
+	DescriptionIndex const idx = egbase.world().get_critter(objname);
+	if (idx == Widelands::INVALID_INDEX)
+		report_error(L, "Unknown critter '%s'", objname.c_str());
+
+	m = &egbase.create_critter(c->coords(), idx, nullptr /* owner */);
 	return LuaMaps::upcasted_map_object_to_lua(L, m);
 }
 

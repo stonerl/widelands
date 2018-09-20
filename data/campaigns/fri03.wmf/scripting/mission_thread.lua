@@ -115,10 +115,17 @@ function mission_thread()
       sleep(10000)
       local enemy = false
       for i,f in pairs(fields) do
-         if f.owner ~= p1 then
+         if f.owner and f.owner.team == 2 then
             enemy = true
             break
          end
+      end
+      if #p1:get_buildings("frisians_headquarters") == 0 then
+         scroll_to_field(map.player_slots[1].starting_field)
+         sleep(2000)
+         campaign_message_box(defeated_1)
+         wl.ui.MapView():close()
+         return
       end
       if enemy then break end
    end
@@ -230,7 +237,92 @@ function mission_thread()
    campaign_message_box(help_arrives_2)
    p1:switchplayer(3)
    campaign_message_box(help_arrives_3)
-   local o = add_campaign_objective(obj_rescue)
+   o = add_campaign_objective(obj_rescue)
+
+   -- wait until the enemy is pushed well back
+   fields = map.player_slots[1].starting_field:region(60)
+   while true do
+      local enemy = false
+      for i,f in pairs(fields) do
+         if f.owner and f.owner.team == 2 then
+            enemy = true
+            break
+         end
+         sleep(10)
+      end
+      if p3.defeated or #p1:get_buildings("frisians_headquarters") == 0 then
+         scroll_to_field(map.player_slots[1].starting_field)
+         sleep(2000)
+         campaign_message_box(defeated_1)
+         wl.ui.MapView():close()
+         return
+      end
+      if enemy then break end
+   end
+   set_objective_done(o)
+
+   local critters = {
+      bunny,
+      sheep,
+      wisent,
+      wildboar,
+      chamois,
+      deer,
+      reindeer,
+      stag,
+      elk,
+      marten,
+      badger,
+      lynx,
+      fox,
+      wolf,
+      brownbear
+   }
+   local witch = {}
+   for i=1,64 do
+      local f = fields[math.random(#fields)]
+      table.insert(witch, map:place_critter(f, critters[math.random(#critters)]))
+   end
+   witch = witch[math.random(#witch)]
+
+   -- Now, we have placed the witch on the map. She'll walk around and cause buildings to spontaneously burst into flames.
+
+   local plr = p1
+   local destroyed = 0
+   while result == nil do
+      local did_destroy = false
+      for i,f in pairs(witch.field:region(1)) do
+         if f.owner == plr and f.immovable and is_building(f.immovable) then
+            f.immovable:destroy()
+            did_destroy = true
+            if destroyed ~= nil then
+               destroyed = destroyed + 1
+               scroll_to_field(f)
+               if destroyed > 3 then
+                  destroyed = nil
+                  campaign_message_box(witchhunt_1)
+                  campaign_message_box(witchhunt_2)
+                  campaign_message_box(witchhunt_3)
+                  o = add_campaign_objective(obj_witchhunt)
+               end
+            end
+            break
+         end
+      end
+      if did_destroy then
+         -- give the witch some time to get away from the flames
+         sleep(3600)
+      else
+         -- check if the player killed or conjured the witch
+         
+         
+         
+      end
+      
+      sleep(math.random(600, 18000))
+   end
+
+
 
 end
 
