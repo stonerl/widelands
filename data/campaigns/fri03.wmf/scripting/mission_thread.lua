@@ -46,6 +46,53 @@ function farms()
    end
 end
 
+function save_atterdag()
+   -- Waldemar Atterdag must not be defeated, therefore rescue him when it’s going badly for him
+   local hq = p2:get_buildings("empire_headquarters")[1]
+   while true do
+      sleep(5000)
+      local danger = 0
+      for i,f in pairs(map.player_slots[2].starting_field:region(21)) do
+         if f.owner == p1 or f.owner == p3 then
+            danger = danger + 1
+         end
+      end
+      if danger > 0 then
+         -- Fill his milsites with soldiers
+         local ok = false
+         for i,f in pairs(map.player_slots[2].starting_field:region(21)) do
+            if f.immovable and f.immovable.descr.type_name == "militarsite" then
+               if f.immovable:get_soldiers({4, 4, 0, 2}) < f.immovable.descr.max_number_of_soldiers then
+                  f.immovable:set_soldiers({4, 4, 0, 2}, f.immovable.descr.max_number_of_soldiers)
+                  ok = true
+               end
+            end
+         end
+         if not ok then
+            -- No milsites to fill? Straight into the HQ then
+            local soldiers = 0
+            for descr,n in pairs(hq:get_soldiers("all")) do
+               soldiers = soldiers + n
+            end
+            hq:set_soldiers({4, 4, 0, 2}, soldiers + danger)
+         end
+         sleep(90000)
+      end
+   end
+end
+
+function run_witch(witch)
+   while witch do
+      for i,f in pairs(witch.field:region(1)) do
+         if f.owner.team == 2 and f.immovable and f.immovable.descr.type_name == "productionsite" then
+            f.immovable:destroy()
+            break
+         end
+      end
+      sleep(math.random(900, 24000))
+   end
+end
+
 function mission_thread()
 
    p1.team = 1
@@ -106,10 +153,12 @@ function mission_thread()
    campaign_message_box(intro_6)
 
    sleep(30000)
+   run(save_atterdag)
    run(farms)
 
-   -- now we wait until the enemy is nearly at the Castle
+   -- Give the player some extra work to keep him busy
    while not farm_connect_done do sleep(1000) end
+   -- Now we wait until the enemy is nearly at the Castle
    local fields = map.player_slots[1].starting_field:region(21, 16)
    while true do
       sleep(10000)
@@ -224,6 +273,8 @@ function mission_thread()
       "frisians_rockmine_deep",
       "frisians_goldmine_deep",
       "frisians_fortress",
+      "frisians_port",
+      "frisians_shipyard",
    }
    run(steady_supply, p3, {
       log = 30,
@@ -239,7 +290,7 @@ function mission_thread()
    campaign_message_box(help_arrives_3)
    o = add_campaign_objective(obj_rescue)
 
-   -- wait until the enemy is pushed well back
+   -- Wait until the enemy is pushed well back
    fields = map.player_slots[1].starting_field:region(60)
    while true do
       local enemy = false
@@ -262,21 +313,21 @@ function mission_thread()
    set_objective_done(o)
 
    local critters = {
-      bunny,
-      sheep,
-      wisent,
-      wildboar,
-      chamois,
-      deer,
-      reindeer,
-      stag,
-      elk,
-      marten,
-      badger,
-      lynx,
-      fox,
-      wolf,
-      brownbear
+      "bunny",
+      "sheep",
+      "wisent",
+      "wildboar",
+      "chamois",
+      "deer",
+      "reindeer",
+      "stag",
+      "elk",
+      "marten",
+      "badger",
+      "lynx",
+      "fox",
+      "wolf",
+      "brownbear"
    }
    local witch = {}
    for i=1,64 do
@@ -285,15 +336,28 @@ function mission_thread()
    end
    witch = witch[math.random(#witch)]
 
-   -- Now, we have placed the witch on the map. She'll walk around and cause buildings to spontaneously burst into flames.
+   -- Now we have placed an evil witch in disguise on the map.
+   -- She'll walk around and cause buildings to spontaneously burst into flames.
 
-   local plr = p1
    local destroyed = 0
-   while result == nil do
+   local created_flames = {}
+   while true do
       local did_destroy = false
+
+      local fires_removed = {}
+      for i,f in pairs(created_flames) do
+         if (not f.immovable) or f.immovable.descr.name ~= "destroyed_building" then
+            table.insert(fires_removed, i)
+         end
+      end
+      for i,index in pairs(fires_removed) do
+         table.remove(index)
+      end
+
       for i,f in pairs(witch.field:region(1)) do
-         if f.owner == plr and f.immovable and is_building(f.immovable) then
+         if f.owner.team == 1 and f.immovable and f.immovable.descr.type_name == "productionsite" then
             f.immovable:destroy()
+            table.insert(created_flames, f)
             did_destroy = true
             if destroyed ~= nil then
                destroyed = destroyed + 1
@@ -309,20 +373,101 @@ function mission_thread()
             break
          end
       end
+
       if did_destroy then
-         -- give the witch some time to get away from the flames
+         -- Give the witch some time to get away from the flames
          sleep(3600)
       else
-         -- check if the player killed or conjured the witch
-         
-         
-         
+         -- Check if the player killed or conjured the witch
+         local next_to_fire = false
+         for i,f in pairs(witch.field:region(1)) do
+            if f.tln.immovable and f.tln.immovable.descr.name == "destroyed_building" then
+               -- Check if this flame was created by the witch or not
+               local w = false
+               for j,field in pairs(f:region(1)) do
+                  for k,flame in pairs(created_flames) do
+                     if field == flame then
+                        w = true
+                        break
+                     end
+                  end
+                  if w then break end
+               end
+               if w then
+                  -- At least one adjacent fire was created by the witch, so she's safe for now
+                  next_to_fire = false
+                  break
+               else
+                  next_to_fire = true
+               end
+            end
+         end
+
+         if next_to_fire then
+            -- The witch is killed
+            scroll_to_field(witch.field)
+            witch:destroy()
+            witch = nil
+            sleep(1000)
+            campaign_message_box(witchhunt_kill)
+            set_objective_done(o)
+            break
+         -- else
+            -- check if she's conjured
+            
+            -- TODO(NOCOM)(Nordfriese): Conjure the witch
+            
+         end
       end
       
       sleep(math.random(600, 18000))
    end
+   if witch then run(run_witch, witch) end
 
+   campaign_message_box(next_attack_1)
+   o = add_campaign_objective(obj_defeat_ravenstrupp)
+   while not p4.defeated do sleep(4321) end
+   set_objective_done(o)
+   
+   sleep(5000)
+   -- TODO(NOCOM)(Nordfriese): place ships for Atterdag and give him lots and lots of soldiers
+   scroll_to_field(map.player_slots[2].starting_field)
+   campaign_message_box(next_attack_2)
+   sleep(1000)
+   campaign_message_box(next_attack_3)
+   campaign_message_box(next_attack_4)
+   o = add_campaign_objective(obj_flee)
+   
+   p3:allow_buildings{
+      "frisians_port",
+      "frisians_shipyard",
+   }
 
+   -- Wait until an expedition ship is ready
+   local expedition = nil
+   while not expedition do
+      if p3.defeated or #p1:get_buildings("frisians_headquarters") == 0 then
+         scroll_to_field(map.player_slots[1].starting_field)
+         sleep(2000)
+         campaign_message_box(defeated_1)
+         wl.ui.MapView():close()
+         return
+      end
+      for idx,ship in ipairs(p3:get_ships()) do
+         if (ship.state:sub(1, 4) == "exp_") then
+            expedition = ship
+            break
+         end
+      end
+      sleep(1149)
+   end
+
+   -- We escaped!
+   scroll_to_field(expedition.field)
+   sleep(1000)
+   campaign_message_box(victory_1)
+   p3:reveal_scenario("frisians03")
+   -- END OF MISSION 3
 
 end
 

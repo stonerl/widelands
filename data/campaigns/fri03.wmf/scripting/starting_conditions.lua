@@ -16,6 +16,8 @@ p1:forbid_buildings {
    "frisians_rockmine_deep",
    "frisians_goldmine_deep",
    "frisians_fortress",
+   "frisians_port",
+   "frisians_shipyard",
 }
 
 hq = p1:place_building("frisians_headquarters", map.player_slots [1].starting_field, false, true)
@@ -256,7 +258,7 @@ for bld,n in pairs(houses) do
    end
 end
 
-for i=1,512 do
+for i=1,384 do
    field = nil
    while not field do
       field = map:get_field(math.random(5, map.width - 5), math.random(5, map.height - 5))
@@ -284,6 +286,8 @@ p2:forbid_buildings {
    "empire_coalmine_deep",
    "empire_marblemine_deep",
    "empire_goldmine_deep",
+   "empire_port",
+   "empire_shipyard",
 }
 
 hq = p2:place_building("empire_headquarters", map.player_slots [2].starting_field, false, true)
@@ -372,6 +376,8 @@ p4:forbid_buildings {
    "barbarians_ironmine_deeper",
    "barbarians_coalmine_deeper",
    "barbarians_goldmine_deeper",
+   "barbarians_port",
+   "barbarians_shipyard",
 }
 
 hq = p4:place_building("barbarians_headquarters", map.player_slots [4].starting_field, false, true)

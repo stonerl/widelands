@@ -5,16 +5,13 @@
 include "scripting/richtext_scenarios.lua"
 
 function claus(title, text)
-   return speech ("map:lembeck_claus.png", "1CC200", title, text)
+   return speech ("map:claus.png", "1CC200", title, text)
 end
 function henneke(title, text)
-   return speech ("map:lembeck_henneke.png", "F7FF00", title, text)
+   return speech ("map:henneke.png", "F7FF00", title, text)
 end
 function atterdag(title, text)
-   return speech ("map:dane.png", "8A0004", title, text)
-end
-function hans(title, text)
-   return speech ("map:haderslev.png", "1590B5", title, text)
+   return speech ("map:atterdag.png", "CC1000", title, text)
 end
 
 -- =======================================================================
@@ -64,12 +61,22 @@ obj_witchhunt = {
    ),
 }
 
-obj_ = {
-   name = "",
-   title=_"Title name",
+obj_defeat_ravenstrupp = {
+   name = "defeat_ravenstrupp",
+   title=_"Defeat Hans Ravenstrupp",
    number = 1,
-   body = objective_text(_"Body Heading",
-      li(_[[Text]])
+   body = objective_text(_"Defeat the King’s Ally",
+      li(_[[Defeat Atterdag’s accomplice Ravenstrupp!]])
+   ),
+}
+
+obj_flee = {
+   name = "flee",
+   title=_"Flee",
+   number = 1,
+   body = objective_text(_"Flee the Island",
+      li(_[[Build a ship and start an expedition from a port to flee.]]) ..
+      li(_[[The enemies are too powerful and numerous for you to defeat them. Don’t even try.]])
    ),
 }
 
@@ -140,7 +147,7 @@ help_arrives_1 = {
    title = _"Aid is Arriving",
    body=claus(_"Henneke is coming!",
       -- TRANSLATORS: Claus Lembeck – Henneke arrives 1
-      _([[Finally! A ship has landed on the eastern cost of the island. I know these colours – my son Henneke has come to our aid at last!]])),
+      _([[Finally! A ship has landed on the eastern cost of the island. I know these colors – my son Henneke has come to our aid at last!]])),
 }
 help_arrives_2 = {
    title = _"Aid is Arriving",
@@ -157,23 +164,64 @@ help_arrives_3 = {
 }
 
 witchhunt_1 = {
-   title = _"Unexplicable Fires",
+   title = _"Inexplicable Fires",
    body=claus(_"Buildings are burning",
       -- TRANSLATORS: Claus Lembeck – Witchhunt 1
-      _([[The enemies have been pushes back, but something strange is going on. Several buildings have burst into flame for no apparent reason! How can this be?]])),
+      _([[The enemies have been pushed back, but something strange is going on. Several buildings have burst into flame for no apparent reason! How can this be?]])),
 }
 witchhunt_2 = {
-   title = _"Unexplicable Fires",
+   title = _"Inexplicable Fires",
    body=henneke(_"Buildings are burning",
       -- TRANSLATORS: Henneke Lembeck – Witchhunt 2
-      _([[It is rumoured among our people that there is a witch or wizard inside our fortifications. This evildoer, they say, is responsible for the fires. Sightings of ferocious animals that strolled through out town have been reported. I suspect the evil witch is disguised as one of these, and working havoc in our Castle!]])),
+      _([[It is rumoured among our people that there is a witch or wizard inside our fortifications. This evildoer, they say, is responsible for the fires. Sightings of ferocious animals that strolled through our town have been reported. I suspect the evil witch is disguised as one of these, and working havoc in our Castle!]])),
 }
 witchhunt_3 = {
-   title = _"Unexplicable Fires",
+   title = _"Inexplicable Fires",
    body=claus(_"Buildings are burning",
       -- TRANSLATORS: Claus Lembeck – Witchhunt 3
       _([[You think so? You know I am sceptical whether witches even exist, but the clerics seem to share your suspicions. Very well, let’s see if we can identify and kill the witch. Or perhaps, it might even be possible to capture her alive and make her fight our enemies for us! I have no idea how that could be done though…]]))
       .. new_objectives(obj_witchhunt),
+}
+witchhunt_kill = {
+   title = _"Witch Killed",
+   body=claus(_"The witch was killed",
+      -- TRANSLATORS: Claus Lembeck – Witchhunt: Witch was killed
+      _([[Finally! The witch was killed, and we can now focus on driving out our enemies again.]])),
+}
+witchhunt_conjure = {
+   title = _"Witch Conjured",
+   body=henneke(_"The witch was conjured",
+      -- TRANSLATORS: Henneke Lembeck – Witchhunt: Witch was conjured
+      _([[We succeeded in conjuring the witch! She is now heading to our enemies and will harrass them instead of us. We can now focus on driving out our enemies again.]])),
+}
+next_attack_1 = {
+   title = _"Defeat Hans Ravenstrupp",
+   body=claus(_"Defeat Ravenstrupp",
+      -- TRANSLATORS: Claus Lembeck – Next Attack 1
+      _([[I am confident we only need to defeat Hans Ravenstrupp – I know his master the King for a coward that pretends to be invincible while he is protected by his minions but who will run for life as soon as his helpers are defeated.]]))
+      .. new_objectives(obj_defeat_ravenstrupp),
+}
+next_attack_2 = {
+   title = _"Reinforcements",
+   body=atterdag(_"I am not defeated yet!",
+      -- TRANSLATORS: Waldemar Atterdag – Next Attack 2
+      _([[You may have defeated my loyal ally, but do not think you have gotten the better of me! Fools, I have sent to Denmark for aid, and here it arrives! Today, I will defeat you at last, Lembeck!]])),
+}
+next_attack_3 = {
+   title = _"Reinforcements",
+   body=henneke(_"No hope",
+      -- TRANSLATORS: Henneke Lembeck – Next Attack 3
+      _([[Oh no! Just look at the sheer number of ships! There is no way we can defeat such a mighty army. How can we possibly hope to see another dawn?]])),
+}
+next_attack_4 = {
+   title = _"Reinforcements",
+   body=claus(_"Escape",
+      -- TRANSLATORS: Claus Lembeck – Next Attack 4
+      _([[If we attempt to fight, we will all be slaughtered. We have to escape while we still can, and come back later with a large fighting force to give the cur what he deserves!]])
+      .. paragraphdivider() ..
+      -- TRANSLATORS: Claus Lembeck – Next Attack 4
+      _([[I have but few friends on the mainland and the surrounding islands – they will not be able or willing to aid us. Our only hope is my old friend Reebaud. I heard he sailed North after the Great Stormflood. Our only hope to reclaim my island lies in seeking him out and asking for his aid.!]]))
+      .. new_objectives(obj_flee),
 }
 
 defeated_1 = {
@@ -186,9 +234,9 @@ defeated_1 = {
 victory_1 = {
    title = _"Victory",
    body=claus(_"We escaped!",
-      -- TRANSLATORS: Reebaud – victory
-      _([[The gods have answered our prayers. We will escape the island’s drowning, and I am confident we will be able to build a new home again in a more peaceful corner of this world!]]))
+      -- TRANSLATORS: Claus Lembeck – victory
+      _([[We have escaped]]))
       .. objective_text(_"Congratulations",
-      -- TRANSLATORS: Reebaud – victory
-      _[[You have completed this mission. You may move on to the next scenario now to help us build a new home, far from the false God’s vengeful reach…]]),
+      -- TRANSLATORS: Claus Lembeck – victory
+      _[[You have completed this mission. You may move on to the next scenario now to help us in our quest to seek out Reebaud and obtain his aid…]]),
 }
