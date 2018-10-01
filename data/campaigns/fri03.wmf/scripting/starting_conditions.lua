@@ -1,25 +1,8 @@
 -- =======================================================================
 --                                 Player 1
 -- =======================================================================
-p1:allow_buildings("all")
-p1:forbid_buildings {
-   "frisians_hunters_house",
-   "frisians_quarry",
-   "frisians_foresters_house",
-   "frisians_woodcutters_house",
-   "frisians_coalmine",
-   "frisians_ironmine",
-   "frisians_rockmine",
-   "frisians_goldmine",
-   "frisians_ironmine_deep",
-   "frisians_coalmine_deep",
-   "frisians_rockmine_deep",
-   "frisians_goldmine_deep",
-   "frisians_fortress",
-   "frisians_port",
-   "frisians_shipyard",
-}
-
+p1:forbid_buildings("all")
+p1:allow_buildings({"frisians_farm"})
 hq = p1:place_building("frisians_headquarters", map.player_slots [1].starting_field, false, true)
 hq:set_wares {
    log = 40,
@@ -66,7 +49,7 @@ hq:set_workers {
    frisians_blacksmith = 3,
    frisians_baker = 1,
    frisians_brewer = 1,
-   frisians_builder = 10,
+   frisians_builder = 5,
    frisians_charcoal_burner = 1,
    frisians_claydigger = 2,
    frisians_brickmaker = 2,
@@ -84,7 +67,7 @@ hq:set_workers {
    frisians_miner_master = 2,
    frisians_forester = 2,
    frisians_stonemason = 2,
-   frisians_reindeer = 5,
+   frisians_reindeer = 500,
    frisians_trainer = 3,
 }
 hq:set_soldiers {

@@ -37,7 +37,8 @@ obj_connect_farms = {
    title=_"Connect the farms",
    number = 1,
    body = objective_text(_"Build Roads to All Farms",
-      li(_[[Build roads to ensure all farms can be reached from your headquarters.]])
+      li(_[[Build roads to ensure all farms can be reached from your headquarters.]]) ..
+      li_arrow(_[[You may not build any buildings until then.]])
    ),
 }
 

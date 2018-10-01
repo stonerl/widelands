@@ -23,10 +23,14 @@ end
 function farms()
    campaign_message_box(farms_1)
    local o = add_campaign_objective(obj_connect_farms)
+   local nr_farms = #p1:get_buildings("frisians_farm")
    local hq = p1:get_buildings("frisians_headquarters")[1].flag
    sleep(300000)
    while true do
-      sleep(120000)
+      repeat
+         -- He mustn't dismantle some farms to make his life easier, unless he rebuilds them elsewhere
+         sleep(90000)
+      until #p1:get_buildings("frisians_farm") >= nr_farms
       local ok = true
       for i,farm in pairs(p1:get_buildings("frisians_farm")) do
          if not hq:is_flag_reachable(farm.flag) then
@@ -38,10 +42,29 @@ function farms()
             })
             break
          end
+         sleep(5)
       end
       if ok then
          set_objective_done(o)
          farm_connect_done = true
+         p1:allow_buildings("all")
+         p1:forbid_buildings {
+            "frisians_hunters_house",
+            "frisians_quarry",
+            "frisians_foresters_house",
+            "frisians_woodcutters_house",
+            "frisians_coalmine",
+            "frisians_ironmine",
+            "frisians_rockmine",
+            "frisians_goldmine",
+            "frisians_ironmine_deep",
+            "frisians_coalmine_deep",
+            "frisians_rockmine_deep",
+            "frisians_goldmine_deep",
+            "frisians_fortress",
+            "frisians_port",
+            "frisians_shipyard",
+         }
          return
       end
    end
@@ -150,10 +173,10 @@ function mission_thread()
    sleep(3000)
    campaign_message_box(intro_5)
    local o = add_campaign_objective(obj_wait_for_reinforcements)
-   sleep(10000)
+   sleep(5000)
    campaign_message_box(intro_6)
 
-   sleep(30000)
+   sleep(5000)
    run(save_atterdag)
    run(farms)
 
