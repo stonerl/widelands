@@ -999,6 +999,7 @@ public:
 	 */
 	int set_wares(lua_State*);
 	int get_wares(lua_State*);
+	int is_flag_reachable(lua_State* L);
 
 	/*
 	 * C Methods

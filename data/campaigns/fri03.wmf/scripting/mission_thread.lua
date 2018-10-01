@@ -24,11 +24,12 @@ function farms()
    campaign_message_box(farms_1)
    local o = add_campaign_objective(obj_connect_farms)
    local hq = p1:get_buildings("frisians_headquarters")[1].flag
+   sleep(300000)
    while true do
-      sleep(60000)
+      sleep(120000)
       local ok = true
       for i,farm in pairs(p1:get_buildings("frisians_farm")) do
-         if farm.flag.economy ~= hq.economy then
+         if not hq:is_flag_reachable(farm.flag) then
             ok = false
             p1:send_message(unconnected_farm.title, unconnected_farm.body, {
                heading = unconnected_farm.heading,

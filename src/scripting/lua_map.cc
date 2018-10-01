@@ -1143,12 +1143,9 @@ Map
 */
 const char LuaMap::className[] = "Map";
 const MethodType<LuaMap> LuaMap::Methods[] = {
-   METHOD(LuaMap, place_immovable),
-   METHOD(LuaMap, place_critter),
-   METHOD(LuaMap, get_field),
-   METHOD(LuaMap, recalculate),
-   METHOD(LuaMap, recalculate_seafaring),
-   METHOD(LuaMap, set_port_space),
+   METHOD(LuaMap, place_immovable), METHOD(LuaMap, place_critter),
+   METHOD(LuaMap, get_field), METHOD(LuaMap, recalculate),
+   METHOD(LuaMap, recalculate_seafaring), METHOD(LuaMap, set_port_space),
    {nullptr, nullptr},
 };
 const PropertyType<LuaMap> LuaMap::Properties[] = {
@@ -1290,32 +1287,25 @@ int LuaMap::place_immovable(lua_State* const L) {
 
 	return LuaMaps::upcasted_map_object_to_lua(L, m);
 }
+
 /* RST
    .. method:: place_critter(name, field)
 
-      Creates a critter that is defined by the world, that is, an animal.
+      Creates a critter that is defined by the world.
 
-      :arg name: The name of the immovable to create
+      :arg name: The name of the critter to create
       :type name: :class:`string`
-      :arg field: The immovable is created on this field.
+      :arg field: The critter is created on this field.
       :type field: :class:`wl.map.Field`
 
-      :returns: The created bob.
+      :returns: The created critter.
 */
-
 int LuaMap::place_critter(lua_State* const L) {
 	const std::string objname = luaL_checkstring(L, 2);
 	LuaMaps::LuaField* c = *get_user_class<LuaMaps::LuaField>(L, 3);
-
 	EditorGameBase& egbase = get_egbase(L);
-
-	BaseImmovable* m = nullptr;
-	DescriptionIndex const idx = egbase.world().get_critter(objname);
-	if (idx == Widelands::INVALID_INDEX)
-		report_error(L, "Unknown critter '%s'", objname.c_str());
-
-	m = &egbase.create_critter(c->coords(), idx, nullptr /* owner */);
-	return LuaMaps::upcasted_map_object_to_lua(L, m);
+	Bob& critter = egbase.create_critter(c->coords(), objname, nullptr);
+	return LuaMaps::upcasted_map_object_to_lua(L, &critter);
 }
 
 /* RST
@@ -4095,7 +4085,7 @@ Flag
 */
 const char LuaFlag::className[] = "Flag";
 const MethodType<LuaFlag> LuaFlag::Methods[] = {
-   METHOD(LuaFlag, set_wares), METHOD(LuaFlag, get_wares), {nullptr, nullptr},
+   METHOD(LuaFlag, set_wares), METHOD(LuaFlag, get_wares), METHOD(LuaFlag, is_flag_reachable), {nullptr, nullptr},
 };
 const PropertyType<LuaFlag> LuaFlag::Properties[] = {
    PROP_RO(LuaFlag, economy),
@@ -4280,6 +4270,25 @@ int LuaFlag::get_wares(lua_State* L) {
 		}
 	}
 
+	return 1;
+}
+
+/* RST
+   .. method:: is_flag_reachable(flag)
+
+      Returns whether the specified flag can be reached from this flag by roads and/or ships.
+      
+      :arg flag: The flag to test.
+      :type flag: :class:`Flag`
+
+      :returns: :class:`boolean`
+*/
+int LuaFlag::is_flag_reachable(lua_State* L) {
+	EditorGameBase& egbase = get_egbase(L);
+	const Flag* f1 = get(L, egbase);
+	const Flag* f2 = (*get_user_class<LuaMaps::LuaFlag>(L, 2))->get(L, egbase);
+	// log("NOCOM: this %i, other %i\n", get_economy(L), f->get_economy(L));
+	lua_pushboolean(L, f1->get_economy() == f2->get_economy());
 	return 1;
 }
 
