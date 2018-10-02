@@ -77,15 +77,15 @@ function save_atterdag()
       sleep(5000)
       local danger = 0
       for i,f in pairs(map.player_slots[2].starting_field:region(21)) do
-         if f.owner == p1 or f.owner == p3 then
-            danger = danger + 1
+         if f.immovable and f.immovable.descr.type_name == "militarysite" and (f.owner == p1 or f.owner == p3) then
+            danger = danger + f.immovable.descr.max_number_of_soldiers
          end
       end
       if danger > 0 then
          -- Fill his milsites with soldiers
          local ok = false
          for i,f in pairs(map.player_slots[2].starting_field:region(21)) do
-            if f.immovable and f.immovable.descr.type_name == "militarsite" then
+            if f.immovable and f.immovable.descr.type_name == "militarysite" then
                if f.immovable:get_soldiers({4, 4, 0, 2}) < f.immovable.descr.max_number_of_soldiers then
                   f.immovable:set_soldiers({4, 4, 0, 2}, f.immovable.descr.max_number_of_soldiers)
                   ok = true

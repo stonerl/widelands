@@ -2,7 +2,10 @@
 --                                 Player 1
 -- =======================================================================
 p1:forbid_buildings("all")
-p1:allow_buildings({"frisians_farm"})
+p1:allow_buildings {
+   "frisians_farm",
+   "frisians_warehouse",
+}
 hq = p1:place_building("frisians_headquarters", map.player_slots [1].starting_field, false, true)
 hq:set_wares {
    log = 40,
@@ -13,14 +16,11 @@ hq:set_wares {
    water = 10,
    fish = 10,
    meat = 10,
-   fruit = 10,
    barley = 5,
-   ration = 20,
    honey = 10,
    smoked_meat = 5,
    smoked_fish = 5,
    mead = 5,
-   meal = 2,
    coal = 20,
    iron = 5,
    gold = 4,
@@ -296,10 +296,8 @@ hq:set_wares {
    kitchen_tools = 4,
    marble = 25,
    marble_column = 6,
-   meal = 4,
    meat = 6,
    pick = 8,
-   ration = 12,
    saw = 2,
    scythe = 5,
    shovel = 6,
@@ -332,6 +330,8 @@ hq:set_soldiers {
    [{2,2,0,0}] = 80,
    [{4,4,0,2}] = 40,
 }
+p2:place_building("empire_blockhouse", map:get_field(102, 36), true, true)
+p2:place_building("empire_tower", map:get_field(113, 30), true, true)
 
 -- =======================================================================
 --                                 Player 3
@@ -346,6 +346,7 @@ p3:forbid_buildings("all")
 p4:allow_buildings("all")
 p4:forbid_buildings {
    "barbarians_hunters_hut",
+   "barbarians_gamekeepers_hut",
    "barbarians_quarry",
    "barbarians_rangers_hut",
    "barbarians_lumberjacks_hut",
@@ -381,15 +382,12 @@ hq:set_wares {
    iron = 12,
    iron_ore = 5,
    kitchen_tools = 4,
-   meal = 4,
    meat = 6,
    pick = 8,
    barbarians_bread = 8,
-   ration = 12,
    granite = 40,
    scythe = 6,
    shovel = 4,
-   snack = 3,
    thatch_reed = 24,
    log = 80,
 }
@@ -416,4 +414,5 @@ hq:set_soldiers {
    [{3,5,0,0}] = 80,
    [{3,5,0,2}] = 40,
 }
+p4:place_building("barbarians_fortress", map:get_field(369, 128), true, true)
 
