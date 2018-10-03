@@ -249,7 +249,9 @@ for i=1,384 do
          field = nil
       end
    end
-   p1:place_building("frisians_farm", field, false, true):set_workers("frisians_farmer", 1)
+   -- Using custom building here to prevent the player from destroying or
+   -- dismantling some farms to make the connect_farms objective easier
+   p1:place_building("frisians_farm_new", field, false, true):set_workers("frisians_farmer", 1)
 end
 
 -- =======================================================================

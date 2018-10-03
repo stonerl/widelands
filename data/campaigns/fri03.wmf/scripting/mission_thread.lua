@@ -27,12 +27,12 @@ function farms()
    local hq = p1:get_buildings("frisians_headquarters")[1].flag
    sleep(300000)
    while true do
-      repeat
-         -- He mustn't dismantle some farms to make his life easier, unless he rebuilds them elsewhere
-         sleep(90000)
-      until #p1:get_buildings("frisians_farm") >= nr_farms
+      sleep(90000)
       local ok = true
-      for i,farm in pairs(p1:get_buildings("frisians_farm")) do
+      for i,farm in pairs(array_combine(
+         p1:get_buildings("frisians_farm"),
+         p1:get_buildings("frisians_farm_new")
+      )) do
          if not hq:is_flag_reachable(farm.flag) then
             ok = false
             p1:send_message(unconnected_farm.title, unconnected_farm.body, {
@@ -61,7 +61,9 @@ function farms()
             "frisians_coalmine_deep",
             "frisians_rockmine_deep",
             "frisians_goldmine_deep",
+            "frisians_farm",
             "frisians_fortress",
+            "frisians_warehouse",
             "frisians_port",
             "frisians_shipyard",
          }
@@ -128,13 +130,23 @@ function mission_thread()
       map:place_immovable("debris00", f, "world")
    end
 
-   for x=3, map.width - 4 do
-      for y=2, map.height - 3 do
+   local land = {}
+   for x=0, map.width - 1 do
+      for y=0, map.height - 1 do
          local f = map:get_field(x, y)
-         p1:reveal_fields{f}
-         p1:conquer(f)
+         if f.terr ~= "winter_water" or f.terd ~= "winter_water" then
+            table.insert(land, f)
+            table.insert(land, f.brn)
+            table.insert(land, f.bln)
+            table.insert(land, f.trn)
+            table.insert(land, f.tln)
+            table.insert(land, f.rn)
+            table.insert(land, f.ln)
+         end
       end
    end
+   p1:reveal_fields(land)
+   p1:conquer(map.player_slots [1].starting_field, map.width)
    include "map:scripting/starting_conditions.lua"
 
    run(steady_supply, p1, {

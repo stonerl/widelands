@@ -38,7 +38,8 @@ obj_connect_farms = {
    number = 1,
    body = objective_text(_"Build Roads to All Farms",
       li(_[[Build roads to ensure all farms can be reached from your headquarters.]]) ..
-      li_arrow(_[[You may not build any buildings until then.]])
+      li(_[[You may not attempt to make this task easier by destroying or dismantling some farms.]]) ..
+      li(_[[Until you have completed this objective, you may build only farms and warehouses. Afterwards, these buildings can not be built anymore.]])
    ),
 }
 
