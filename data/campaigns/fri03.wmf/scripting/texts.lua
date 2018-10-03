@@ -78,7 +78,8 @@ obj_flee = {
    number = 1,
    body = objective_text(_"Flee the Island",
       li(_[[Build a ship and start an expedition from a port to flee.]]) ..
-      li(_[[The enemies are too powerful and numerous for you to defeat them. Don’t even try.]])
+      li(_[[The enemies are too powerful and numerous for you to defeat them. Don’t even try.]]) ..
+      li(_[[Take some soldiers with you when your ship sets sail. You will need them.]])
    ),
 }
 
@@ -111,7 +112,7 @@ intro_4 = {
    title = _"Introduction",
    body=claus(_"Welcome back!",
       -- TRANSLATORS: Claus Lembeck – Introduction 4
-      _([[Added to this worry is the fact that Rolf made an enemy of Atterdag’s kinsmen Hans Ravenstrupp, who owns the castle of Haderslevhuus. If the news hold true, he has dishonourably murdered my son and is now seeking to be revenged on me as well for God knows what.]])
+      _([[Added to this worry is the fact that Rolf made an enemy of Atterdag’s kinsman Hans Ravenstrupp, who owns the castle of Haderslevhuus. If the news hold true, he has dishonourably murdered my son and is now seeking to be revenged on me as well for God knows what.]])
       .. paragraphdivider() ..
       -- TRANSLATORS: Claus Lembeck – Introduction 4
       _([[Atterdag and Ravenstrupp have joined in complot and have both landed on this island before my watchmen discovered their approach.]])),

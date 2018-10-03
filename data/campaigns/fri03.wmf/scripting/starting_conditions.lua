@@ -259,18 +259,11 @@ end
 -- =======================================================================
 p2:allow_buildings("all")
 p2:forbid_buildings {
+   -- NOCOM: these buildings are allowed _only_ because the AI can´t cope without them (bug 1794962). Disable them ASAP!
    "empire_hunters_house",
-   "empire_quarry",
-   "empire_foresters_house",
-   "empire_lumberjacks_house",
-   "empire_coalmine",
-   "empire_ironmine",
-   "empire_marblemine",
-   "empire_goldmine",
-   "empire_ironmine_deep",
-   "empire_coalmine_deep",
-   "empire_marblemine_deep",
-   "empire_goldmine_deep",
+   -- "empire_quarry",
+   -- "empire_foresters_house",
+   -- "empire_lumberjacks_house",
    "empire_port",
    "empire_shipyard",
 }
@@ -348,20 +341,11 @@ p3:forbid_buildings("all")
 p4:allow_buildings("all")
 p4:forbid_buildings {
    "barbarians_hunters_hut",
+   -- NOCOM: these buildings are allowed _only_ because the AI can´t cope without them (bug 1794962). Disable them ASAP!
    "barbarians_gamekeepers_hut",
    "barbarians_quarry",
-   "barbarians_rangers_hut",
-   "barbarians_lumberjacks_hut",
-   "barbarians_coalmine",
-   "barbarians_ironmine",
-   "barbarians_granitemine",
-   "barbarians_goldmine",
-   "barbarians_ironmine_deep",
-   "barbarians_coalmine_deep",
-   "barbarians_goldmine_deep",
-   "barbarians_ironmine_deeper",
-   "barbarians_coalmine_deeper",
-   "barbarians_goldmine_deeper",
+   -- "barbarians_rangers_hut",
+   -- "barbarians_lumberjacks_hut",
    "barbarians_port",
    "barbarians_shipyard",
 }
