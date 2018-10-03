@@ -489,9 +489,9 @@ function mission_thread()
          wl.ui.MapView():close()
          return
       end
-      for idx,ship in ipairs(p3:get_ships()) do
-         if (ship.state:sub(1, 4) == "exp_") then
-            expedition = ship
+      for i,port in pairs(p3:get_buildings("frisians_port")) do
+         if port.expedition_in_progress then
+            expedition = port
             break
          end
       end
@@ -499,7 +499,14 @@ function mission_thread()
    end
 
    -- We escaped!
-   scroll_to_field(expedition.field)
+   scroll_to_field(expedition.fields[1])
+   local persist = {}
+   for descr,n in pairs(expedition:get_soldiers("all")) do
+      persist[descr[1] .. descr[2] .. descr[3]] = n
+   end
+   -- We save a table of all soldiers we can take with us.
+   -- The syntax is the same as in fri01.
+   wl.Game():save_campaign_data("frisians", "fri03", persist)
    sleep(1000)
    campaign_message_box(victory_1)
    p3:reveal_scenario("frisians03")
