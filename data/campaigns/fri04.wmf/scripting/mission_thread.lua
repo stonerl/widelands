@@ -160,17 +160,21 @@ function mission_thread()
       local fight = nil
       if map.player_slots[3].starting_field.immovable and
             map.player_slots[3].starting_field.immovable.descr.name == "frisians_port" then
-         fight = true
+         fight = {
+            payment = nil,
+         }
       elseif port_north.immovable:get_wares("gold") >= cost then
-         fight = false
+         fight = {
+            payment = cost,
+         }
          p1:reveal_fields(map.player_slots[3].starting_field:region(7))
       end
-      if fight ~= nil then
+      if fight then
          set_objective_done(o)
-         game:save_campaign_data("frisians", "fri04", { defeated_iniucundus = fight })
+         game:save_campaign_data("frisians", "fri04", fight)
          scroll_to_field(map.player_slots[3].starting_field)
          local field = map.player_slots[3].starting_field.trn.trn.tln
-         if fight then
+         if fight.payment == nil then
             p1:place_ship(field)
             sleep(2000)
             campaign_message_box(victory_fight)
