@@ -5,12 +5,15 @@ function mission_thread()
    scroll_to_field(map.player_slots[1].starting_field)
    include "map:scripting/starting_conditions.lua"
 
+   -- TODO(Nordfriese): p3 should be forbidden to attack p1 until p1 has attacked p3
+
    -- Introduction
    sleep(1000)
    campaign_message_box(intro_1)
    -- This objective stays active until the player meets the Empire
    local o_north = add_campaign_objective(obj_north)
 
+   -- Wait until the first port space is found (and reachable)
    while true do
       sleep(2341)
       local ok = true
@@ -36,12 +39,13 @@ function mission_thread()
       end
    end
    p1:conquer(port_south, 4)
---    for i,f in pairs(obstacles_1) do
---       f.immovable:remove()
---    end
+   for i,f in pairs(obstacles_1) do
+      f.immovable:remove()
+   end
    scroll_to_field(port_south)
    campaign_message_box(port_1)
 
+   -- Wait for the player to build a port on the Volcano Island
    while not (port_volcano.immovable and port_volcano.immovable.descr.name == "frisians_port") do sleep(2341) end
 --    for i,f in pairs(obstacles_2) do
 --       f.immovable:remove()
@@ -50,6 +54,7 @@ function mission_thread()
    sleep(2000)
    campaign_message_box(port_2)
 
+   -- Wait for the player to meet the Atlanteans
    local fields = {}
    for x = 0, map.width - 1 do
       for y = 307, 404 do
@@ -81,24 +86,29 @@ function mission_thread()
    campaign_message_box(atl_5)
    campaign_message_box(atl_6)
    local o = add_campaign_objective(obj_atl)
+
+   -- Wait for the player to defeat the Atlanteans
    while not (map.player_slots[2].starting_field.immovable and
          map.player_slots[2].starting_field.immovable.descr.name == "frisians_port") do sleep(2341) end
    set_objective_done(o)
    scroll_to_field(map.player_slots[2].starting_field)
    campaign_message_box(atl_7)
 
+   -- Wait for the player to build a port on the Desert Island
    while not (port_desert_s.immovable and port_desert_s.immovable.descr.name == "frisians_port") do sleep(2341) end
    scroll_to_field(port_desert_s)
    sleep(1000)
    campaign_message_box(port_3)
    campaign_message_box(port_4)
 
+   -- Wait for the player to find the other port space on the Desert Island
    while port_desert_n.owner ~= p1 do sleep(2341) end
    p1:conquer(port_desert_n, 4)
    scroll_to_field(port_desert_n)
    sleep(2000)
    campaign_message_box(port_5)
 
+   -- Wait for the player to build a port on the Northern Shore
    while not (port_north.immovable and port_north.immovable.descr.name == "frisians_port") do sleep(2341) end
 --    for i,f in pairs(obstacles_3) do
 --       f.immovable:remove()
@@ -108,6 +118,7 @@ function mission_thread()
    campaign_message_box(port_6)
    campaign_message_box(port_7)
 
+   -- Wait for the player to meet the Empire
    fields = {}
    for x = 0, map.width - 1 do
       for y = 0, 164 do
@@ -133,27 +144,29 @@ function mission_thread()
    set_objective_done(o_north)
    scroll_to_field(see_other)
    sleep(1000)
+   local cost = p1:get_wares("gold") + 200
    campaign_message_box(emp_1)
    campaign_message_box(emp_2)
    campaign_message_box(emp_3)
    campaign_message_box(emp_4)
    campaign_message_box(emp_5)
-   campaign_message_box(emp_6)
-   campaign_message_box(emp_7)
-   o = add_campaign_objective(obj_emp)
-   local end_time = game.time + 7200000 -- 2 hours
+   campaign_message_box(emp_6(cost))
+   campaign_message_box(emp_7(cost))
+   o = add_campaign_objective(obj_emp(cost))
 
+   local end_time = game.time + 7200000 -- 2 hours until timeout
    while game.time < end_time do
       sleep(1999)
       local fight = nil
       if map.player_slots[3].starting_field.immovable and
             map.player_slots[3].starting_field.immovable.descr.name == "frisians_port" then
          fight = true
-      elseif port_north.immovable:get_wares("gold") >= 200 then
+      elseif port_north.immovable:get_wares("gold") >= cost then
          fight = false
          p1:reveal_fields(map.player_slots[3].starting_field:region(7))
       end
       if fight ~= nil then
+         set_objective_done(o)
          game:save_campaign_data("frisians", "fri04", { defeated_iniucundus = fight })
          scroll_to_field(map.player_slots[3].starting_field)
          local field = map.player_slots[3].starting_field.trn.trn.tln

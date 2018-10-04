@@ -43,16 +43,20 @@ obj_atl = {
    ),
 }
 
-obj_emp = {
+function obj_emp(cost)
+return {
    name = "emp",
    title=_"Pay or Fight",
    number = 1,
    body = objective_text(_"Pay the Empire or Destroy Their Port",
-      li(_[[Gather 200 gold bars in your northernmost port to obtain a passage from Marcus Caius Iniucundus.]]) ..
+      li(ngettext([[Gather %d gold bar in your northernmost port to obtain a passage from Marcus Caius Iniucundus.]],
+            [[Gather %d gold bars in your northernmost port to obtain a passage from Marcus Caius Iniucundus.]],
+            cost):bformat(cost)) ..
       li(_[[Alternatively, you can destroy his port to build one of your own in it’s place.]]) ..
       li(_[[You have two hours to accomplish this objective.]])
    ),
 }
+end
 
 -- ==================
 -- Texts to the user
@@ -83,7 +87,7 @@ port_1 = {
    title = _"Port Space Found",
    body=claus(_"One step closer to the North",
       -- TRANSLATORS: Claus Lembeck – Port Space 1
-      _([[My soldiers report they have found a port space! Now we need to build a port and a shipyard and start an expedition. Of course, we’ll have to build a complete seafaring economy first. But don’t waste too much time perfecting our economy – all that matters is that we get to the North soon.]]))
+      _([[My soldiers report they have found a port space! Now we need to build a port and a shipyard and start an expedition. Of course, we’ll have to build a complete seafaring economy first, with a shipyard and a weaving mill. But don’t waste too much time perfecting our economy – all that matters is that we get to the North soon.]]))
       .. new_objectives(obj_north),
 }
 port_2 = {
@@ -103,7 +107,7 @@ atl_2 = {
    title = _"Strangers",
    body=atlantean(_"Who are you?",
       -- TRANSLATORS: Angadthur – Strangers 2
-      _([[Be greeted, foreigners! I am Angadthur, the King of this miraculous island, a descendant of the legendary King Ajanthul I of Atlantis himself. Be welcome to me, if you will be our friends!]])),
+      _([[Be greeted, foreigners! I am Angadthur, the King of this miraculous island, a descendant of the legendary King Ajanthul the First of Atlantis himself. Be welcome to me, if you will be our friends!]])),
 }
 atl_3 = {
    title = _"Strangers",
@@ -127,7 +131,7 @@ atl_6 = {
    title = _"Strangers",
    body=atlantean(_"Greetings",
       -- TRANSLATORS: Angadthur – Strangers 6
-      _([[I am sorry to disappoint you, Sir Lembeck, but I have never heard this name before and can therefore give you no news of him. As for your intent of tarvveling to the North – I am afraid there is but one suitable location for a port on this island other than the one where you did land, and it is located directly under my palace.]])
+      _([[I am sorry to disappoint you, Sir Lembeck, but I have never heard this name before and can therefore give you no news of him. As for your intent of travelling to the North – I am afraid there is but one suitable location for a port on this island other than the one where you did land, and it is located directly under my palace.]])
       .. paragraphdivider() ..
       -- TRANSLATORS: Angadthur – Strangers 6
       _([[As it so happens, my soldiers are bored with never having anything to do. Let us perform a contest of arms, shall we? You may send your soldiers to try and destroy my palace. I am certain that you will not stand a chance, and therefore I promise I will pray to the gods to bless your journey if you do succeed.]]))
@@ -137,7 +141,7 @@ atl_7 = {
    title = _"Congratulations",
    body=atlantean(_"May Satul bless you",
       -- TRANSLATORS: Angadthur – Atlantean Headquarter Destroyed
-      _([[You have gotten past my best guards and burnt down my Palace, which I believed to be impossible. You must be very powerful, and favoured by the gods. You have most certainly deserved your victory. I congratulate you and wish you well for your voyage. May Satul keep you safe!]])),
+      _([[You have gotten past my best guards and burnt down my palace, which I believed to be impossible. You must be very powerful, and favoured by the gods. You have most certainly deserved your victory. I congratulate you and wish you well for your voyage. May Satul keep you safe!]])),
 }
 
 port_3 = {
@@ -157,14 +161,14 @@ port_5 = {
    title = _"In the Desert",
    body=claus(_"Port space found",
       -- TRANSLATORS: Claus Lembeck – Port Space 5
-      _([[We found a port space on this island. Now we can leave this mysterious desert and continue sailing.]]))
+      _([[We have found a port space on this island. Now we can leave this mysterious desert and continue sailing.]]))
       .. new_objectives(obj_north),
 }
 port_6 = {
    title = _"The North",
    body=henneke(_"In the North",
       -- TRANSLATORS: Henneke Lembeck – Port Space 6
-      _([[Yes, this looks more like I imagine the North should look like. The meadows are still green here, but the patches of snow are getting larger and larger the further North one can look.]])),
+      _([[Yes, this looks more like what I imagine the North should look like. The meadows are still green here, but the patches of snow are getting larger and larger the further North one can look.]])),
 }
 port_7 = {
    title = _"The North",
@@ -184,7 +188,7 @@ emp_2 = {
    title = _"Strangers",
    body=iniucundus(_"No troubles, please",
       -- TRANSLATORS: M. C. Iniucundus – Strangers 2
-      _([[Greetings, Strangers! I am Marcus Caius Iniucundus, a legate of the Empire. Is this your island? We are just passing through, I hope you don’t mind. We don’t want any trouble.]])),
+      _([[Greetings, Strangers! I am Marcus Caius Iniucundus, a legate of the Empire. Is this your island? We are only passing through, I hope you don’t mind. We don’t want any trouble.]])),
 }
 emp_3 = {
    title = _"Strangers",
@@ -204,11 +208,13 @@ emp_5 = {
       -- TRANSLATORS: Claus Lembeck – Strangers 5
       _([[We thank you for your offer! What is the price you demand? And, if you don’t mind my asking, may I know what business you are employed on?]])),
 }
-emp_6 = {
+function emp_6(cost)
+return {
    title = _"Strangers",
    body=iniucundus(_"Greetings",
+      join_sentences(ngettext([[%d piece of gold.]], [[%d pieces of gold.]], cost):bformat(cost),
       -- TRANSLATORS: M. C. Iniucundus – Strangers 6
-      _([[200 pieces of gold. I know it seems much, but the Senate did not furnish me with much money for this expedition, so I must admit I am in need of some.]])
+      _([[I know it seems much, but the Senate did not furnish me with much money for this expedition, so I must admit I am in need of some.]]))
       .. paragraphdivider() ..
       -- TRANSLATORS: M. C. Iniucundus – Strangers 6
       _([[The purpose of my journey is to seek out the Proconsule of the Province The Northern Lands, who has neglected to pay his taxes for several years running. My task is to give this Murilius a good telling-off, and if I discover he failed to pay out of greed rather than necessity, I am to bring him back to the Capital in chains. I must say, I am rather happy to be given this task, for I have a good chance of being appointed Proconsule in his stead if I succeed.]])
@@ -216,13 +222,16 @@ emp_6 = {
       -- TRANSLATORS: M. C. Iniucundus – Strangers 6
       _([[But back to the topic of your passage. There is only one place on the northern coast of this island where a port can be built. So you do not really have an alternative to purchasing a passage on my galley. But my astrologers report that a terrible storm is gathering that will make sea travel impossible for a long time. We must set sail within two hours, and whoever is still on the island after that time will not leave it anytime soon.]])),
 }
-emp_7 = {
+end
+function emp_7(cost)
+return {
    title = _"Strangers",
    body=claus(_"Decide",
       -- TRANSLATORS: Claus Lembeck – Strangers 7
       _([[He seems happy enough to offer us a passage, but the price is exorbitant. We may as well destroy his port and build one of our own. I wonder what would be better…]]))
-      .. new_objectives(obj_emp),
+      .. new_objectives(obj_emp(cost)),
 }
+end
 
 victory_fight = {
    title =_ "Victory",

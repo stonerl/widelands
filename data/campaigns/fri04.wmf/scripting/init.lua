@@ -67,9 +67,9 @@ include "map:scripting/texts.lua"
 campaign_data = game:read_campaign_data("frisians", "fri03")
 if not campaign_data then
    campaign_message_box(campaign_data_warning)
-   -- If he wants to cheat, let him, but give him a very hard time
+   -- If he wants to cheat, let him, but give him a seriously hard time
    campaign_data = {
-      [{0, 0, 0, 0}] = 5
+      ["000"] = 2
    }
 end
 
