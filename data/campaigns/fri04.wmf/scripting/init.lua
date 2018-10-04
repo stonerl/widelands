@@ -13,7 +13,7 @@ include "scripting/messages.lua"
 game = wl.Game()
 map = game.map
 p1 = game.players[1] -- Claus Lembeck           – Player's tribe
-p2 = game.players[2] -- Angadthur               – Atlantean fugitive
+p2 = game.players[2] -- Angadthur               – Atlantean King
 p3 = game.players[3] -- Marcus Caius Iniucundus – Imperial Legate
 
 port_south = map:get_field(6, 461)
@@ -21,8 +21,6 @@ port_volcano = map:get_field(16, 402)
 port_desert_s = map:get_field(42, 243)
 port_desert_n = map:get_field(4, 235)
 port_north = map:get_field(20, 162)
-
-p1.see_all=true -- NOCOM for testing only
 
 local field = map:get_field(1, 456)
 obstacles_1 = {field}
@@ -33,7 +31,7 @@ end
 -- NOCOM: The obstacle-related scripting <2> and <3> is to ensure that the red and yellow
 -- players don't reach the port spaces too soon. If testers report that this is a problem,
 -- this code will be uncommented, else removed.
--- (Note to self: Don't forget to adjust mission thread and starting conditions!)
+-- (Note to self: Don't forget to adjust mission_thread and starting_conditions!)
 -- obstacles_1 is used to ensure the player doesn’t reach the first port space
 -- before he owns the whole southern island.
 

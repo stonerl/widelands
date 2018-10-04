@@ -53,6 +53,7 @@ return {
             [[Gather %d gold bars in your northernmost port to obtain a passage from Marcus Caius Iniucundus.]],
             cost):bformat(cost)) ..
       li(_[[Alternatively, you can destroy his port to build one of your own in it’s place.]]) ..
+      li(_[[All soldiers who are present on the Northern island when you embark will accompany you.]]) ..
       li(_[[You have two hours to accomplish this objective.]])
    ),
 }

@@ -1,5 +1,16 @@
 include "scripting/field_animations.lua"
 
+function insert_soldiers(tbl, what)
+   for descr,n in pairs(what) do
+      local key = descr[1] .. descr[2] .. descr[3]
+      if tbl[key] then
+         tbl[key] = tbl[key] + n
+      else
+         tbl[key] = n
+      end
+   end
+end
+
 function mission_thread()
 
    scroll_to_field(map.player_slots[1].starting_field)
@@ -171,6 +182,37 @@ function mission_thread()
       end
       if fight then
          set_objective_done(o)
+         -- Gather the soldiers. We take all who are on the northern island, no
+         -- matter whether they are in warehouses, milsites, or walking around.
+         fight.soldiers = {}
+         for i,bld in pairs(array_combine(
+            p1:get_buildings("frisians_warehouse"),
+            p1:get_buildings("frisians_port"),
+            p1:get_buildings("frisians_sentinel"),
+            p1:get_buildings("frisians_outpost"),
+            p1:get_buildings("frisians_tower"),
+            p1:get_buildings("frisians_fortress"),
+            p1:get_buildings("frisians_wooden_tower"),
+            p1:get_buildings("frisians_wooden_tower_high")
+         )) do
+            if bld.fields[1].y < 200 then
+               insert_soldiers(fight.soldiers, bld:get_soldiers("all"))
+            end
+         end
+         for x = 0, map.width - 1 do
+            for y = 24, 166 do
+               for i,bob in pairs(map:get_field(x, y).bobs) do
+                  if bob.descr.name == "frisians_soldier" then
+                     insert_soldiers(fight.soldiers, {
+                        [{ bob.health_level, bob.attack_level, bob.defense_level, 0 }] = 1
+                     })
+                  end
+               end
+            end
+         end
+         -- The campaign data contains two values:
+         -- · payment: is nil if the empire was conquered, else the number of gold paid
+         -- · soldiers: a table of all soldiers we take with us (in the usual syntax convention)
          game:save_campaign_data("frisians", "fri04", fight)
          scroll_to_field(map.player_slots[3].starting_field)
          local field = map.player_slots[3].starting_field.trn.trn.tln
