@@ -1,0 +1,13 @@
+# Automatically created by Widelands bzr8851[fri03] (Release)
+
+[global]
+packet_version="1"
+map_w="64"
+map_h="512"
+nr_players="3"
+name=_"The Journey North"
+author="Nordfriese"
+descr=_"Claus and Henneke Lembeck are sailing to the North. But before they can ask Reebaud for help, they have to get to him first…"
+hint=
+background="campaigns/fri04.wmf/pics/background.jpg"
+tags="seafaring,unbalanced"
