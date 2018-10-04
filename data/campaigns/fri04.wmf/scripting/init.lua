@@ -22,6 +22,14 @@ port_desert_s = map:get_field(42, 243)
 port_desert_n = map:get_field(4, 235)
 port_north = map:get_field(20, 162)
 
+p1.see_all=true -- NOCOM for testing only
+
+local field = map:get_field(1, 456)
+obstacles_1 = {field}
+for i=1, 14 do
+   field = field.brn
+   table.insert(obstacles_1, field)
+end
 -- NOCOM: The obstacle-related scripting <2> and <3> is to ensure that the red and yellow
 -- players don't reach the port spaces too soon. If testers report that this is a problem,
 -- this code will be uncommented, else removed.
@@ -29,12 +37,6 @@ port_north = map:get_field(20, 162)
 -- obstacles_1 is used to ensure the player doesn’t reach the first port space
 -- before he owns the whole southern island.
 
--- local field = map:get_field(1, 456)
--- obstacles_1 = {field}
--- for i=1, 14 do
---    field = field.brn
---    table.insert(obstacles_1, field)
--- end
 -- obstacles_2 = {
 --    map:get_field(19, 401),
 --    map:get_field(21, 399),
