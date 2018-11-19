@@ -27,6 +27,7 @@
 #include "economy/flag.h"
 #include "logic/campaign_visibility.h"
 #include "logic/game_controller.h"
+#include "logic/map_objects/checkstep.h"
 #include "logic/map_objects/tribes/tribe_descr.h"
 #include "logic/message.h"
 #include "logic/objective.h"
@@ -101,6 +102,9 @@ const MethodType<LuaPlayer> LuaPlayer::Methods[] = {
    METHOD(LuaPlayer, allow_workers),
    METHOD(LuaPlayer, switchplayer),
    METHOD(LuaPlayer, get_produced_wares_count),
+   METHOD(LuaPlayer, get_attack_soldiers),
+   METHOD(LuaPlayer, attack),
+   METHOD(LuaPlayer, connect_with_road),
    {nullptr, nullptr},
 };
 const PropertyType<LuaPlayer> LuaPlayer::Properties[] = {
@@ -881,6 +885,64 @@ int LuaPlayer::get_produced_wares_count(lua_State* L) {
 		}
 	}
 
+	return 1;
+}
+
+/* RST
+   .. method:: get_attack_soldiers(site)
+
+      Returns an array with all soldiers that this player can currently send to attack the given enemy building.
+      :rtype: :class:`array` of :class:`Soldier`
+*/
+int LuaPlayer::get_attack_soldiers(lua_State* L) {
+	std::vector<Soldier*> soldiers;
+	get(L, get_egbase(L)).find_attack_soldiers(
+			(*get_base_user_class<LuaBuilding>(L, 2))->get(L, get_egbase(L))->base_flag(), &soldiers);
+	lua_newtable(L);
+	uint32_t index = 1;
+	for (Soldier* s : soldiers) {
+		lua_pushuint32(L, index++);
+		to_lua<LuaSoldier>(L, new LuaSoldier(*s));
+		lua_settable(L, -3);
+	}
+	return 1;
+}
+
+/* RST
+   .. method:: get_attack_soldiers(site, number)
+
+      Attack the given enemy building with the given number of soldiers.
+*/
+int LuaPlayer::attack(lua_State* L) {
+	if (upcast(Game, game, &get_egbase(L))) {
+		game->send_player_enemyflagaction((*get_base_user_class<LuaBuilding>(L, 2))->get(L, get_egbase(L))->base_flag(),
+				get(L, get_egbase(L)).player_number(), luaL_checkuint32(L, 3));
+	}
+	return 0;
+}
+
+/* RST
+   .. method:: connect_with_road(start, end[, persist = 3])
+
+      Build a road between the two given flags.
+      :returns: `true` if a road was built, `false` otherwise
+      :rtype: :class:`boolean`
+*/
+int LuaPlayer::connect_with_road(lua_State* L) {
+	Widelands::Player& player = get(L, get_egbase(L));
+	Widelands::Flag* start = (*get_user_class<LuaFlag>(L, 2))->get(L, get_egbase(L));
+	Widelands::Flag* end = (*get_user_class<LuaFlag>(L, 3))->get(L, get_egbase(L));
+	int32_t persist = 3;
+	if (lua_gettop(L) > 3) {
+		persist = luaL_checkint32(L, 4);
+	}
+	Widelands::Path path;
+	bool result = get_egbase(L).map().findpath(start->get_position(), end->get_position(), persist, path,
+			Widelands::CheckStepRoad(player, Widelands::MOVECAPS_WALK)) > 0;
+	if (result) {
+		player.build_road(path);
+	}
+	lua_pushboolean(L, result);
 	return 1;
 }
 

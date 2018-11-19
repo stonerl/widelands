@@ -4461,6 +4461,8 @@ Building
 */
 const char LuaBuilding::className[] = "Building";
 const MethodType<LuaBuilding> LuaBuilding::Methods[] = {
+   METHOD(LuaBuilding, dismantle),
+   METHOD(LuaBuilding, enhance),
    {nullptr, nullptr},
 };
 const PropertyType<LuaBuilding> LuaBuilding::Properties[] = {
@@ -4489,6 +4491,31 @@ int LuaBuilding::get_flag(lua_State* L) {
  LUA METHODS
  ==========================================================
  */
+
+/* RST
+   .. method:: dismantle()
+
+      Dismantle this building as if the player had clicked the dismantle button.
+*/
+int LuaBuilding::dismantle(lua_State* L) {
+	if (upcast(Game, game, &get_egbase(L))) {
+		game->send_player_dismantle(*get(L, get_egbase(L)));
+	}
+	return 0;
+}
+
+/* RST
+   .. method:: enhance()
+
+      Enhance this building as if the player had clicked the enhance button.
+*/
+int LuaBuilding::enhance(lua_State* L) {
+	if (upcast(Game, game, &get_egbase(L))) {
+		Widelands::Building* bld = get(L, get_egbase(L));
+		game->send_player_enhance_building(*bld, bld->descr().enhancement());
+	}
+	return 0;
+}
 
 /*
  ==========================================================
