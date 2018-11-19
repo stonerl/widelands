@@ -324,8 +324,8 @@ hq:set_soldiers {
    [{2,2,0,0}] = 80,
    [{4,4,0,2}] = 40,
 }
-p2:place_building("empire_blockhouse", map:get_field(102, 36), true, true)
-p2:place_building("empire_tower", map:get_field(113, 30), true, true)
+-- p2:place_building("empire_blockhouse", map:get_field(102, 36), true, true)
+-- p2:place_building("empire_tower", map:get_field(113, 30), true, true)
 
 -- =======================================================================
 --                                 Player 3
@@ -398,5 +398,5 @@ hq:set_soldiers {
    [{3,5,0,0}] = 80,
    [{3,5,0,2}] = 40,
 }
-p4:place_building("barbarians_fortress", map:get_field(369, 128), true, true)
+-- p4:place_building("barbarians_fortress", map:get_field(369, 128), true, true)
 

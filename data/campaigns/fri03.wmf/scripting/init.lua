@@ -9,11 +9,12 @@ include "scripting/infrastructure.lua"
 include "scripting/table.lua"
 include "scripting/ui.lua"
 
-map = wl.Game().map
-p1 = wl.Game().players[1] -- Claus Lembeck     – Player's tribe
-p2 = wl.Game().players[2] -- Waldemar Atterdag – Enemy, King of Denmark
-p3 = wl.Game().players[3] -- Henneke Lembeck   – Claus's son and friend
-p4 = wl.Game().players[4] -- Hans Ravenstrupp  – Enemy to Claus's other son
+game = wl.Game()
+map = game.map
+p1 = game.players[1] -- Claus Lembeck     – Player's tribe
+p2 = game.players[2] -- Waldemar Atterdag – Enemy, King of Denmark
+p3 = game.players[3] -- Henneke Lembeck   – Claus's son
+p4 = game.players[4] -- Hans Ravenstrupp  – Enemy to Claus's other son
 
 p3_start = {
    map:get_field(334, 206),
@@ -33,4 +34,5 @@ p3_start = {
 }
 
 include "map:scripting/texts.lua"
+include "map:scripting/ai.lua"
 include "map:scripting/mission_thread.lua"

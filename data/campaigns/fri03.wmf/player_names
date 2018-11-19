@@ -12,17 +12,17 @@ closeable="false"
 [player_2]
 name="Waldemar Atterdag"
 tribe="empire"
-ai=
+ai=empty
 closeable="false"
 
 [player_3]
 name="Henneke Lembeck"
 tribe="frisians"
-ai=
+ai=empty
 closeable="false"
 
 [player_4]
 name="Hans Ravenstrupp"
 tribe="barbarians"
-ai=
+ai=empty
 closeable="false"
