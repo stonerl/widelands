@@ -9,7 +9,7 @@
 -- If the military looks good, we take care of our economy.
 -- If there are shortages of some ware which we can produce, we need to build more buildings for it.
 
-function ai(pl, speed)
+function ai(pl)
    if pl.tribe.name == "empire" then
       local eco = pl:get_buildings("empire_headquarters")[1].flag.economy
       eco:set_ware_target_quantity("planks", 25)
@@ -33,32 +33,59 @@ function ai(pl, speed)
       print("FATAL EXCEPTION: The custom AI for fri03 does not support the tribe '" .. pl.tribe.name .. "'!")
       return
    end
+   local init = true
    while not pl.defeated do
-      ai_one_loop(pl, speed)
-      sleep(speed)
+      ai_one_loop(pl, init)
+      init = false
+      sleep(3000) -- NOCOM very slow, for testing
+      -- Yes, we need to do this after every single step. I'm sorry :(
+      collectgarbage()
    end
 end
 
-function ai_one_loop(pl, sleeptime)
+function ai_one_loop(pl, initial)
    
    -- We begin by cleaning up our road network. Long roads are broken into shorter sections, dead-ends are removed.
-   for x=0, map.width - 1 do
-      for y=0, map.height - 1 do
+   if not initial then
+   for y=0, map.height - 1 do
+      sleep(1)
+      for x=0, map.width - 1 do
          local f = map:get_field(x, y)
          if f.owner == pl and f.immovable then
-            if f.immovable.descr.type_name == "road" and f:has_caps("flag") then
-               pl:place_flag(f)
-               return
-            elseif f.immovable.descr.type_name == "flag" and not f.immovable.building then
+            if f.immovable.descr.type_name == "road" then
+               local l = 0
+               for i,field in ipairs(f.immovable.fields) do
+                  if field:has_caps("flag") then
+                     pl:place_flag(field)
+                     print("NOCOM built flag")
+                     return
+                  elseif field.immovable and f.immovable.descr.type_name == "flag" then
+                     l = 0
+                  else
+                     l = l + 1
+                     if l > 3 then
+                        field.immovable:destroy()
+                     print("NOCOM destroyed road")
+                        return
+                     end
+                  end
+               end
+            elseif f.immovable.descr.type_name == "flag" then
                local r = 0
                for _ in pairs(f.immovable.roads) do r = r + 1 end
-               if r < 2 then
+               if f.immovable.building and r < 1 then
+                  connect(pl, f.immovable, 3)
+                     print("NOCOM built road")
+                  return
+               elseif not f.immovable.building and r < 2 then
                   f.immovable:destroy()
+                     print("NOCOM destroyed unreachable building")
                   return
                end
             end
          end
       end
+   end
    end
    
    -- Military stuff
@@ -69,6 +96,8 @@ function ai_one_loop(pl, sleeptime)
    --   Otherwise, we construct a new militarysite nearby.
    --     (If a new own milsite is already under construction nearby, we ignore that enemy site – for now...)
    
+   sleep(10)
+   
    for i,b in pairs(array_combine(
          p1:get_buildings("frisians_headquarters"),
          p1:get_buildings("frisians_port"),
@@ -77,9 +106,12 @@ function ai_one_loop(pl, sleeptime)
       local n = #pl:get_attack_soldiers(b)
       if n > 0 then
          pl:attack(b, n)
+                     print("NOCOM attacked hq or port")
          return
       end
    end
+   
+   sleep(10)
    
    for i,b in pairs(array_combine(
          p1:get_buildings("frisians_tower"),
@@ -93,6 +125,7 @@ function ai_one_loop(pl, sleeptime)
          p3:get_buildings("frisians_wooden_tower"),
          p3:get_buildings("frisians_wooden_tower_high")
    )) do
+      sleep(10)
       local attack_soldiers = pl:get_attack_soldiers(b)
       if #attack_soldiers > 0 then
          local attackers_score = 0
@@ -100,6 +133,7 @@ function ai_one_loop(pl, sleeptime)
          local attackers = 0
          local milsite_under_construction = false
          for j,f in pairs(b.fields[1]:region(25)) do
+            sleep(10)
             if f.owner and f.owner.team ~= pl.team and f.immovable and f.immovable.descr.type_name == "militarysite" then
                for descr,n in pairs(f.immovable.get_soldiers("all")) do
                   -- This approximation is incorrect for several reasons, but they balance each other out fairly well ;)
@@ -112,6 +146,7 @@ function ai_one_loop(pl, sleeptime)
             end
          end
          for j,s in pairs(attack_soldiers) do
+            sleep(10)
             attackers_score = attackers_score + (s.attack_level + 1) * (s.evade_level + 1) *
                   (s.health_level + 1) * (s.defense_level + 1)
             attackers = attackers + 1
@@ -138,15 +173,20 @@ function ai_one_loop(pl, sleeptime)
                      game:get_building_description("barbarians_fortress"),
                   }
                end
-               build_best_building(pl, buildings, b.fields[1]:region(21), sleeptime)
-               return
+               if build_best_building(pl, buildings, b.fields[1]:region(21)) then
+                  print("NOCOM built new milsite")
+                  return
+               end
             end
          else
             pl:attack(b, attackers)
+                     print("NOCOM attacked milsite")
             return
          end
       end
    end
+   
+   sleep(10)
    
    -- Now, let's take care of our economy. We define our very own "basic economy" below.
    -- If we haven't built everything from there yet, we really need to take care of that.
@@ -156,12 +196,15 @@ function ai_one_loop(pl, sleeptime)
    local most_important_missing_build = nil
    local most_important_missing_enhance = nil
    for b,tbl in pairs(basic_economy) do
-      if game:get_building_description(b).buildable and ((not most_important_missing_build) or
-            most_important_missing_build < tbl.importance) and count_buildings(pl, b) < tbl.amount then
+      sleep(10)
+      local buildable = game:get_building_description(b).buildable
+      local count = count_buildings(pl, b) < tbl.amount
+      if buildable and ((not most_important_missing_build) or
+            most_important_missing_build < tbl.importance) and count then
          most_important_missing_build = tbl.importance
       end
-      if (not game:get_building_description(b).buildable) and ((not most_important_missing_enhance) or
-            most_important_missing_enhance < tbl.importance) and count_buildings(pl, b) < tbl.amount then
+      if (not buildable) and ((not most_important_missing_enhance) or
+            most_important_missing_enhance < tbl.importance) and count then
          most_important_missing_enhance = tbl.importance
       end
    end
@@ -169,6 +212,7 @@ function ai_one_loop(pl, sleeptime)
       -- There is at least 1 basic building that can be built directly
       local bld = {}
       for b,tbl in pairs(basic_economy) do
+         sleep(10)
          local descr = game:get_building_description(b)
          if descr.buildable and tbl.importance >= most_important_missing_build and
                count_buildings(pl, b) < tbl.amount then
@@ -183,14 +227,17 @@ function ai_one_loop(pl, sleeptime)
          pl:get_buildings("barbarians_warehouse"))
       local size = #field
       field = field[math.random(size)].fields[1]
-      build_best_building(pl, bld, field:region(20 * size), sleeptime)
-      return
+      if build_best_building(pl, bld, field:region(20 * size)) then
+         print("NOCOM built basic building")
+         return
+      end
    elseif most_important_missing_enhance ~= nil then
       -- TODO We need to find out whether we can enhance something to a missing building
       
    end
    
    print("NOCOM I am bored :(")
+   sleep(100)
    
 end
 
@@ -308,11 +355,12 @@ constructionsites = {}
 function count_buildings(pl, building)
    local n = #pl:get_buildings(building)
    if constructionsites[building] then
-      for i,b in pairs(constructionsites[building]) do
-         if b.descr.type_name ~= "constructionsite" or b.descr.name ~= "constructionsite" then
-            table.remove(constructionsites[building], i);
-         elseif b.building == building then
+      for i,f in pairs(constructionsites[building]) do
+         if f.immovable and f.immovable.descr.type_name == "constructionsite" and
+               f.immovable.descr.name == "constructionsite" and f.immovable.building == building then
             n = n + 1
+         else
+            table.remove(constructionsites[building], i);
          end
       end
    end
@@ -343,7 +391,7 @@ function suitability(pl, field, building_descr)
    if not field:has_caps(building_descr.size) then return false end
    local size
    if building_descr.size == "big" then size = 2 else size = 1 end
-   for i,f in pairs(field:region(size)) do
+   for i,f in pairs(array_combine(field.brn:region(1), field:region(size))) do
       if f.owner ~= pl then return false end
    end
    return true
@@ -446,37 +494,38 @@ function build_best_building(pl, buildings, region, sleeptime)
    
    local is_flag = field.brn
    is_flag = is_flag.immovable and is_flag.immovable.descr.type_name == "flag"
-   local building = pl:place_building(best.name, field, true, true)
+   local building = pl:place_building(best.name, field, true)
    if not constructionsites[best.name] then
       constructionsites[best.name] = {}
    end
-   table.insert(constructionsites[best.name], building)
+   table.insert(constructionsites[best.name], building.fields[1])
    if not is_flag then
-      sleep(sleeptime)
-      if not connect(pl, building.flag) then
+      sleep(100)
+      if not connect(pl, building.flag, 1) then
          building:destroy()
       end
    end
+   return building
 end
 
 -- Connects the given flag to a nearby road network
-function connect(pl, flag)
---   print("NOCOM: Starting to connect the flag of a new " .. flag.building.building)
-   local d = 1
+function connect(pl, flag, precision)
+   local d = precision
    while d < map.width / 2 do
-      for i,f in pairs(flag.fields[1]:region(d, d - 1)) do
+      local fields = flag.fields[1]:region(d, d - precision)
+      while #fields > 0 do
+         local fi = math.random(#fields)
+         local f = fields[fi]
+         table.remove(fields, fi)
          if f.immovable and (f.immovable.descr.type_name == "flag" or
                (f.immovable.descr.type_name == "road" and f:has_caps("flag"))) then
---   print("NOCOM: Found a potential flag at" .. f.x .. "×" .. f.y)
             if pl:connect_with_road(flag, f.immovable, 10) then
---   print("NOCOM: Road built!")
                return true
             end
          end
       end
-      d = d + 1
+      d = d + precision
    end
-   print("WARNING: Unable to build a road from this flag!!")
    return false
 end
 

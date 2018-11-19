@@ -163,6 +163,7 @@ function mission_thread()
    scroll_to_field(map.player_slots[1].starting_field)
 
    -- Introduction
+-- NOCOM uncomment all of those
 --   sleep(3000)
 --   campaign_message_box(intro_1)
 --   sleep(3000)
@@ -177,10 +178,11 @@ function mission_thread()
 --   sleep(3000)
 --   campaign_message_box(intro_5)
 --   local o = add_campaign_objective(obj_wait_for_reinforcements)
-   sleep(5000)
+--   sleep(5000)
 --   campaign_message_box(intro_6)
-   run(ai, p2, 500)
---   run(ai, p4, 1000)
+   run(ai, p2)
+--   run(ai, p4)
+while true do sleep(1000000) end -- NOCOM
 
    sleep(5000)
    run(save_atterdag)
