@@ -35,7 +35,7 @@ function ai(pl)
    end
    while not pl.defeated do
       ai_one_loop(pl)
-      sleep(3000) -- NOCOM very slow, for testing
+      sleep(ai_speed_1)
    end
 end
 
@@ -49,7 +49,9 @@ function ai_one_loop(pl)
             for dir,road in pairs(field.immovable.roads) do
                nroads = nroads + 1
             end
-            if nroads < 2 and not field.immovable.building then
+            if nroads < 1 and field.immovable.building then
+               if connect(pl, field.immovable, 3) then return end
+            elseif nroads < 2 and not field.immovable.building then
                field.immovable:destroy()
                table.remove(ai_flags[pl.number], i)
                return
@@ -92,7 +94,7 @@ function ai_one_loop(pl)
    --   Otherwise, we construct a new militarysite nearby.
    --     (If a new own milsite is already under construction nearby, we ignore that enemy site – for now...)
    
-   sleep(10)
+   sleep(ai_speed_2)
    
    for i,b in pairs(array_combine(
          p1:get_buildings("frisians_headquarters"),
@@ -102,12 +104,11 @@ function ai_one_loop(pl)
       local n = #pl:get_attack_soldiers(b)
       if n > 0 then
          pl:attack(b, n)
-         print("NOCOM attacked hq or port")
          return
       end
    end
    
-   sleep(10)
+   sleep(ai_speed_2)
    
    for i,b in pairs(array_combine(
          p1:get_buildings("frisians_tower"),
@@ -121,7 +122,7 @@ function ai_one_loop(pl)
          p3:get_buildings("frisians_wooden_tower"),
          p3:get_buildings("frisians_wooden_tower_high")
    )) do
-      sleep(10)
+      sleep(ai_speed_2)
       local attack_soldiers = pl:get_attack_soldiers(b)
       if #attack_soldiers > 0 then
          local attackers_score = 0
@@ -129,7 +130,7 @@ function ai_one_loop(pl)
          local attackers = 0
          local milsite_under_construction = false
          for j,f in pairs(b.fields[1]:region(25)) do
-            sleep(10)
+            sleep(ai_speed_2)
             if f.owner and f.owner.team ~= pl.team and f.immovable and f.immovable.descr.type_name == "militarysite" then
                for descr,n in pairs(f.immovable.get_soldiers("all")) do
                   -- This approximation is incorrect for several reasons, but they balance each other out fairly well ;)
@@ -142,7 +143,7 @@ function ai_one_loop(pl)
             end
          end
          for j,s in pairs(attack_soldiers) do
-            sleep(10)
+            sleep(ai_speed_2)
             attackers_score = attackers_score + (s.attack_level + 1) * (s.evade_level + 1) *
                   (s.health_level + 1) * (s.defense_level + 1)
             attackers = attackers + 1
@@ -170,19 +171,17 @@ function ai_one_loop(pl)
                   }
                end
                if build_best_building(pl, buildings, b.fields[1]:region(21)) then
-                  print("NOCOM built new milsite")
                   return
                end
             end
          else
             pl:attack(b, attackers)
-            print("NOCOM attacked milsite")
             return
          end
       end
    end
    
-   sleep(10)
+   sleep(ai_speed_2)
    
    -- Now, let's take care of our economy. We define our very own "basic economy" below.
    -- If we haven't built everything from there yet, we really need to take care of that.
@@ -192,7 +191,7 @@ function ai_one_loop(pl)
    local most_important_missing_build = nil
    local most_important_missing_enhance = nil
    for b,tbl in pairs(basic_economy) do
-      sleep(10)
+      sleep(ai_speed_2)
       local buildable = game:get_building_description(b).buildable
       local count = count_buildings(pl, b) < tbl.amount
       if buildable and ((not most_important_missing_build) or
@@ -208,7 +207,7 @@ function ai_one_loop(pl)
       -- There is at least 1 basic building that can be built directly
       local bld = {}
       for b,tbl in pairs(basic_economy) do
-         sleep(10)
+         sleep(ai_speed_2)
          local descr = game:get_building_description(b)
          if descr.buildable and tbl.importance >= most_important_missing_build and
                count_buildings(pl, b) < tbl.amount then
@@ -224,20 +223,65 @@ function ai_one_loop(pl)
       local size = #field
       field = field[math.random(size)].fields[1]
       if build_best_building(pl, bld, field:region(20 * size)) then
-         print("NOCOM built basic building")
          return
       end
    elseif most_important_missing_enhance ~= nil then
-      -- TODO: We need to find out whether we can enhance something to a missing building
+      for b,tbl in pairs(basic_economy) do
+         sleep(ai_speed_2)
+         local descr = game:get_building_description(b)
+         if not descr.buildable and tbl.importance >= most_important_missing_build and
+               count_buildings(pl, b) < tbl.amount then
+            local candidates = pl:get_buildings(descr.enhanced_from.name)
+            if #candidates > 0 then
+               -- If this building needs an experienced worker, we need to check if we have the required
+               -- worker either in a warehouse or in this building
+               local missing_worker = nil
+               if descr.working_positions then
+                  for i,worker in pairs(descr.working_positions) do
+                     if worker.name == "barbarians_blacksmith_master" or worker.name == "barbarians_brewer_master" then
+                        missing_worker = worker.name
+                        break
+                     end
+                  end
+                  sleep(ai_speed_2)
+                  if missing_worker then
+                     for i,wh in pairs(array_combine(
+                           pl:get_buildings("barbarians_headquarters"),
+                           pl:get_buildings("barbarians_warehouse"))) do
+                        if wh:get_workers(missing_worker) > 0 then
+                           missing_worker = nil
+                           break
+                        end
+                     end
+                  end
+                  sleep(ai_speed_2)
+                  local choice = nil
+                  if missing_worker then
+                     for i,bld in pairs(candidates) do
+                        if bld:get_workers(missing_worker) > 0 then
+                           choice = bld
+                           break
+                        end
+                     end
+                  else
+                     choice = candidates[math.random(#candidates)]
+                  end
+                  if choice then choice:enhance() end
+                  return
+               end
+            end
+         end
+      end
       
    end
    
-   -- TODO: Do other stuff – find out if we should build more productionsites, warehouses, milsites...
+   -- TODO: Do other stuff – micromanage workers and wares, find out if we should build more
+   -- productionsites, warehouses, milsites...
    
    
    
    print("NOCOM I am bored :(")
-   sleep(100)
+   sleep(ai_speed_1)
    
 end
 
@@ -501,7 +545,7 @@ function build_best_building(pl, buildings, region, sleeptime)
    end
    table.insert(constructionsites[best.name], building.fields[1])
    if not is_flag then
-      sleep(100)
+      sleep(ai_speed_1)
       if connect(pl, building.flag, 1) then
          table.insert(ai_flags[pl.number], building.flag.fields[1])
       else

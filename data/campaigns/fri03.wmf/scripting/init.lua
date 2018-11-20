@@ -16,6 +16,9 @@ p2 = game.players[2] -- Waldemar Atterdag – Enemy, King of Denmark
 p3 = game.players[3] -- Henneke Lembeck   – Claus's son
 p4 = game.players[4] -- Hans Ravenstrupp  – Enemy to Claus's other son
 
+ai_speed_1 = 500
+ai_speed_2 = 10
+
 p3_start = {
    map:get_field(334, 206),
    map:get_field(334, 207),

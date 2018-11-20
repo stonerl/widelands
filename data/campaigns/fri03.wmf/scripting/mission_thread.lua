@@ -184,6 +184,7 @@ function mission_thread()
       while true do
          sleep(60000)
          -- Yes, we need to do this now and again because our AI is a bit memory-hungry. I'm sorry :(
+         print("*** Running gc")
          collectgarbage()
       end
    end)
