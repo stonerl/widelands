@@ -78,13 +78,9 @@ function ai_one_loop(pl)
          end
       end
    else
-      ai_flags[pl.number] = {}
+      ai_flags[pl.number] = { array_combine(pl:get_buildings("barbarians_headquarters"),
+            pl:get_buildings("empire_headquarters"))[1].flag.fields[1] }
    end
-   
-   -- TODO: We should occasionally check for pairs of flags that are physically close to each other
-   -- but far apart in the road network, and connect such flags with roads if possible
-   
-   
    
    -- Military stuff
    -- ==============
@@ -272,7 +268,19 @@ function ai_one_loop(pl)
             end
          end
       end
-      
+   end
+   
+   -- Let's check whether there are two flags that are physically close but far apart in the road network
+   for i = 1, #ai_flags[pl.number] do
+      local f1 = ai_flags[pl.number][i]
+      for j = i + 1, #ai_flags[pl.number] do
+         local f2 = ai_flags[pl.number][j]
+         local d = distance(f1, f2, 8, ai_speed_2)
+         if d and f1.immovable:get_distance(f2.immovable) > 9000 * d then
+            if pl:connect_with_road(f1.immovable, f2.immovable) then return end
+         end
+      end
+      sleep(ai_speed_2)
    end
    
    -- TODO: Do other stuff – micromanage workers and wares, find out if we should build more
@@ -280,7 +288,7 @@ function ai_one_loop(pl)
    
    
    
-   print("NOCOM I am bored :(")
+   print("NOCOM AI #" .. pl.number .. " is bored :(")
    sleep(ai_speed_1)
    
 end
@@ -498,19 +506,23 @@ function build_best_building(pl, buildings, region, sleeptime)
          end
    
          if best.type_name == "militarysite" then
-            score = ai_milsite_border_score_factor - border_distance
+            score = 72 * (ai_milsite_border_score_factor - border_distance)
          elseif best.type_name == "warehouse" then
-            score = border_distance
+            score = 72 * border_distance
          elseif best.type_name == "trainingsite" then
-            score = ai_trainsite_border_score_offset - (border_distance - ai_trainsite_border_score_factor) *
+            score = 72 * (ai_trainsite_border_score_offset - (border_distance - ai_trainsite_border_score_factor) *
                   (border_distance - ai_trainsite_border_score_factor) * ai_trainsite_border_score_offset /
-                  (ai_trainsite_border_score_factor * ai_trainsite_border_score_factor)
+                  (ai_trainsite_border_score_factor * ai_trainsite_border_score_factor))
+         elseif best.name:find("fisher") then
+            score = 0
+            for i,fish in pairs(f:region(6)) do
+               if fish.resource == "fish" then
+                  score = score + fish.resource_amount
+               end
+            end
          else
-            score = 1
+            score = 72
          end
-         
-         -- For nicer integer arithmetics in the following section
-         score = score * 72
          
          -- Placing a small building on a big plot is BAD. Placing a small building on a small plot is GOOD.
          if f:has_caps("big") then
@@ -577,7 +589,7 @@ function connect(pl, flag, precision)
 end
 
 -- Helper function: Determine the distance between two fields
-function distance(f1, f2)
+function distance(f1, f2, max, sleeptime)
    if f1.x == f2.x and f1.y == f2.y then return 0 end
    local d = 1
    while true do
@@ -585,5 +597,10 @@ function distance(f1, f2)
          if f.x == f2.x and f.y == f2.y then return d end
       end
       d = d + 1
+      if max and d > max then
+         return nil
+      elseif sleeptime then
+         sleep(sleeptime)
+      end
    end
 end

@@ -33,7 +33,7 @@ function farms()
          p1:get_buildings("frisians_farm"),
          p1:get_buildings("frisians_farm_new")
       )) do
-         if not hq:is_flag_reachable(farm.flag) then
+         if not hq:get_distance(farm.flag) then
             ok = false
             p1:send_message(unconnected_farm.title, unconnected_farm.body, {
                heading = unconnected_farm.heading,
@@ -168,10 +168,10 @@ function mission_thread()
 --   campaign_message_box(intro_1)
 --   sleep(3000)
 --   campaign_message_box(intro_2)
-   scroll_to_field(map.player_slots[2].starting_field)
+--   scroll_to_field(map.player_slots[2].starting_field)
 --   sleep(3000)
 --   campaign_message_box(intro_3)
---   scroll_to_field(map.player_slots[4].starting_field)
+   scroll_to_field(map.player_slots[4].starting_field)
 --   sleep(3000)
 --   campaign_message_box(intro_4)
 --   scroll_to_field(map.player_slots[1].starting_field)
@@ -180,16 +180,11 @@ function mission_thread()
 --   local o = add_campaign_objective(obj_wait_for_reinforcements)
 --   sleep(5000)
 --   campaign_message_box(intro_6)
-   run(function()
-      while true do
-         sleep(60000)
-         -- Yes, we need to do this now and again because our AI is a bit memory-hungry. I'm sorry :(
-         print("*** Running gc")
-         collectgarbage()
-      end
-   end)
+   
+   -- Yes, we need to gc faster than usual because our AI is a bit memory-hungry. I'm sorry :(
+   collectgarbage("setpause", 100)
    run(ai, p2)
---   run(ai, p4)
+   run(ai, p4)
 while true do sleep(1000000) end -- NOCOM
 
    sleep(5000)

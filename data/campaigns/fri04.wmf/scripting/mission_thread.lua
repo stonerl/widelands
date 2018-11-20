@@ -40,7 +40,7 @@ function mission_thread()
             for y = 456, 470 do
                local f = map:get_field(x, y)
                if f.immovable and f.immovable.descr.type_name == "flag" and
-                     f.immovable:is_flag_reachable(map.player_slots[1].starting_field.brn.immovable) then
+                     f.immovable:get_distance(map.player_slots[1].starting_field.brn.immovable) then
                   ok = f
                end
             end
