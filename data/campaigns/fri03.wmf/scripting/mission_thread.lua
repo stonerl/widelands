@@ -163,29 +163,29 @@ function mission_thread()
    scroll_to_field(map.player_slots[1].starting_field)
 
    -- Introduction
--- NOCOM uncomment all of those
---   sleep(3000)
---   campaign_message_box(intro_1)
---   sleep(3000)
---   campaign_message_box(intro_2)
---   scroll_to_field(map.player_slots[2].starting_field)
---   sleep(3000)
---   campaign_message_box(intro_3)
+   sleep(3000)
+   campaign_message_box(intro_1)
+   sleep(3000)
+   campaign_message_box(intro_2)
+   scroll_to_field(map.player_slots[2].starting_field)
+   sleep(3000)
+   campaign_message_box(intro_3)
    scroll_to_field(map.player_slots[4].starting_field)
---   sleep(3000)
---   campaign_message_box(intro_4)
---   scroll_to_field(map.player_slots[1].starting_field)
---   sleep(3000)
---   campaign_message_box(intro_5)
---   local o = add_campaign_objective(obj_wait_for_reinforcements)
---   sleep(5000)
---   campaign_message_box(intro_6)
-   
-   -- Yes, we need to gc faster than usual because our AI is a bit memory-hungry. I'm sorry :(
+   sleep(3000)
+   campaign_message_box(intro_4)
+   scroll_to_field(map.player_slots[1].starting_field)
+   sleep(3000)
+   campaign_message_box(intro_5)
+   local o = add_campaign_objective(obj_wait_for_reinforcements)
+
+   -- We need to gc faster than usual because our AI is a bit memory-hungry. I'm sorry :(
    collectgarbage("setpause", 100)
+
    run(ai, p2)
    run(ai, p4)
-while true do sleep(1000000) end -- NOCOM
+
+   sleep(5000)
+   campaign_message_box(intro_6)
 
    sleep(5000)
    run(save_atterdag)
@@ -221,7 +221,7 @@ while true do sleep(1000000) end -- NOCOM
    scroll_to_field(map.player_slots[3].starting_field)
    sleep(3000)
    campaign_message_box(help_arrives_1)
-   
+
    local port = p3:place_building("frisians_port", map.player_slots[3].starting_field, false, true)
    port:set_wares {
       log = 40,
@@ -441,12 +441,12 @@ while true do sleep(1000000) end -- NOCOM
             break
          -- else
             -- check if she's conjured
-            
+
             -- TODO(NOCOM)(Nordfriese): Conjure the witch
-            
+
          end
       end
-      
+
       sleep(math.random(600, 18000))
    end
    if witch then run(run_witch, witch) end
@@ -455,7 +455,7 @@ while true do sleep(1000000) end -- NOCOM
    o = add_campaign_objective(obj_defeat_ravenstrupp)
    while not p4.defeated do sleep(4321) end
    set_objective_done(o)
-   
+
    sleep(5000)
    -- TODO(NOCOM)(Nordfriese): place ships for Atterdag and give him lots and lots of soldiers
    scroll_to_field(map.player_slots[2].starting_field)
@@ -464,7 +464,7 @@ while true do sleep(1000000) end -- NOCOM
    campaign_message_box(next_attack_3)
    campaign_message_box(next_attack_4)
    o = add_campaign_objective(obj_flee)
-   
+
    p3:allow_buildings{
       "frisians_port",
       "frisians_shipyard",

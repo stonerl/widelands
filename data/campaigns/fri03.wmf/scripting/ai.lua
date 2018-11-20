@@ -9,6 +9,11 @@
 -- If the military looks good, we take care of our economy.
 -- If there are shortages of some ware which we can produce, we need to build more buildings for it.
 
+local ai_milsite_border_score_factor = 20
+local ai_milsite_border_score_factor_alt = 7
+local ai_trainsite_border_score_factor = 40
+local ai_trainsite_border_score_offset = 100
+
 function ai(pl)
    if pl.tribe.name == "empire" then
       local eco = pl:get_buildings("empire_headquarters")[1].flag.economy
@@ -40,7 +45,7 @@ function ai(pl)
 end
 
 function ai_one_loop(pl)
-   
+
    -- We begin by cleaning up our road network. Long roads are broken into shorter sections, dead-ends are removed.
    if ai_flags[pl.number] then
       for i,field in pairs(ai_flags[pl.number]) do
@@ -81,7 +86,7 @@ function ai_one_loop(pl)
       ai_flags[pl.number] = { array_combine(pl:get_buildings("barbarians_headquarters"),
             pl:get_buildings("empire_headquarters"))[1].flag.fields[1] }
    end
-   
+
    -- Military stuff
    -- ==============
    -- We frequently check for enemy militarysites near our border.
@@ -89,9 +94,9 @@ function ai_one_loop(pl)
    --   If we are stronger than the enemy, we attack!
    --   Otherwise, we construct a new militarysite nearby.
    --     (If a new own milsite is already under construction nearby, we ignore that enemy site – for now...)
-   
+
    sleep(ai_speed_2)
-   
+
    for i,b in pairs(array_combine(
          p1:get_buildings("frisians_headquarters"),
          p1:get_buildings("frisians_port"),
@@ -103,9 +108,9 @@ function ai_one_loop(pl)
          return
       end
    end
-   
+
    sleep(ai_speed_2)
-   
+
    for i,b in pairs(array_combine(
          p1:get_buildings("frisians_tower"),
          p1:get_buildings("frisians_outpost"),
@@ -176,12 +181,12 @@ function ai_one_loop(pl)
          end
       end
    end
-   
+
    sleep(ai_speed_2)
-   
+
    -- Now, let's take care of our economy. We define our very own "basic economy" below.
    -- If we haven't built everything from there yet, we really need to take care of that.
-   
+
    local basic_economy
    if pl.tribe.name == "empire" then basic_economy = ai_basic_economy_emp else basic_economy = ai_basic_economy_bar end
    local most_important_missing_build = nil
@@ -269,28 +274,145 @@ function ai_one_loop(pl)
          end
       end
    end
-   
+
    -- Let's check whether there are two flags that are physically close but far apart in the road network
+   print("NOCOM (" .. pl.number .. ") Starting to consider connecting roads")
+   local connect_candidates = {}
    for i = 1, #ai_flags[pl.number] do
       local f1 = ai_flags[pl.number][i]
       for j = i + 1, #ai_flags[pl.number] do
          local f2 = ai_flags[pl.number][j]
-         local d = distance(f1, f2, 8, ai_speed_2)
-         if d and f1.immovable:get_distance(f2.immovable) > 9000 * d then
-            if pl:connect_with_road(f1.immovable, f2.immovable) then return end
+         local d_short = distance(f1, f2, 8, ai_speed_2)
+         local d_real = f1.immovable:get_distance(f2.immovable) / 1800
+         if d_short and d_real >= d_short * 4 then
+            table.insert(connect_candidates, {f1 = f1, f2 = f2})
          end
       end
       sleep(ai_speed_2)
    end
-   
+   print("NOCOM (" .. pl.number .. ") Found " .. #connect_candidates .. " pairs of candidates")
+   while #connect_candidates > 0 do
+      local i = math.random(#connect_candidates)
+      local f1 = connect_candidates[i].f1
+      local f2 = connect_candidates[i].f2
+      if pl:connect_with_road(f1.immovable, f2.immovable) then
+         print("NOCOM (" .. pl.number .. ") built a new road.")
+         return
+      end
+      table.remove(connect_candidates, i)
+   end
+   print("NOCOM (" .. pl.number .. ") Did NOT build a new road!")
+
    -- TODO: Do other stuff – micromanage workers and wares, find out if we should build more
    -- productionsites, warehouses, milsites...
+
+   -- We check our borders now. Any field where we can build something and the border is close
+   -- is interesting, even more so if immovables nearby are owned by an enemy.
+   -- Fields located closely to an enemy warehouse or milsite are also more interesting.
+   print("NOCOM (" .. pl.number .. ") Starting to consider building a milsite")
+   local interesting_fields = {}
+   local best_scored = nil
+   local found = 0
+   for i,milsite in pairs(array_combine(
+      pl:get_buildings("empire_headquarters"),
+      pl:get_buildings("empire_sentry"),
+      pl:get_buildings("empire_barrier"),
+      pl:get_buildings("empire_tower"),
+      pl:get_buildings("empire_outpost"),
+      pl:get_buildings("empire_fortress"),
+      pl:get_buildings("barbarians_headquarters"),
+      pl:get_buildings("barbarians_sentry"),
+      pl:get_buildings("barbarians_tower"),
+      pl:get_buildings("barbarians_barrier"),
+      pl:get_buildings("barbarians_fortress"),
+      pl:get_buildings("frisians_outpost"),
+      pl:get_buildings("frisians_sentinel"),
+      pl:get_buildings("frisians_tower"),
+      pl:get_buildings("frisians_fortress"),
+      pl:get_buildings("frisians_wooden_tower"),
+      pl:get_buildings("frisians_wooden_tower_high")
+   )) do
+      for id,f in pairs(milsite.fields[1]:region(milsite.descr.conquers), 3) do
+         if suitability(pl, f, game:get_building_description("barbarians_sentry")) then
+            local border_distance = nil
+            local d = 1
+            while not border_distance and d < ai_milsite_border_score_factor_alt do
+               for j,fld in pairs(f:region(d, d - 1)) do
+                  if fld.owner and fld.owner.team ~= pl.team then
+                     border_distance = d
+                     break
+                  end
+               end
+               d = d + 1
+            end
+            if border_distance then
+               score = ai_milsite_border_score_factor_alt - border_distance
+               for j,field in pairs(f:region(ai_milsite_border_score_factor_alt)) do
+                  if field.immovable then
+                     local obj = field.immovable.descr.type_name
+                     if field.owner.team ~= pl.team then
+                            if obj == "warehouse"      then score = score * 8
+                        elseif obj == "militarysite"   then score = score * 6
+                        elseif obj == "trainingsite"   then score = score * 4
+                        elseif obj == "productionsite" then score = score * 3
+                        else                                score = score * 2
+                        end
+                     elseif field.owner == pl and (obj == "militarysite" or (obj == "constructionsite" and
+                           game:get_building_description(field.immovable.building).type_name == "militarysite")) then
+                        score = score / 3
+                     end
+                  end
+               end
+               interesting_fields[f] = score
+               found = found + 1
+               print("NOCOM (" .. pl.number .. ") Found field " .. f.x .. "|" .. f.y .. ", scored it " .. score)
+               if not best_scored or best_scored < score then
+                  best_scored = score
+               end
+            end
+         end
+      end
+   end
+   if found > 0 then
+      print("NOCOM (" .. pl.number .. ") Found " .. found .. " fields, best score is ".. best_scored)
+      local best_field = {}
+      for field,score in pairs(interesting_fields) do
+         if score >= best_scored then
+            for i,f in pairs(field:region(1)) do
+               table.insert(best_field, f)
+            end
+         end
+      end
+      print("NOCOM (" .. pl.number .. ") There are " .. #best_field .. " fields with those values")
+      local buildings
+      if pl.tribe.name == "empire" then
+         buildings = {
+            game:get_building_description("empire_sentry"),
+            game:get_building_description("empire_outpost"),
+            game:get_building_description("empire_barrier"),
+            game:get_building_description("empire_tower"),
+            game:get_building_description("empire_fortress"),
+         }
+      elseif pl.tribe.name == "barbarians" then
+         buildings = {
+            game:get_building_description("barbarians_sentry"),
+            game:get_building_description("barbarians_barrier"),
+            game:get_building_description("barbarians_tower"),
+            game:get_building_description("barbarians_fortress"),
+         }
+      end
+      if build_best_building(pl, buildings, best_field) then
+      print("NOCOM (" .. pl.number .. ") Built one!")
+         return
+      end
+   else
+   print("NOCOM (" .. pl.number .. ") Found no fields!")
+   end
    
-   
-   
+
    print("NOCOM AI #" .. pl.number .. " is bored :(")
    sleep(ai_speed_1)
-   
+
 end
 
 -- Our own basic economy. Each building has an amount and an importance (higher importance = built earlier)
@@ -314,8 +436,8 @@ ai_basic_economy_bar = {
    barbarians_barracks       = { amount = 1, importance = 2 },
    barbarians_battlearena    = { amount = 1, importance = 1 },
    barbarians_trainingcamp   = { amount = 1, importance = 1 },
-   barbarians_barrier        = { amount = 1, importance = 7 },
-   barbarians_sentry         = { amount = 1, importance = 4 },
+   barbarians_barrier        = { amount = 1, importance = 4 },
+   barbarians_sentry         = { amount = 1, importance = 7 },
 }
 ai_basic_economy_emp = {
    empire_fishers_house     = { amount = 2, importance = 3 },
@@ -352,7 +474,7 @@ ai_ware_preciousness = {
    planks = 2,
    marble = 2,
    marble_column = 4,
-   
+
    fish = 1,
    meat = 2,
    water = 1,
@@ -362,13 +484,13 @@ ai_ware_preciousness = {
    barbarians_bread = 3,
    beer = 1,
    beer_strong = 1,
-   
+
    coal = 4,
    iron_ore = 3,
    iron = 4,
    gold_ore = 5,
    gold = 6,
-   
+
    pick = 1,
    felling_ax = 1,
    saw = 1,
@@ -381,7 +503,7 @@ ai_ware_preciousness = {
    basket = 1,
    kitchen_tools = 1,
    fire_tongs = 1,
-   
+
    spear_wooden = 1,
    spear = 2,
    spear_advanced = 2,
@@ -436,10 +558,6 @@ function stock(pl)
    return tbl
 end
 
-local ai_milsite_border_score_factor = 20
-local ai_trainsite_border_score_factor = 40
-local ai_trainsite_border_score_offset = 100
-
 function suitability(pl, field, building_descr)
    if not field:has_caps(building_descr.size) then return false end
    local size
@@ -461,7 +579,7 @@ function build_best_building(pl, buildings, region, sleeptime)
    local cheapest = nil
    local best_score
    local cheapest_score
-   
+
    for i,b in pairs(buildings) do
       local score = 0
       local affordable = true
@@ -482,7 +600,7 @@ function build_best_building(pl, buildings, region, sleeptime)
    end
    if not best then best = cheapest end
    if not best then return nil end
-   
+
    -- We will build the building 'best'. Now we must decide where.
    -- We map each field to a score. Only fields where we can actually build the building are considered.
    -- All scoring values are arbitrary. They are designed to produce fairly good results.
@@ -491,7 +609,7 @@ function build_best_building(pl, buildings, region, sleeptime)
    for i,f in pairs(region) do
       if suitability(pl, f, best) then
          local score
-         
+
          -- Militarysites should be played near the border, Warehouses far inland, Trainingsites in-between
          local border_distance = nil
          local d = 1
@@ -504,7 +622,7 @@ function build_best_building(pl, buildings, region, sleeptime)
             end
             d = d + 1
          end
-   
+
          if best.type_name == "militarysite" then
             score = 72 * (ai_milsite_border_score_factor - border_distance)
          elseif best.type_name == "warehouse" then
@@ -523,24 +641,24 @@ function build_best_building(pl, buildings, region, sleeptime)
          else
             score = 72
          end
-         
+
          -- Placing a small building on a big plot is BAD. Placing a small building on a small plot is GOOD.
          if f:has_caps("big") then
             if best.size == "small" then
                score = score / 6
             elseif best.size == "medium" then
-               score = score / 4
+               score = score / 3
             end
          elseif f:has_caps("medium") then
             if best.size == "small" then
                score = score / 2
             else
-               score = score * 4
+               score = score * 2
             end
          else
-            score = score * 6
+            score = score * 3
          end
-         
+
          if score > 0 and ((not field) or field_score < score) then
             field = f
             field_score = score
@@ -548,7 +666,7 @@ function build_best_building(pl, buildings, region, sleeptime)
       end
    end
    if not field then return nil end
-   
+
    local is_flag = field.brn
    is_flag = is_flag.immovable and is_flag.immovable.descr.type_name == "flag"
    local building = pl:place_building(best.name, field, true)
