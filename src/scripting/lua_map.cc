@@ -1153,8 +1153,9 @@ Map
 */
 const char LuaMap::className[] = "Map";
 const MethodType<LuaMap> LuaMap::Methods[] = {
-   METHOD(LuaMap, place_immovable), METHOD(LuaMap, get_field),
-   METHOD(LuaMap, recalculate),     METHOD(LuaMap, recalculate_seafaring),
+   METHOD(LuaMap, place_immovable), METHOD(LuaMap, place_critter),
+   METHOD(LuaMap, get_field),       METHOD(LuaMap, recalculate),
+   METHOD(LuaMap, recalculate_seafaring),
    METHOD(LuaMap, set_port_space),  {nullptr, nullptr},
 };
 const PropertyType<LuaMap> LuaMap::Properties[] = {
@@ -1295,6 +1296,26 @@ int LuaMap::place_immovable(lua_State* const L) {
 	}
 
 	return LuaMaps::upcasted_map_object_to_lua(L, m);
+}
+
+/* RST
+   .. method:: place_critter(name, field)
+
+      Creates a critter that is defined by the world.
+
+      :arg name: The name of the critter to create
+      :type name: :class:`string`
+      :arg field: The critter is created on this field.
+      :type field: :class:`wl.map.Field`
+
+      :returns: The created critter.
+*/
+int LuaMap::place_critter(lua_State* const L) {
+	const std::string objname = luaL_checkstring(L, 2);
+	LuaMaps::LuaField* c = *get_user_class<LuaMaps::LuaField>(L, 3);
+	EditorGameBase& egbase = get_egbase(L);
+	Bob& critter = egbase.create_critter(c->coords(), objname, nullptr);
+	return LuaMaps::upcasted_map_object_to_lua(L, &critter);
 }
 
 /* RST
@@ -4077,7 +4098,8 @@ Flag
 */
 const char LuaFlag::className[] = "Flag";
 const MethodType<LuaFlag> LuaFlag::Methods[] = {
-   METHOD(LuaFlag, set_wares), METHOD(LuaFlag, get_wares), {nullptr, nullptr},
+   METHOD(LuaFlag, set_wares), METHOD(LuaFlag, get_wares),
+   METHOD(LuaFlag, get_distance), {nullptr, nullptr},
 };
 const PropertyType<LuaFlag> LuaFlag::Properties[] = {
    PROP_RO(LuaFlag, economy),
@@ -4262,6 +4284,39 @@ int LuaFlag::get_wares(lua_State* L) {
 		}
 	}
 
+	return 1;
+}
+
+/* RST
+   .. method:: get_distance(flag)
+
+      Returns the distance of the specified flag from this flag by roads and/or ships,
+      or `nil` of the flag cannot be reached. More precisely, this is the time that a worker
+      will need to get from this flag to the other flag using roads.
+      
+      Note that the distance from A to B is not necessarily equal to the distance from B to A.
+      
+      :arg flag: The flag to find.
+      :type flag: :class:`Flag`
+
+      :returns: The distance of the flags in walking time or `nil` if no path exists
+*/
+int LuaFlag::get_distance(lua_State* L) {
+	EditorGameBase& egbase = get_egbase(L);
+	Flag* f1 = get(L, egbase);
+	Flag* f2 = (*get_user_class<LuaMaps::LuaFlag>(L, 2))->get(L, egbase);
+	if (f1->get_economy() == f2->get_economy()) {
+		Route* route = new Route();
+		if (f1->get_economy()->find_route(*f1, *f2, route, Widelands::wwWORKER)) {
+			lua_pushint32(L, route->get_totalcost());
+		}
+		else {
+			report_error(L, "Unable to discover the walking-time between two flags within one economy!");
+		}
+	}
+	else {
+		lua_pushnil(L);
+	}
 	return 1;
 }
 
