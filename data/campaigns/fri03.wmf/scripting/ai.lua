@@ -33,60 +33,56 @@ function ai(pl)
       print("FATAL EXCEPTION: The custom AI for fri03 does not support the tribe '" .. pl.tribe.name .. "'!")
       return
    end
-   local init = true
    while not pl.defeated do
-      ai_one_loop(pl, init)
-      init = false
+      ai_one_loop(pl)
       sleep(3000) -- NOCOM very slow, for testing
-      -- Yes, we need to do this after every single step. I'm sorry :(
-      collectgarbage()
    end
 end
 
-function ai_one_loop(pl, initial)
+function ai_one_loop(pl)
    
    -- We begin by cleaning up our road network. Long roads are broken into shorter sections, dead-ends are removed.
-   if not initial then
-   for y=0, map.height - 1 do
-      sleep(1)
-      for x=0, map.width - 1 do
-         local f = map:get_field(x, y)
-         if f.owner == pl and f.immovable then
-            if f.immovable.descr.type_name == "road" then
-               local l = 0
-               for i,field in ipairs(f.immovable.fields) do
-                  if field:has_caps("flag") then
-                     pl:place_flag(field)
-                     print("NOCOM built flag")
-                     return
-                  elseif field.immovable and f.immovable.descr.type_name == "flag" then
-                     l = 0
-                  else
-                     l = l + 1
-                     if l > 3 then
-                        field.immovable:destroy()
-                     print("NOCOM destroyed road")
+   if ai_flags[pl.number] then
+      for i,field in pairs(ai_flags[pl.number]) do
+         if field.owner == pl and field.immovable and field.immovable.descr.type_name == "flag" then
+            local nroads = 0
+            for dir,road in pairs(field.immovable.roads) do
+               nroads = nroads + 1
+            end
+            if nroads < 2 and not field.immovable.building then
+               field.immovable:destroy()
+               table.remove(ai_flags[pl.number], i)
+               return
+            else
+               for dir,road in pairs(field.immovable.roads) do
+                  local len = 0
+                  for j,f in ipairs(road.fields) do
+                     if f:has_caps("flag") then
+                        pl:place_flag(f)
+                        table.insert(ai_flags[pl.number], f)
                         return
+                     else
+                        len = len + 1
+                        if len > 3 then
+                           road:destroy()
+                           return
+                        end
                      end
                   end
                end
-            elseif f.immovable.descr.type_name == "flag" then
-               local r = 0
-               for _ in pairs(f.immovable.roads) do r = r + 1 end
-               if f.immovable.building and r < 1 then
-                  connect(pl, f.immovable, 3)
-                     print("NOCOM built road")
-                  return
-               elseif not f.immovable.building and r < 2 then
-                  f.immovable:destroy()
-                     print("NOCOM destroyed unreachable building")
-                  return
-               end
             end
+         else
+            table.remove(ai_flags[pl.number], i)
          end
       end
+   else
+      ai_flags[pl.number] = {}
    end
-   end
+   
+   -- TODO: We should occasionally check for pairs of flags that are physically close to each other
+   -- but far apart in the road network, and connect such flags with roads if possible
+   
+   
    
    -- Military stuff
    -- ==============
@@ -106,7 +102,7 @@ function ai_one_loop(pl, initial)
       local n = #pl:get_attack_soldiers(b)
       if n > 0 then
          pl:attack(b, n)
-                     print("NOCOM attacked hq or port")
+         print("NOCOM attacked hq or port")
          return
       end
    end
@@ -180,7 +176,7 @@ function ai_one_loop(pl, initial)
             end
          else
             pl:attack(b, attackers)
-                     print("NOCOM attacked milsite")
+            print("NOCOM attacked milsite")
             return
          end
       end
@@ -232,9 +228,13 @@ function ai_one_loop(pl, initial)
          return
       end
    elseif most_important_missing_enhance ~= nil then
-      -- TODO We need to find out whether we can enhance something to a missing building
+      -- TODO: We need to find out whether we can enhance something to a missing building
       
    end
+   
+   -- TODO: Do other stuff – find out if we should build more productionsites, warehouses, milsites...
+   
+   
    
    print("NOCOM I am bored :(")
    sleep(100)
@@ -351,6 +351,7 @@ ai_ware_preciousness = {
 }
 
 constructionsites = {}
+ai_flags = {}
 
 function count_buildings(pl, building)
    local n = #pl:get_buildings(building)
@@ -501,7 +502,9 @@ function build_best_building(pl, buildings, region, sleeptime)
    table.insert(constructionsites[best.name], building.fields[1])
    if not is_flag then
       sleep(100)
-      if not connect(pl, building.flag, 1) then
+      if connect(pl, building.flag, 1) then
+         table.insert(ai_flags[pl.number], building.flag.fields[1])
+      else
          building:destroy()
       end
    end

@@ -180,6 +180,13 @@ function mission_thread()
 --   local o = add_campaign_objective(obj_wait_for_reinforcements)
 --   sleep(5000)
 --   campaign_message_box(intro_6)
+   run(function()
+      while true do
+         sleep(60000)
+         -- Yes, we need to do this now and again because our AI is a bit memory-hungry. I'm sorry :(
+         collectgarbage()
+      end
+   end)
    run(ai, p2)
 --   run(ai, p4)
 while true do sleep(1000000) end -- NOCOM
