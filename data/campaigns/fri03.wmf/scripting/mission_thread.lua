@@ -162,6 +162,15 @@ function mission_thread()
    })
    scroll_to_field(map.player_slots[1].starting_field)
 
+   -- We need to gc faster than usual because our AI is a bit memory-hungry. I'm sorry :(
+   collectgarbage("setpause", 100)
+   run(ai, p2)
+   run(ai, p4)
+
+-- NOCOM
+-- p1.see_all = true
+-- sleep(9999999)
+
    -- Introduction
    sleep(3000)
    campaign_message_box(intro_1)
@@ -177,12 +186,6 @@ function mission_thread()
    sleep(3000)
    campaign_message_box(intro_5)
    local o = add_campaign_objective(obj_wait_for_reinforcements)
-
-   -- We need to gc faster than usual because our AI is a bit memory-hungry. I'm sorry :(
-   collectgarbage("setpause", 100)
-
-   run(ai, p2)
-   run(ai, p4)
 
    sleep(5000)
    campaign_message_box(intro_6)

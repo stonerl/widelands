@@ -62,8 +62,8 @@ function ai_one_loop(pl)
                return
             else
                for dir,road in pairs(field.immovable.roads) do
-                  local len = 0
                   for j,f in ipairs(road.fields) do
+                     local len = 0
                      if f:has_caps("flag") then
                         pl:place_flag(f)
                         table.insert(ai_flags[pl.number], f)
@@ -75,6 +75,10 @@ function ai_one_loop(pl)
                            return
                         end
                      end
+                  end
+                  if road.length > 3 then
+                     road:destroy()
+                     return
                   end
                end
             end
@@ -226,7 +230,8 @@ function ai_one_loop(pl)
       if build_best_building(pl, bld, field:region(20 * size)) then
          return
       end
-   elseif most_important_missing_enhance ~= nil then
+   end
+   if most_important_missing_enhance ~= nil then
       for b,tbl in pairs(basic_economy) do
          sleep(ai_speed_2)
          local descr = game:get_building_description(b)
@@ -284,7 +289,7 @@ function ai_one_loop(pl)
          local f2 = ai_flags[pl.number][j]
          local d_short = distance(f1, f2, 8, ai_speed_2)
          local d_real = f1.immovable:get_distance(f2.immovable) / 1800
-         if d_short and d_real >= d_short * 4 then
+         if d_short and d_real >= d_short * 3 then
             table.insert(connect_candidates, {f1 = f1, f2 = f2})
          end
       end
@@ -347,6 +352,7 @@ function ai_one_loop(pl)
             end
             if border_distance then
                score = ai_milsite_border_score_factor_alt - border_distance
+               score = score * score * score
                for j,field in pairs(f:region(ai_milsite_border_score_factor_alt)) do
                   if field.immovable then
                      local obj = field.immovable.descr.type_name
@@ -359,7 +365,7 @@ function ai_one_loop(pl)
                         end
                      elseif field.owner == pl and (obj == "militarysite" or (obj == "constructionsite" and
                            game:get_building_description(field.immovable.building).type_name == "militarysite")) then
-                        score = score / 3
+                        score = score / 5
                      end
                   end
                end
@@ -408,7 +414,7 @@ function ai_one_loop(pl)
    else
    print("NOCOM (" .. pl.number .. ") Found no fields!")
    end
-   
+
 
    print("NOCOM AI #" .. pl.number .. " is bored :(")
    sleep(ai_speed_1)
@@ -436,8 +442,7 @@ ai_basic_economy_bar = {
    barbarians_barracks       = { amount = 1, importance = 2 },
    barbarians_battlearena    = { amount = 1, importance = 1 },
    barbarians_trainingcamp   = { amount = 1, importance = 1 },
-   barbarians_barrier        = { amount = 1, importance = 4 },
-   barbarians_sentry         = { amount = 1, importance = 7 },
+   barbarians_barrier        = { amount = 1, importance = 5 },
 }
 ai_basic_economy_emp = {
    empire_fishers_house     = { amount = 2, importance = 3 },
@@ -560,9 +565,7 @@ end
 
 function suitability(pl, field, building_descr)
    if not field:has_caps(building_descr.size) then return false end
-   local size
-   if building_descr.size == "big" then size = 2 else size = 1 end
-   for i,f in pairs(array_combine(field.brn:region(1), field:region(size))) do
+   for i,f in pairs(array_combine(field.brn:region(1), field:region(building_descr.size == "big" and 2 or 1))) do
       if f.owner ~= pl then return false end
    end
    return true
@@ -580,6 +583,18 @@ function build_best_building(pl, buildings, region, sleeptime)
    local best_score
    local cheapest_score
 
+   -- If we are offered mainly small fields, we preferably build a small building...
+   local size_bias = 0
+   for i,f in pairs(region) do
+      if f:has_caps("big") then
+         size_bias = size_bias - 1
+      elseif f:has_caps("small") and not f:has_caps("medium") then
+         size_bias = size_bias + 1
+      end
+   end
+   size_bias = size_bias / #region
+   -- Now we have values between +1 (only small fields) and -1 (only big fields)
+
    for i,b in pairs(buildings) do
       local score = 0
       local affordable = true
@@ -589,6 +604,8 @@ function build_best_building(pl, buildings, region, sleeptime)
             affordable = false
          end
       end
+      score = score * (12 * math.exp((b.size == "small" and 1 or b.size == "big" and -1 or 0) - size_bias) * math.log(12))
+
       if (not cheapest) or score < cheapest_score then
          cheapest = b
          cheapest_score = score
@@ -610,7 +627,6 @@ function build_best_building(pl, buildings, region, sleeptime)
       if suitability(pl, f, best) then
          local score
 
-         -- Militarysites should be played near the border, Warehouses far inland, Trainingsites in-between
          local border_distance = nil
          local d = 1
          while not border_distance do
@@ -624,22 +640,37 @@ function build_best_building(pl, buildings, region, sleeptime)
          end
 
          if best.type_name == "militarysite" then
-            score = 72 * (ai_milsite_border_score_factor - border_distance)
+            score = (ai_milsite_border_score_factor - border_distance)
+            score = 72 * score * score * score
          elseif best.type_name == "warehouse" then
-            score = 72 * border_distance
+            score = 72 * border_distance * border_distance
          elseif best.type_name == "trainingsite" then
             score = 72 * (ai_trainsite_border_score_offset - (border_distance - ai_trainsite_border_score_factor) *
                   (border_distance - ai_trainsite_border_score_factor) * ai_trainsite_border_score_offset /
                   (ai_trainsite_border_score_factor * ai_trainsite_border_score_factor))
-         elseif best.name:find("fisher") then
+         elseif best.name:find("fisher") or best.name:find("well") then
             score = 0
-            for i,fish in pairs(f:region(6)) do
-               if fish.resource == "fish" then
-                  score = score + fish.resource_amount
+            local what
+            if best.name:find("fisher") then what = "fish" else what = "water" end
+            for i,fld in pairs(f:region(6)) do
+               if fld.resource == what then
+                  score = score + fld.resource_amount
+               end
+            end
+         elseif best.workarea_radius then
+            score = border_distance
+            for d = 1, best.workarea_radius do
+               local sc = 84 - 12 * d
+               for j,fld in pairs(f:region(d, d-1)) do
+                  if fld.immovable then
+                     score = score - sc
+                  else
+                     score = score + sc
+                  end
                end
             end
          else
-            score = 72
+            score = 12 * border_distance
          end
 
          -- Placing a small building on a big plot is BAD. Placing a small building on a small plot is GOOD.
@@ -649,14 +680,15 @@ function build_best_building(pl, buildings, region, sleeptime)
             elseif best.size == "medium" then
                score = score / 3
             end
-         elseif f:has_caps("medium") then
-            if best.size == "small" then
+         elseif f:has_caps("medium") and best.size == "small" then
+            score = score / 2
+         end
+
+         for j,fld in pairs(f:region(best.workarea_radius and best.workarea_radius + 4 or 4, 1)) do
+            if fld.immovable and fld.immovable.descr.type_name == "productionsite" and
+                  fld.immovable.descr.workarea_radius then
                score = score / 2
-            else
-               score = score * 2
             end
-         else
-            score = score * 3
          end
 
          if score > 0 and ((not field) or field_score < score) then
