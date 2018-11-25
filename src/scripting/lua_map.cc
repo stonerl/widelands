@@ -1034,6 +1034,18 @@ HasWorkers
 */
 
 /* RST
+   .. method:: dismiss_worker(name)
+
+      Terminate the employment of the first worker with the given name.
+      
+      :arg name: The name of the worker to didmiss.
+      :type which: :class:`string`.
+
+      :returns: `true` if the building had a worker with the given name, `false` otherwise.
+      :rtype: :class:`boolean`.
+*/
+
+/* RST
    .. attribute:: valid_workers
 
       (RO) Similar to :attr:`HasWares.valid_wares` but for workers in this
@@ -1126,6 +1138,32 @@ HasSoldiers
       :arg which: either a table of (description, count) pairs or one
          description. In that case amount has to be specified as well.
       :type which: :class:`table` or :class:`array`.
+      
+      :returns: `true` if such a soldier was found and dismissed; `false` otherwise
+      :rtype: :class:`boolean`.
+*/
+
+/* RST
+   .. method:: dismiss_soldier(health, attack, defense, evade)
+
+      Analogous to :meth:`HasWorkers.dismiss_worker`, but for soldiers. This function does not use
+      an :class:`array` to define the soldier, the levels are passed directly.
+
+      Usage example:
+
+      .. code-block:: lua
+
+         l:dismiss_soldier(0,0,0,0)
+
+      would dismiss the first level 0 soldier (if there is one).
+
+      .. code-block:: lua
+
+      :arg which: The soldier's levels.
+      :type which: :class:`array`.
+
+      :returns: `true` if such a soldier was found and dismissed; `false` otherwise
+      :rtype: :class:`boolean`.
 */
 
 /* RST
@@ -4099,7 +4137,7 @@ Flag
 const char LuaFlag::className[] = "Flag";
 const MethodType<LuaFlag> LuaFlag::Methods[] = {
    METHOD(LuaFlag, set_wares), METHOD(LuaFlag, get_wares),
-   METHOD(LuaFlag, get_distance), {nullptr, nullptr},
+   METHOD(LuaFlag, get_distance), METHOD(LuaFlag, send_geologist), {nullptr, nullptr},
 };
 const PropertyType<LuaFlag> LuaFlag::Properties[] = {
    PROP_RO(LuaFlag, economy),
@@ -4318,6 +4356,20 @@ int LuaFlag::get_distance(lua_State* L) {
 		lua_pushnil(L);
 	}
 	return 1;
+}
+
+/* RST
+   .. method:: send_geologist()
+
+      Send a geologist to explore the area around the flag.
+      
+*/
+int LuaFlag::send_geologist(lua_State* L) {
+	if (upcast(Game, game, get_egbase(L))) {
+		Flag* flag = get(L, game);
+		flag->get_owner()->flagaction(*flag);
+	}
+	return 0;
 }
 
 /*
@@ -5120,6 +5172,7 @@ const MethodType<LuaProductionSite> LuaProductionSite::Methods[] = {
    METHOD(LuaProductionSite, get_inputs),
    METHOD(LuaProductionSite, get_workers),
    METHOD(LuaProductionSite, set_workers),
+   METHOD(LuaProductionSite, dismiss_worker),
    METHOD(LuaProductionSite, toggle_start_stop),
 
    {nullptr, nullptr},
@@ -5274,6 +5327,22 @@ int LuaProductionSite::set_workers(lua_State* L) {
 	return do_set_workers<LuaProductionSite>(L, ps, get_valid_workers_for(*ps));
 }
 
+// documented in parent class
+int LuaProductionSite::dismiss_worker(lua_State* L) {
+	std::string name = luaL_checkstring(L, 2);
+	if (upcast(Game, game, get_egbase(L))) {
+		for (Worker& worker : get(L, game)->get_workers()) {
+			if (worker.descr().name() == name) {
+				worker->evict(game);
+				lua_pushboolean(L, true);
+				return 1;
+			}
+		}
+	}
+	lua_pushboolean(L, false);
+	return 1;
+}
+
 /* RST
    .. method:: toggle_start_stop()
 
@@ -5390,10 +5459,12 @@ MilitarySite
 */
 const char LuaMilitarySite::className[] = "MilitarySite";
 const MethodType<LuaMilitarySite> LuaMilitarySite::Methods[] = {
-   METHOD(LuaMilitarySite, get_soldiers), METHOD(LuaMilitarySite, set_soldiers), {nullptr, nullptr},
+   METHOD(LuaMilitarySite, get_soldiers), METHOD(LuaMilitarySite, set_soldiers),
+   METHOD(LuaMilitarySite, dismiss_soldier), {nullptr, nullptr},
 };
 const PropertyType<LuaMilitarySite> LuaMilitarySite::Properties[] = {
-   PROP_RO(LuaMilitarySite, max_soldiers), {nullptr, nullptr, nullptr},
+   PROP_RO(LuaMilitarySite, max_soldiers), PROP_RW(LuaMilitarySite, prefer_heroes),
+   {nullptr, nullptr, nullptr},
 };
 
 /*
@@ -5406,6 +5477,22 @@ const PropertyType<LuaMilitarySite> LuaMilitarySite::Properties[] = {
 int LuaMilitarySite::get_max_soldiers(lua_State* L) {
 	lua_pushuint32(L, get(L, get_egbase(L))->soldier_control()->soldier_capacity());
 	return 1;
+}
+
+/* RST
+   .. attribute:: get_prefer_heroes
+
+      (RW) Whether this militarysite currently prefers heroes to rookies.
+
+		:returns: `true` if this site prefers heroes, `false` if it prefers rookies.
+*/
+int LuaMilitarySite::get_prefer_heroes(lua_State* L) {
+	lua_pushboolean(L, get(L, get_egbase(L))->get_soldier_preference() == Widelands::kRookies);
+	return 1;
+}
+int LuaMilitarySite::set_prefer_heroes(lua_State* L) {
+	get_egbase(L)->set_soldier_preference(luaL_checkboolean(L, 2) ? Widelands::kHeroes : Widelands::kRookies);
+	return 0;
 }
 
 /*
@@ -5424,6 +5511,27 @@ int LuaMilitarySite::get_soldiers(lua_State* L) {
 int LuaMilitarySite::set_soldiers(lua_State* L) {
 	MilitarySite* ms = get(L, get_egbase(L));
 	return do_set_soldiers(L, ms->get_position(), ms->mutable_soldier_control(), ms->get_owner());
+}
+
+// documented in parent class
+int LuaMilitarySite::dismiss_soldier(lua_State* L) {
+	SoldierControl* s_ctrl = get(L, get_egbase(L))->mutable_soldier_control();
+	uint8_t hp = luaL_checkuint32(L, 2);
+	uint8_t at = luaL_checkuint32(L, 3);
+	uint8_t de = luaL_checkuint32(L, 4);
+	uint8_t ev = luaL_checkuint32(L, 5);
+	
+	for (Soldier* soldier : s_ctrl->present_soldiers()) {
+		if (soldier->get_health_level() == hp && soldier->get_attack_level() == at &&
+				soldier->get_defense_level() == de && soldier->get_evade_level() == ev) {
+			s_ctrl->drop_soldier(soldier);
+			lua_pushboolean(L, true);
+			return 1;
+		}
+	}
+	
+	lua_pushboolean(L, false);
+	return 1;
 }
 
 /*
@@ -5447,7 +5555,8 @@ TrainingSite
 */
 const char LuaTrainingSite::className[] = "TrainingSite";
 const MethodType<LuaTrainingSite> LuaTrainingSite::Methods[] = {
-   METHOD(LuaTrainingSite, get_soldiers), METHOD(LuaTrainingSite, set_soldiers), {nullptr, nullptr},
+   METHOD(LuaTrainingSite, get_soldiers), METHOD(LuaTrainingSite, set_soldiers),
+   METHOD(LuaTrainingSite, dismiss_soldier), {nullptr, nullptr},
 };
 const PropertyType<LuaTrainingSite> LuaTrainingSite::Properties[] = {
    PROP_RO(LuaTrainingSite, max_soldiers), {nullptr, nullptr, nullptr},
@@ -5481,6 +5590,27 @@ int LuaTrainingSite::get_soldiers(lua_State* L) {
 int LuaTrainingSite::set_soldiers(lua_State* L) {
 	TrainingSite* ts = get(L, get_egbase(L));
 	return do_set_soldiers(L, ts->get_position(), ts->mutable_soldier_control(), ts->get_owner());
+}
+
+// documented in parent class
+int LuaTrainingSite::dismiss_soldier(lua_State* L) {
+	SoldierControl* s_ctrl = get(L, get_egbase(L))->mutable_soldier_control();
+	uint8_t hp = luaL_checkuint32(L, 2);
+	uint8_t at = luaL_checkuint32(L, 3);
+	uint8_t de = luaL_checkuint32(L, 4);
+	uint8_t ev = luaL_checkuint32(L, 5);
+	
+	for (Soldier* soldier : s_ctrl->present_soldiers()) {
+		if (soldier->get_health_level() == hp && soldier->get_attack_level() == at &&
+				soldier->get_defense_level() == de && soldier->get_evade_level() == ev) {
+			s_ctrl->drop_soldier(soldier);
+			lua_pushboolean(L, true);
+			return 1;
+		}
+	}
+	
+	lua_pushboolean(L, false);
+	return 1;
 }
 
 /*
