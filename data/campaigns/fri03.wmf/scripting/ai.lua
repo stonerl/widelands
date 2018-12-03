@@ -1,6 +1,7 @@
--- This function simulates an enire standalone AI.
+-- This function simulates an entire standalone AI.
 -- It is intended to be run for a player that is NOT the human player and set to the empty (!) AI.
--- This AI is designed specifically for the special conditions of this scenario.
+-- This AI is designed specifically for the special conditions of this scenario,
+-- and only for the empire and barbarian tribe.
 -- If you wish to use it for a different purpose, you will need to enhance it significantly.
 
 -- So how does it work?
@@ -414,6 +415,63 @@ function ai_one_loop(pl)
    else
    print("NOCOM (" .. pl.number .. ") Found no fields!")
    end
+
+   local stock = stock(pl)
+   local economy
+   if #pl:get_buildings("empire_headquarters") > 0 then
+      economy = pl:get_buildings("empire_headquarters")[1]
+   elseif #pl:get_buildings("barbarians_headquarters") > 0 then
+      economy = pl:get_buildings("barbarians_headquarters")[1]
+   elseif #pl:get_buildings("empire_warehouse") > 0 then
+      economy = pl:get_buildings("empire_warehouse")[1]
+   elseif #pl:get_buildings("barbarians_warehouse") > 0 then
+      economy = pl:get_buildings("barbarians_warehouse")[1]
+   else
+      print("ERROR: " .. pl.name .. " does not seem to have a warehouse!")
+      return
+   end
+   economy = economy.flag.economy
+   for ware,x in pairs(ai_ware_preciousness) do
+      if pl.tribe:has_ware(ware) then
+         local missing = economy:ware_target_quantity(ware) - stock[ware]
+         if missing > 0 then
+            local under_construction = count_buildings(pl, building) - #pl:get_buildings(building)
+            if under_construction < 8 * missing then
+               local buildings = {}
+               for i,building in pairs(pl.tribe.buildings) do
+                  if building.output_ware_types then
+                     for j,w in pairs(building.output_ware_types) do
+                        if w.name == ware then
+                           table.insert(buildings, building)
+                           break
+                        end
+                     end
+                  end
+               end
+               if #buildings == 0 then
+                  print("ERROR: Tribe " .. pl.tribe.name .. " has no building that produces the ware " .. ware .. "!")
+                  return
+               end
+               local fields = {}
+               for i,wh in pairs(array_combine(
+                     pl:get_buildings("empire_headquarters"),
+                     pl:get_buildings("barbarians_headquarters"),
+                     pl:get_buildings("empire_warehouse"),
+                     pl:get_buildings("barbarians_warehouse"))) do
+                  fields = array_combine(fields, wh.fields[1]:region(9, 2))
+               end
+               if build_best_building(pl, buildings, fields) then return end
+               print("NOCOM: Built none of the " .. #buildings .. " building(s) that produce " .. ware)
+            end
+         end
+      end
+   end
+
+
+
+
+
+
 
 
    print("NOCOM AI #" .. pl.number .. " is bored :(")

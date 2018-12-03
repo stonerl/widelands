@@ -168,8 +168,8 @@ function mission_thread()
    run(ai, p4)
 
 -- NOCOM
--- p1.see_all = true
--- sleep(9999999)
+p1.see_all = true
+sleep(9999999)
 
    -- Introduction
    sleep(3000)
