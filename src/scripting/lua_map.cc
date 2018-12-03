@@ -1986,8 +1986,8 @@ int LuaImmovableDescription::get_editor_category(lua_State* L) {
 
          returns the terrain affinity values for this immovable
 
-         (RO) a table containing numbers labeled as pickiness (double), preferred_fertility (double),
-         preferred_humidity (double), and preferred_temperature (uint),
+         (RO) a table containing numbers labeled as pickiness (uint), preferred_fertility (uint),
+         preferred_humidity (uint), and preferred_temperature (uint),
          or nil if the immovable has no terrain affinity.
 */
 int LuaImmovableDescription::get_terrain_affinity(lua_State* L) {
@@ -1995,13 +1995,13 @@ int LuaImmovableDescription::get_terrain_affinity(lua_State* L) {
 		const TerrainAffinity& affinity = get()->terrain_affinity();
 		lua_newtable(L);
 		lua_pushstring(L, "pickiness");
-		lua_pushdouble(L, affinity.pickiness());
+		lua_pushuint32(L, affinity.pickiness());
 		lua_settable(L, -3);
 		lua_pushstring(L, "preferred_fertility");
-		lua_pushdouble(L, affinity.preferred_fertility());
+		lua_pushuint32(L, affinity.preferred_fertility());
 		lua_settable(L, -3);
 		lua_pushstring(L, "preferred_humidity");
-		lua_pushdouble(L, affinity.preferred_humidity());
+		lua_pushuint32(L, affinity.preferred_humidity());
 		lua_settable(L, -3);
 		lua_pushstring(L, "preferred_temperature");
 		lua_pushuint32(L, affinity.preferred_temperature());
@@ -2093,7 +2093,8 @@ int LuaImmovableDescription::probability_to_grow(lua_State* L) {
 	if (get()->has_terrain_affinity()) {
 		const TerrainDescription* terrain =
 		   (*get_user_class<LuaMaps::LuaTerrainDescription>(L, 2))->get();
-		lua_pushdouble(L, Widelands::probability_to_grow(get()->terrain_affinity(), *terrain));
+		lua_pushdouble(L, Widelands::probability_to_grow(get()->terrain_affinity(), *terrain) /
+		                     static_cast<double>(Widelands::TerrainAffinity::kPrecisionFactor));
 	} else {
 		lua_pushnil(L);
 	}
@@ -3572,22 +3573,22 @@ int LuaTerrainDescription::get_editor_category(lua_State* L) {
 /* RST
    .. attribute:: fertility
 
-         (RO) the :class:`double` fertility value for this terrain
+         (RO) the :class:`uint` fertility value for this terrain
 */
 
 int LuaTerrainDescription::get_fertility(lua_State* L) {
-	lua_pushdouble(L, get()->fertility());
+	lua_pushuint32(L, get()->fertility());
 	return 1;
 }
 
 /* RST
    .. attribute:: humidity
 
-         (RO) the :class:`double` humidity value for this terrain
+         (RO) the :class:`uint` humidity value for this terrain
 */
 
 int LuaTerrainDescription::get_humidity(lua_State* L) {
-	lua_pushdouble(L, get()->humidity());
+	lua_pushuint32(L, get()->humidity());
 	return 1;
 }
 
@@ -4365,8 +4366,8 @@ int LuaFlag::get_distance(lua_State* L) {
       
 */
 int LuaFlag::send_geologist(lua_State* L) {
-	if (upcast(Game, game, get_egbase(L))) {
-		Flag* flag = get(L, game);
+	if (upcast(Game, game, &get_egbase(L))) {
+		Flag* flag = get(L, *game);
 		flag->get_owner()->flagaction(*flag);
 	}
 	return 0;
@@ -5330,10 +5331,10 @@ int LuaProductionSite::set_workers(lua_State* L) {
 // documented in parent class
 int LuaProductionSite::dismiss_worker(lua_State* L) {
 	std::string name = luaL_checkstring(L, 2);
-	if (upcast(Game, game, get_egbase(L))) {
-		for (Worker& worker : get(L, game)->get_workers()) {
-			if (worker.descr().name() == name) {
-				worker->evict(game);
+	if (upcast(Game, game, &get_egbase(L))) {
+		for (Worker* worker : get(L, *game)->get_workers()) {
+			if (worker->descr().name() == name) {
+				worker->evict(*game);
 				lua_pushboolean(L, true);
 				return 1;
 			}
@@ -5487,11 +5488,12 @@ int LuaMilitarySite::get_max_soldiers(lua_State* L) {
 		:returns: `true` if this site prefers heroes, `false` if it prefers rookies.
 */
 int LuaMilitarySite::get_prefer_heroes(lua_State* L) {
-	lua_pushboolean(L, get(L, get_egbase(L))->get_soldier_preference() == Widelands::kRookies);
+	lua_pushboolean(L, get(L, get_egbase(L))->get_soldier_preference() == SoldierPreference::kRookies);
 	return 1;
 }
 int LuaMilitarySite::set_prefer_heroes(lua_State* L) {
-	get_egbase(L)->set_soldier_preference(luaL_checkboolean(L, 2) ? Widelands::kHeroes : Widelands::kRookies);
+	get(L, get_egbase(L))->set_soldier_preference(luaL_checkboolean(L, 2) ?
+			SoldierPreference::kHeroes : SoldierPreference::kRookies);
 	return 0;
 }
 
@@ -5524,7 +5526,7 @@ int LuaMilitarySite::dismiss_soldier(lua_State* L) {
 	for (Soldier* soldier : s_ctrl->present_soldiers()) {
 		if (soldier->get_health_level() == hp && soldier->get_attack_level() == at &&
 				soldier->get_defense_level() == de && soldier->get_evade_level() == ev) {
-			s_ctrl->drop_soldier(soldier);
+			s_ctrl->drop_soldier(*soldier);
 			lua_pushboolean(L, true);
 			return 1;
 		}
@@ -5603,7 +5605,7 @@ int LuaTrainingSite::dismiss_soldier(lua_State* L) {
 	for (Soldier* soldier : s_ctrl->present_soldiers()) {
 		if (soldier->get_health_level() == hp && soldier->get_attack_level() == at &&
 				soldier->get_defense_level() == de && soldier->get_evade_level() == ev) {
-			s_ctrl->drop_soldier(soldier);
+			s_ctrl->drop_soldier(*soldier);
 			lua_pushboolean(L, true);
 			return 1;
 		}
