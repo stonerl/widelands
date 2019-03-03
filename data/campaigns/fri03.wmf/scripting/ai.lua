@@ -435,7 +435,20 @@ function ai_one_loop(pl)
       if pl.tribe:has_ware(ware) then
          local missing = economy:ware_target_quantity(ware) - stock[ware]
          if missing > 0 then
-            local under_construction = count_buildings(pl, building) - #pl:get_buildings(building)
+            print("NOCOM (" .. pl.number .. ") Needs " .. missing .. " of ware " .. ware)
+            local under_construction = 0
+            for i,building in pairs(pl.tribe.buildings) do
+               if building.output_ware_types then
+                  for j,w in pairs(building.output_ware_types) do
+                     if w.name == ware then
+                        under_construction = under_construction +
+                              count_buildings(pl, building.name) - #pl:get_buildings(building.name)
+                        break
+                     end
+                  end
+               end
+            end
+            print("NOCOM (" .. pl.number .. ") Has " .. under_construction .. " buildings under construction for it")
             if under_construction < 8 * missing then
                local buildings = {}
                for i,building in pairs(pl.tribe.buildings) do
@@ -460,8 +473,9 @@ function ai_one_loop(pl)
                      pl:get_buildings("barbarians_warehouse"))) do
                   fields = array_combine(fields, wh.fields[1]:region(9, 2))
                end
+               print("NOCOM (" .. pl.number .. ") Considering " .. #fields .. " fields for it")
                if build_best_building(pl, buildings, fields) then return end
-               print("NOCOM: Built none of the " .. #buildings .. " building(s) that produce " .. ware)
+               print("NOCOM (" .. pl.number .. ") Built none :(")
             end
          end
       end
