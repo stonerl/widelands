@@ -97,6 +97,9 @@ public:
 	int allow_workers(lua_State* L);
 	int switchplayer(lua_State* L);
 	int get_produced_wares_count(lua_State* L);
+	int get_attack_soldiers(lua_State* L);
+	int attack(lua_State* L);
+	int connect_with_road(lua_State* L);
 
 	/*
 	 * C methods

@@ -972,6 +972,9 @@ public:
 	 * Lua Methods
 	 */
 
+	int dismantle(lua_State* L);
+	int enhance(lua_State* L);
+
 	/*
 	 * C Methods
 	 */
@@ -1002,7 +1005,8 @@ public:
 	 */
 	int set_wares(lua_State*);
 	int get_wares(lua_State*);
-	int is_flag_reachable(lua_State* L);
+	int get_distance(lua_State* L);
+	int send_geologist(lua_State* L);
 
 	/*
 	 * C Methods
@@ -1169,6 +1173,7 @@ public:
 	int get_workers(lua_State* L);
 	int set_inputs(lua_State* L);
 	int set_workers(lua_State* L);
+	int dismiss_worker(lua_State* L);
 	int toggle_start_stop(lua_State* L);
 
 	/*
@@ -1197,12 +1202,15 @@ public:
 	 * Properties
 	 */
 	int get_max_soldiers(lua_State*);
+	int get_prefer_heroes(lua_State*);
+	int set_prefer_heroes(lua_State*);
 
 	/*
 	 * Lua Methods
 	 */
 	int set_soldiers(lua_State*);
 	int get_soldiers(lua_State*);
+	int dismiss_soldier(lua_State*);
 
 	/*
 	 * C Methods
@@ -1233,6 +1241,7 @@ public:
 	 */
 	int set_soldiers(lua_State*);
 	int get_soldiers(lua_State*);
+	int dismiss_soldier(lua_State*);
 
 	/*
 	 * C Methods
