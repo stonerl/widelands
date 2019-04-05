@@ -1,4 +1,4 @@
-# Automatically created by Widelands bzr8841[widelands] (Release)
+# Automatically created by Widelands bzr9036[editor-resize-map] (Debug)
 
 [global]
 packet_version="2"
@@ -12,17 +12,17 @@ closeable="false"
 [player_2]
 name="Waldemar Atterdag"
 tribe="empire"
-ai=empty
+ai="empty"
 closeable="false"
 
 [player_3]
 name="Henneke Lembeck"
 tribe="frisians"
-ai=empty
+ai="empty"
 closeable="false"
 
 [player_4]
 name="Hans Ravenstrupp"
 tribe="barbarians"
-ai=empty
+ai="empty"
 closeable="false"

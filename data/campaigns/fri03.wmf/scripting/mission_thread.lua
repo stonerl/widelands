@@ -220,7 +220,7 @@ sleep(9999999)
    for i,f in pairs(p3_start) do
       f.immovable:remove()
    end
-   p3:place_ship(map:get_field(333, 204))
+   p3:place_ship(map:get_field(344, 208))
    scroll_to_field(map.player_slots[3].starting_field)
    sleep(3000)
    campaign_message_box(help_arrives_1)
