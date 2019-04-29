@@ -921,6 +921,10 @@ LuaGameInterface& Game::lua() {
 	return static_cast<LuaGameInterface&>(EditorGameBase::lua());
 }
 
+ComputerPlayer* Game::get_ai(PlayerNumber n) const {
+	return ctrl_->get_ai(n);
+}
+
 const std::string& Game::get_win_condition_displayname() const {
 	return win_condition_displayname_;
 }

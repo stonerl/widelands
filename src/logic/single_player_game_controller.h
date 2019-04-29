@@ -42,6 +42,10 @@ public:
 	                   Widelands::PlayerEndResult result,
 	                   const std::string& info) override;
 
+	ComputerPlayer* get_ai(uint8_t player_number) const override {
+		return computerplayers_[player_number - 1];
+	}
+
 private:
 	Widelands::Game& game_;
 	bool use_ai_;

@@ -126,6 +126,7 @@ private:
 	void clear_computer_players();
 	void init_computer_player(Widelands::PlayerNumber p);
 	void init_computer_players();
+	ComputerPlayer* get_ai(uint8_t player_number) const override;
 
 	void handle_packet(uint32_t i, RecvPacket&);
 	void handle_network();

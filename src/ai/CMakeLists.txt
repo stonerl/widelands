@@ -10,6 +10,8 @@ wl_library(ai
     defaultai_warfare.cc
     defaultai.cc
     defaultai.h
+    scenario_ai.cc
+    scenario_ai.h
   DEPENDS
     base_exceptions
     base_i18n

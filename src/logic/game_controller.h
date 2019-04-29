@@ -30,6 +30,8 @@ class Game;
 class PlayerCommand;
 }  // namespace Widelands
 
+struct ComputerPlayer;
+
 /**
  * A game controller implements the policies surrounding the actual
  * game simulation. For example, the GameController decides where
@@ -90,6 +92,10 @@ public:
 	 */
 	void toggle_paused() {
 		set_paused(!is_paused());
+	}
+
+	virtual ComputerPlayer* get_ai(uint8_t) const {
+		return nullptr;
 	}
 
 	/**

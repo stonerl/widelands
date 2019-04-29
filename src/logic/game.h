@@ -284,6 +284,8 @@ public:
 
 	InteractivePlayer* get_ipl();
 
+	ComputerPlayer* get_ai(PlayerNumber) const;
+
 	SaveHandler& save_handler() {
 		return savehandler_;
 	}

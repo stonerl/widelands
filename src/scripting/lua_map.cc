@@ -1070,7 +1070,7 @@ HasWorkers
    .. method:: dismiss_worker(name)
 
       Terminate the employment of the first worker with the given name.
-      
+
       :arg name: The name of the worker to didmiss.
       :type which: :class:`string`.
 
@@ -1171,7 +1171,7 @@ HasSoldiers
       :arg which: either a table of (description, count) pairs or one
          description. In that case amount has to be specified as well.
       :type which: :class:`table` or :class:`array`.
-      
+
       :returns: `true` if such a soldier was found and dismissed; `false` otherwise
       :rtype: :class:`boolean`.
 */
@@ -4475,9 +4475,9 @@ int LuaFlag::get_wares(lua_State* L) {
       Returns the distance of the specified flag from this flag by roads and/or ships,
       or `nil` of the flag cannot be reached. More precisely, this is the time that a worker
       will need to get from this flag to the other flag using roads.
-      
+
       Note that the distance from A to B is not necessarily equal to the distance from B to A.
-      
+
       :arg flag: The flag to find.
       :type flag: :class:`Flag`
 
@@ -4507,7 +4507,7 @@ int LuaFlag::get_distance(lua_State* L) {
    .. method:: send_geologist()
 
       Send a geologist to explore the area around the flag.
-      
+
 */
 int LuaFlag::send_geologist(lua_State* L) {
 	if (upcast(Game, game, &get_egbase(L))) {
@@ -5673,7 +5673,7 @@ int LuaMilitarySite::dismiss_soldier(lua_State* L) {
 	uint8_t at = luaL_checkuint32(L, 3);
 	uint8_t de = luaL_checkuint32(L, 4);
 	uint8_t ev = luaL_checkuint32(L, 5);
-	
+
 	for (Soldier* soldier : s_ctrl->present_soldiers()) {
 		if (soldier->get_health_level() == hp && soldier->get_attack_level() == at &&
 				soldier->get_defense_level() == de && soldier->get_evade_level() == ev) {
@@ -5682,7 +5682,7 @@ int LuaMilitarySite::dismiss_soldier(lua_State* L) {
 			return 1;
 		}
 	}
-	
+
 	lua_pushboolean(L, false);
 	return 1;
 }
@@ -5755,7 +5755,7 @@ int LuaTrainingSite::dismiss_soldier(lua_State* L) {
 	uint8_t at = luaL_checkuint32(L, 3);
 	uint8_t de = luaL_checkuint32(L, 4);
 	uint8_t ev = luaL_checkuint32(L, 5);
-	
+
 	for (Soldier* soldier : s_ctrl->present_soldiers()) {
 		if (soldier->get_health_level() == hp && soldier->get_attack_level() == at &&
 				soldier->get_defense_level() == de && soldier->get_evade_level() == ev) {
@@ -5764,7 +5764,7 @@ int LuaTrainingSite::dismiss_soldier(lua_State* L) {
 			return 1;
 		}
 	}
-	
+
 	lua_pushboolean(L, false);
 	return 1;
 }

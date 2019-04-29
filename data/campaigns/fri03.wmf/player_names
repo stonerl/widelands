@@ -12,7 +12,7 @@ closeable="false"
 [player_2]
 name="Waldemar Atterdag"
 tribe="empire"
-ai="empty"
+ai="scenario"
 closeable="false"
 
 [player_3]
@@ -24,5 +24,5 @@ closeable="false"
 [player_4]
 name="Hans Ravenstrupp"
 tribe="barbarians"
-ai="empty"
+ai="scenario"
 closeable="false"

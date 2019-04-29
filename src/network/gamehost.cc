@@ -561,6 +561,10 @@ void GameHost::init_computer_player(Widelands::PlayerNumber p) {
 	                                ->instantiate(*d->game, p));
 }
 
+ComputerPlayer* GameHost::get_ai(uint8_t player_number) const {
+	return d->computerplayers[player_number - 1];
+}
+
 void GameHost::replace_client_with_ai(uint8_t playernumber, const std::string& ai) {
 	assert(d->game->get_player(playernumber + 1)->get_ai().empty());
 	assert(d->game->get_player(playernumber + 1)->get_ai() ==

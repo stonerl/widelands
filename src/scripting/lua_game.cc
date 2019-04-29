@@ -23,6 +23,7 @@
 
 #include <boost/format.hpp>
 
+#include "ai/scenario_ai.h"
 #include "economy/economy.h"
 #include "economy/flag.h"
 #include "logic/campaign_visibility.h"
@@ -105,6 +106,14 @@ const MethodType<LuaPlayer> LuaPlayer::Methods[] = {
    METHOD(LuaPlayer, get_attack_soldiers),
    METHOD(LuaPlayer, attack),
    METHOD(LuaPlayer, connect_with_road),
+
+   METHOD(LuaPlayer, scenario_ai_set_militarysite_allowed),
+   METHOD(LuaPlayer, scenario_ai_set_productionsite_allowed),
+   METHOD(LuaPlayer, scenario_ai_set_trainingsite_allowed),
+   METHOD(LuaPlayer, scenario_ai_set_warehouse_allowed),
+   METHOD(LuaPlayer, scenario_ai_set_is_enemy),
+   METHOD(LuaPlayer, scenario_ai_set_basic_economy),
+   METHOD(LuaPlayer, scenario_ai_set_ware_preciousness),
    {nullptr, nullptr},
 };
 const PropertyType<LuaPlayer> LuaPlayer::Properties[] = {
@@ -112,7 +121,8 @@ const PropertyType<LuaPlayer> LuaPlayer::Properties[] = {
    PROP_RO(LuaPlayer, objectives), PROP_RO(LuaPlayer, defeated),
    PROP_RO(LuaPlayer, messages),   PROP_RO(LuaPlayer, inbox),
    PROP_RW(LuaPlayer, team),       PROP_RO(LuaPlayer, tribe),
-   PROP_RW(LuaPlayer, see_all),    {nullptr, nullptr, nullptr},
+   PROP_RW(LuaPlayer, see_all),    PROP_RO(LuaPlayer, scenario_ai),
+   {nullptr, nullptr, nullptr},
 };
 
 /*
@@ -265,6 +275,16 @@ int LuaPlayer::set_see_all(lua_State* const L) {
 }
 int LuaPlayer::get_see_all(lua_State* const L) {
 	lua_pushboolean(L, get(L, get_egbase(L)).see_all());
+	return 1;
+}
+
+/* RST
+   .. attribute:: scenario_ai
+
+      (RO) Whether this player is controlled by a ScenarioAI.
+*/
+int LuaPlayer::get_scenario_ai(lua_State* L) {
+	lua_pushboolean(L, scenario_ai() != nullptr);
 	return 1;
 }
 
@@ -939,9 +959,139 @@ int LuaPlayer::connect_with_road(lua_State* L) {
 
 /*
  ==========================================================
+ LUA METHODS for interaction with ScenarioAI
+ ==========================================================
+ */
+
+/* RST
+   .. method:: scenario_ai_set_militarysite_allowed(name[, allow = true])
+
+      Allow or forbid the ScenarioAI controlling this player to build this building.
+      Throws an error if this player is not controlled by a ScenarioAI.
+*/
+int LuaPlayer::scenario_ai_set_militarysite_allowed(lua_State* L) {
+	ScenarioAI* ai = scenario_ai(L);
+	std::string name = luaL_checkstring(L, 2);
+	bool allow = true;
+	if (lua_gettop(L) > 2) {
+		allow = luaL_checkboolean(L, 3);
+	}
+	ai->set_militarysite_allowed(name, allow);
+	return 0;
+}
+
+/* RST
+   .. method:: scenario_ai_set_productionsite_allowed(name[, allow = true])
+
+      Allow or forbid the ScenarioAI controlling this player to build this building.
+      Throws an error if this player is not controlled by a ScenarioAI.
+*/
+int LuaPlayer::scenario_ai_set_productionsite_allowed(lua_State* L) {
+	ScenarioAI* ai = scenario_ai(L);
+	std::string name = luaL_checkstring(L, 2);
+	bool allow = true;
+	if (lua_gettop(L) > 2) {
+		allow = luaL_checkboolean(L, 3);
+	}
+	ai->set_productionsite_allowed(name, allow);
+	return 0;
+}
+
+/* RST
+   .. method:: scenario_ai_set_trainingsite_allowed(name[, allow = true])
+
+      Allow or forbid the ScenarioAI controlling this player to build this building.
+      Throws an error if this player is not controlled by a ScenarioAI.
+*/
+int LuaPlayer::scenario_ai_set_trainingsite_allowed(lua_State* L) {
+	ScenarioAI* ai = scenario_ai(L);
+	std::string name = luaL_checkstring(L, 2);
+	bool allow = true;
+	if (lua_gettop(L) > 2) {
+		allow = luaL_checkboolean(L, 3);
+	}
+	ai->set_trainingsite_allowed(name, allow);
+	return 0;
+}
+
+/* RST
+   .. method:: scenario_ai_set_warehouse_allowed(name[, allow = true])
+
+      Allow or forbid the ScenarioAI controlling this player to build this building.
+      Throws an error if this player is not controlled by a ScenarioAI.
+*/
+int LuaPlayer::scenario_ai_set_warehouse_allowed(lua_State* L) {
+	ScenarioAI* ai = scenario_ai(L);
+	std::string name = luaL_checkstring(L, 2);
+	bool allow = true;
+	if (lua_gettop(L) > 2) {
+		allow = luaL_checkboolean(L, 3);
+	}
+	ai->set_warehouse_allowed(name, allow);
+	return 0;
+}
+
+/* RST
+   .. method:: scenario_ai_set_is_enemy(playernumber[, enemy = true])
+
+      Set whether the ScenarioAI controlling this player considers the player with the given player number an enemy.
+      Throws an error if this player is not controlled by a ScenarioAI.
+*/
+int LuaPlayer::scenario_ai_set_is_enemy(lua_State* L) {
+	ScenarioAI* ai = scenario_ai(L);
+	uint8_t player = luaL_checkinteger(L, 2);
+	bool enemy = true;
+	if (lua_gettop(L) > 2) {
+		enemy = luaL_checkboolean(L, 3);
+	}
+	ai->set_is_enemy(player, enemy);
+	return 0;
+}
+
+/* RST
+   .. method:: scenario_ai_set_ware_preciousness(ware, value)
+
+      Set how important this ware is to the ScenarioAI controlling this player. Must be >= 0.
+      Throws an error if this player is not controlled by a ScenarioAI.
+*/
+int LuaPlayer::scenario_ai_set_ware_preciousness(lua_State* L) {
+	ScenarioAI* ai = scenario_ai(L);
+	std::string name = luaL_checkstring(L, 2);
+	uint32_t value = luaL_checkuint32(L, 3);
+	ai->set_ware_preciousness(name, value);
+	return 0;
+}
+
+/* RST
+   .. method:: scenario_ai_set_basic_economy(building, amount, importance)
+
+      Set how many buildings of this type the ScenarioAI controlling this player considers essential.
+      Throws an error if this player is not controlled by a ScenarioAI.
+*/
+int LuaPlayer::scenario_ai_set_basic_economy(lua_State* L) {
+	ScenarioAI* ai = scenario_ai(L);
+	std::string name = luaL_checkstring(L, 2);
+	uint32_t amount = luaL_checkuint32(L, 3);
+	uint32_t importance = luaL_checkuint32(L, 4);
+	ai->set_basic_economy(name, amount, importance);
+	return 0;
+}
+
+/*
+ ==========================================================
  C METHODS
  ==========================================================
  */
+ScenarioAI* LuaPlayer::scenario_ai(lua_State* L) {
+	Game& game = get_game(L);
+	uint8_t pln = get(L, game).player_number();
+	ScenarioAI* ai = dynamic_cast<ScenarioAI*>(game.get_ai(pln));
+	if (L && !ai) {
+		report_error(L, "Attempted to access ScenarioAI for player %u who is not controlled by a ScenarioAI!", pln);
+	}
+	return ai;
+}
+
 void LuaPlayer::parse_building_list(lua_State* L,
                                     const TribeDescr& tribe,
                                     std::vector<DescriptionIndex>& rv) {

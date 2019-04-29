@@ -20,6 +20,7 @@
 #include "ai/computer_player.h"
 
 #include "ai/defaultai.h"
+#include "ai/scenario_ai.h"
 
 ComputerPlayer::ComputerPlayer(Widelands::Game& g, Widelands::PlayerNumber const pid)
    : game_(g), player_number_(pid) {
@@ -63,6 +64,7 @@ const ComputerPlayer::ImplementationVector& ComputerPlayer::get_implementations(
 		impls.push_back(&DefaultAI::weak_impl);
 		impls.push_back(&DefaultAI::very_weak_impl);
 		impls.push_back(&EmptyAI::implementation);
+		impls.push_back(&ScenarioAI::implementation);
 	}
 
 	return impls;
