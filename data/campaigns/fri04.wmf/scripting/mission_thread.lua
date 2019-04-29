@@ -239,7 +239,7 @@ function mission_thread()
             sleep(2000)
             campaign_message_box(victory_pay)
          end
-         p1:reveal_scenario("frisians04")
+         p1:mark_scenario_as_solved("fri04.wmf")
          -- END OF MISSION 4
          return
       end

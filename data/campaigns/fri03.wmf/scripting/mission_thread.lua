@@ -503,7 +503,7 @@ sleep(9999999)
    game:save_campaign_data("frisians", "fri03", persist)
    sleep(1000)
    campaign_message_box(victory_1)
-   p3:reveal_scenario("frisians03")
+   p3:mark_scenario_as_solved("fri03.wmf")
    -- END OF MISSION 3
 
 end
