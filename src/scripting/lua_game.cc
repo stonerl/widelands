@@ -124,6 +124,7 @@ const PropertyType<LuaPlayer> LuaPlayer::Properties[] = {
    PROP_RW(LuaPlayer, team),       PROP_RO(LuaPlayer, tribe),
    PROP_RW(LuaPlayer, see_all),    PROP_RO(LuaPlayer, scenario_ai),
    PROP_RW(LuaPlayer, scenario_ai_agression_treshold),
+   PROP_RW(LuaPlayer, scenario_ai_road_density),
    {nullptr, nullptr, nullptr},
 };
 
@@ -293,7 +294,7 @@ int LuaPlayer::get_scenario_ai(lua_State* L) {
 /* RST
    .. attribute:: scenario_ai_agression_treshold
 
-      (RW) How agressive the ScenarioAI constrolling this player is.
+      (RW) How agressive the ScenarioAI controlling this player is.
       Values greater than 0 stand for caution, values less than 0 indicate recklessness.
 */
 int LuaPlayer::get_scenario_ai_agression_treshold(lua_State* L) {
@@ -302,6 +303,21 @@ int LuaPlayer::get_scenario_ai_agression_treshold(lua_State* L) {
 }
 int LuaPlayer::set_scenario_ai_agression_treshold(lua_State* L) {
 	scenario_ai(L)->set_agression_treshold(luaL_checkint32(L, 2));
+	return 0;
+}
+
+/* RST
+   .. attribute:: scenario_ai_road_density
+
+      (RW) How dense the ScenarioAI controlling this player likes to build its roads.
+      Lower values mean high density. Defaults to 4.
+*/
+int LuaPlayer::get_scenario_ai_road_density(lua_State* L) {
+	lua_pushinteger(L, scenario_ai(L)->get_road_density());
+	return 1;
+}
+int LuaPlayer::set_scenario_ai_road_density(lua_State* L) {
+	scenario_ai(L)->set_road_density(luaL_checkuint32(L, 2));
 	return 0;
 }
 

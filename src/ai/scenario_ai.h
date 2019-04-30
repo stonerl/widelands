@@ -36,6 +36,7 @@
 
 namespace Widelands {
 	class Game;
+	struct WareList;
 }
 
 struct ScenarioAI : ComputerPlayer {
@@ -53,6 +54,8 @@ struct ScenarioAI : ComputerPlayer {
 	void set_is_enemy(Widelands::PlayerNumber, bool);
 	void set_agression_treshold(int32_t);
 	int32_t get_agression_treshold();
+	void set_road_density(uint32_t);
+	uint32_t get_road_density();
 
 	struct ScenarioAIImpl : public ComputerPlayer::Implementation {
 		ScenarioAIImpl()
@@ -75,7 +78,10 @@ private:
 
 	void init();
 	bool try_connect_flag(Widelands::FCoords&, Widelands::FCoords* = nullptr);
-	bool build_building_somewhere(std::vector<std::string>&);
+	bool build_building_somewhere(std::vector<const Widelands::BuildingDescr*>&);
+
+	std::vector<Widelands::FCoords> owned_fields();
+	Widelands::WareList* get_stock();
 
 	// What we are allowed to build
 	std::set<std::string> allowed_militarysites_;
@@ -90,6 +96,7 @@ private:
 
 	std::set<Widelands::PlayerNumber> enemies_;
 	int32_t agression_treshold_;
+	uint32_t road_density_;
 
 	bool did_init_;
 	uint32_t last_time_thought_;
