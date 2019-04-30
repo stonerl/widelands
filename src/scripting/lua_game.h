@@ -80,6 +80,9 @@ public:
 	int set_see_all(lua_State* L);
 	int get_scenario_ai(lua_State* L);
 
+	int scenario_ai_set_agression_treshold(lua_State* L);
+	int scenario_ai_get_agression_treshold(lua_State* L);
+
 	/*
 	 * Lua methods
 	 */

@@ -51,6 +51,8 @@ struct ScenarioAI : ComputerPlayer {
 	void set_basic_economy(const std::string&, uint32_t, uint32_t);
 	void set_ware_preciousness(const std::string&, uint32_t);
 	void set_is_enemy(Widelands::PlayerNumber, bool);
+	void set_agression_treshold(int32_t);
+	int32_t get_agression_treshold();
 
 	struct ScenarioAIImpl : public ComputerPlayer::Implementation {
 		ScenarioAIImpl()
@@ -73,6 +75,7 @@ private:
 
 	void init();
 	bool try_connect_flag(Widelands::FCoords&, Widelands::FCoords* = nullptr);
+	bool build_building_somewhere(std::vector<std::string>&);
 
 	// What we are allowed to build
 	std::set<std::string> allowed_militarysites_;
@@ -80,12 +83,13 @@ private:
 	std::set<std::string> allowed_trainingsites_;
 	std::set<std::string> allowed_warehouses_;
 
-	std::map<std::string, std::tuple<uint32_t, uint32_t>> basic_economy_;
+	std::map<std::string, std::tuple<uint32_t, uint32_t>> basic_economy_; // {amount, importance}
 
 	// We consider wares important only if they are listed here
 	std::map<std::string, uint32_t> ware_preciousness_;
 
 	std::set<Widelands::PlayerNumber> enemies_;
+	int32_t agression_treshold_;
 
 	bool did_init_;
 	uint32_t last_time_thought_;

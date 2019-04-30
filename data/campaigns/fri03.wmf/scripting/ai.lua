@@ -36,6 +36,7 @@ p2:scenario_ai_set_warehouse_allowed("empire_warehouse")
 p2:scenario_ai_set_is_enemy(1, true)
 p2:scenario_ai_set_is_enemy(3, true)
 p2:scenario_ai_set_is_enemy(4, false)
+p2.scenario_ai_agression_treshold = 1
 
 p2:scenario_ai_set_ware_preciousness("granite", 1)
 p2:scenario_ai_set_ware_preciousness("log", 1)
@@ -122,6 +123,7 @@ p4:scenario_ai_set_productionsite_allowed("barbarians_cattlefarm")
 p4:scenario_ai_set_is_enemy(1, true)
 p4:scenario_ai_set_is_enemy(3, true)
 p4:scenario_ai_set_is_enemy(2, false)
+p4.scenario_ai_agression_treshold = -1
 
 p4:scenario_ai_set_ware_preciousness("log", 1)
 p4:scenario_ai_set_ware_preciousness("granite", 1)
@@ -156,6 +158,7 @@ p4:scenario_ai_set_basic_economy("barbarians_wood_hardener", 2, 9)
 p4:scenario_ai_set_basic_economy("barbarians_charcoal_kiln", 3, 7)
 p4:scenario_ai_set_basic_economy("barbarians_bakery", 1, 4)
 p4:scenario_ai_set_basic_economy("barbarians_micro_brewery", 1, 3)
+p4:scenario_ai_set_basic_economy("barbarians_brewery", 1, 3)
 p4:scenario_ai_set_basic_economy("barbarians_smelting_works", 2, 6)
 p4:scenario_ai_set_basic_economy("barbarians_metal_workshop", 2, 5)
 p4:scenario_ai_set_basic_economy("barbarians_farm", 2, 4)

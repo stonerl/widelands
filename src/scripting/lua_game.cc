@@ -123,6 +123,7 @@ const PropertyType<LuaPlayer> LuaPlayer::Properties[] = {
    PROP_RO(LuaPlayer, messages),   PROP_RO(LuaPlayer, inbox),
    PROP_RW(LuaPlayer, team),       PROP_RO(LuaPlayer, tribe),
    PROP_RW(LuaPlayer, see_all),    PROP_RO(LuaPlayer, scenario_ai),
+   PROP_RW(LuaPlayer, scenario_ai_agression_treshold),
    {nullptr, nullptr, nullptr},
 };
 
@@ -287,6 +288,21 @@ int LuaPlayer::get_see_all(lua_State* const L) {
 int LuaPlayer::get_scenario_ai(lua_State* L) {
 	lua_pushboolean(L, scenario_ai() != nullptr);
 	return 1;
+}
+
+/* RST
+   .. attribute:: scenario_ai_agression_treshold
+
+      (RW) How agressive the ScenarioAI constrolling this player is.
+      Values greater than 0 stand for caution, values less than 0 indicate recklessness.
+*/
+int LuaPlayer::get_scenario_ai_agression_treshold(lua_State* L) {
+	lua_pushinteger(L, scenario_ai(L)->get_agression_treshold());
+	return 1;
+}
+int LuaPlayer::set_scenario_ai_agression_treshold(lua_State* L) {
+	scenario_ai(L)->set_agression_treshold(luaL_checkint32(L, 2));
+	return 0;
 }
 
 /*
@@ -1090,23 +1106,6 @@ int LuaPlayer::scenario_ai_set_basic_economy(lua_State* L) {
 	uint32_t amount = luaL_checkuint32(L, 3);
 	uint32_t importance = luaL_checkuint32(L, 4);
 	ai->set_basic_economy(name, amount, importance);
-	return 0;
-}
-
-/* RST
-   .. method:: set_attack_forbidden(who, forbid)
-
-      Sets whether this player is forbidden to attack the player with the specified
-      player number. Note that setting this to `false` does not necessarily mean that this
-      player *can* attack the other player, as they might for example be in the same team.
-
-      :arg who: player number of the player to query
-      :type who: :class:`int`
-      :arg forbid: Whether to allow or forbid attacks
-      :type forbid: :class:`boolean`
-*/
-int LuaPlayer::set_attack_forbidden(lua_State* L) {
-	get(L, get_egbase(L)).set_attack_forbidden(luaL_checkinteger(L, 2), luaL_checkboolean(L, 3));
 	return 0;
 }
 

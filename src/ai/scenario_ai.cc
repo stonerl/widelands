@@ -31,6 +31,7 @@ ScenarioAI::ScenarioAIImpl ScenarioAI::implementation;
 
 ScenarioAI::ScenarioAI(Widelands::Game& ggame, Widelands::PlayerNumber const pid)
    : ComputerPlayer(ggame, pid),
+   agression_treshold_(0),
    did_init_(false),
    last_time_thought_(0) {
 }
@@ -81,6 +82,18 @@ void ScenarioAI::set_ware_preciousness(const std::string& ware, uint32_t p) {
 void ScenarioAI::set_is_enemy(Widelands::PlayerNumber player, bool enemy) {
 	allow_or_erase<Widelands::PlayerNumber>(&enemies_, player, enemy);
 }
+
+void ScenarioAI::set_agression_treshold(int32_t t) {
+	agression_treshold_ = t;
+}
+
+int32_t ScenarioAI::get_agression_treshold() {
+	return agression_treshold_;
+}
+
+/************************************************
+ *              Private functions               *
+ ************************************************/
 
 void ScenarioAI::init() {
 	// If we ever want to do initialisation stuff like setting economy targets, do it here
@@ -137,6 +150,18 @@ bool ScenarioAI::try_connect_flag(Widelands::FCoords& start, Widelands::FCoords*
 	return done;
 }
 
+bool ScenarioAI::build_building_somewhere(std::vector<std::string>& considered_buildings) {
+
+
+
+}
+
+static inline int32_t evaluate_soldier(const Widelands::Soldier& soldier) {
+	int32_t v = soldier.get_total_level() + 1;
+	return v * v * soldier.get_current_health() / (soldier.descr().get_base_health() +
+			soldier.descr().get_health_incr_per_level() * soldier.get_health_level());
+}
+
 // Don't think too often, because we like to wait until our commands have been executed
 constexpr uint32_t kThinkInterval = 200;
 
@@ -152,6 +177,7 @@ void ScenarioAI::think() {
 	}
 
 	const Widelands::Map& map = game().map();
+	Widelands::Player& player = *game().get_player(player_number());
 
 	// We begin by cleaning up our road network. Long roads are broken into shorter sections, dead-ends are removed.
 
@@ -190,6 +216,197 @@ void ScenarioAI::think() {
 	}
 
 
+	/* Military stuff
+	 * ==============
+	 * We frequently check for enemy militarysites near our border.
+	 * Attackable warehouses (port/HQ) are preferred over other milsites.
+	 * If we see one which can be attacked, we compare strengths:
+	 *   If we are stronger than the enemy, we attack!
+	 *   Otherwise, we construct a new militarysite nearby.
+	 *     (If a new own milsite is already under construction nearby, we ignore that enemy site – for now...)
+	 */
+	{ // military stuff
+	std::map<const Widelands::Building*, std::tuple<int32_t, uint32_t>> attackable; // {evaluation, number_of_soldiers}
+	int32_t best_eval = std::numeric_limits<int32_t>::min();
+	for (Widelands::DescriptionIndex di = 0; di < game().tribes().nrbuildings(); ++di) {
+		const Widelands::BuildingDescr& descr = *game().tribes().get_building_descr(di);
+		if (descr.type() != Widelands::MapObjectType::MILITARYSITE &&
+				descr.type() != Widelands::MapObjectType::WAREHOUSE) {
+			continue;
+		}
+		for (const Widelands::PlayerNumber& n : enemies_) {
+			const Widelands::Player& enemy = *game().get_player(n);
+			for (const Widelands::Player::BuildingStats& stat : enemy.get_building_statistics(di)) {
+				if (!stat.is_constructionsite) {
+					upcast(Widelands::Building, bld, map[stat.pos].get_immovable();
+					assert(bld);
+					std::vector<Widelands::Soldier*> soldiers;
+					if (uint32_t amount = player.find_attack_soldiers(bld->base_flag(), &soldiers)) {
+						int32_t eval = 0;
+						for (const Widelands::Soldier*& soldier : soldiers) {
+							eval += evaluate_soldier(*soldier);
+						}
+						if (descr.type() == Widelands::MapObjectType::WAREHOUSE) {
+							eval = eval * 3 / 2;
+						}
+						for (const Widelands::Soldier*& soldier : bld->soldier_control()->present_soldiers()) {
+							eval -= evaluate_soldier(*soldier);
+						}
+						if (eval > 0) {
+							best_eval = std::max(best_eval, eval);
+							attackable->emplace(std::make_pair(bld, {eval, amount}));
+						}
+					}
+				}
+			}
+		}
+	}
+	if (best_eval >= agression_treshold_) {
+		std::vector<const Widelands::Building*> best_buildings;
+		for (const auto& pair : attackable) {
+			if (std::get<0>(pair.second) == best_eval) {
+				best_buildings.push_back(pair.first);
+			}
+		}
+		assert(!best_buildings.empty());
+		const Widelands::Building* building_to_attack = best_buildings[std::rand() % best_buildings.size()];
+		return player.enemyflagaction(building_to_attack->base_flag(), player_number(),
+				std::get<1>(attackable.at(building_to_attack)));
+	}
+	} // military stuff
+
+	/* Now, let's take care of our economy. A script defined our very own "basic economy".
+	 * If we haven't built everything from there yet, we really need to take care of that.
+	 */
+	{ // basic economy
+	std::map<std::string, std::tuple<uint32_t, uint32_t>> all_missing;
+	uint32_t most_important_missing = 0;
+	for (const auto& pair : basic_economy_) {
+		const Widelands::DescriptionIndex di = game().tribes().building_index(pair.first);
+		assert(di != Widelands::INVALID_INDEX);
+		size_t amount = player.get_building_statistics(di).size();
+		if (amount < std::get<0>(pair.second)) {
+			uint32_t importance = std::get<1>(pair.second);
+			all_missing[pair.first] = {std::get<0>(pair.second) - amount, importance};
+			most_important_missing = std::max(most_important_missing, importance);
+		}
+	}
+	if (!all_missing.empty()) {
+		//                    {number missing, can build directly, buildings we can enhance to this}
+		std::map<std::string, std::tuple<uint32_t, bool, std::vector<const Widelands::Building*>>> missing_we_can_build;
+		uint32_t highest_amount_missing = 0;
+		for (const auto& pair : all_missing) {
+			if (std::get<1>(pair.second) < most_important_missing) {
+				continue;
+			}
+			const Widelands::DescriptionIndex di = game().tribes().building_index(pair.first);
+			const Widelands::BuildingDescr& descr = *game().tribes().get_building_descr(di);
+			std::vector<const Widelands::Building*> enhanceable;
+
+			// TODO(Nordfriese): If trainingsites that use upgraded workers are introduced, enhance this code
+			std::map<Widelands::DescriptionIndex, uint32_t> workers_required;
+			if (descr.type() == Widelands::MapObjectType::PRODUCTIONSITE) {
+				upcast(Widelands::ProductionSiteDescr, site_descr, &descr);
+				assert(site_descr);
+				for (const auto& worker_pair : site_descr->working_positions()) {
+					const Widelands::WorkerDescr& descr = *game().tribes().get_worker_descr(worker_pair.first);
+					if (!descr.is_buildable()) {
+						uint32_t amount = 0;
+						for (const auto& eco : player.economies()) {
+							for (const Widelands::Warehouse* wh : eco.second->warehouses()) {
+								amount += wh->get_workers().stock(worker_pair.first);
+							}
+						}
+						if (amount < worker_pair.second) {
+							workers_required[worker_pair.first] = worker_pair.second - amount;
+						}
+					}
+				}
+			}
+
+			if (descr.is_enhanced()) {
+				for (const auto& stat : player.get_building_statistics(descr.enhanced_from())) {
+					if (stat.is_constructionsite) {
+						continue;
+					}
+					upcast(Widelands::Building, bld, map[stat.pos].get_immovable());
+					assert(bld);
+					assert(bld->descr().enhancement() == di);
+					if (!workers_required.empty()) {
+						std::map<Widelands::DescriptionIndex, uint32_t> workers_found;
+						for (const auto& worker : bld->get_workers()) {
+							const Widelands::DescriptionIndex di = game().tribes().worker_index(worker.descr().name());
+							assert(di != Widelands::INVALID_INDEX);
+							auto iterator = workers_found.find(di);
+							if (iterator == workers_found.end()) {
+								workers_found.emplace(di, 1);
+							} else {
+								++iterator.second;
+							}
+						}
+						bool something_missing = false;
+						for (const auto& worker_pair : workers_required) {
+							auto iterator = workers_found.find(worker_pair.first);
+							if (iterator == workers_found.end() || iterator.second < worker_pair.second) {
+								something_missing = true;
+								break;
+							}
+						}
+						if (something_missing) {
+							continue;
+						}
+					}
+					enhanceable.push_back(bld);
+				}
+			}
+			bool can_build_directly = descr.is_buildable();
+			uint32_t amount = std::get<0>(pair.second);
+			if (can_build_directly || !enhanceable.empty()) {
+				missing_we_can_build[pair.first] = {amount, can_build_directly, enhanceable};
+				highest_amount_missing = std::max(highest_amount_missing, amount);
+			}
+		}
+		assert(highest_amount_missing > 0);
+		assert(!missing_we_can_build.empty());
+		std::vector<const Widelands::Building*> enhanceable_buildings;
+		std::vector<std::string> buildable_buildings;
+		for (const auto& pair : missing_we_can_build) {
+			if (std::get<0>(pair.second) < highest_amount_missing) {
+				continue;
+			}
+			for (const Widelands::Building*& bld : std::get<2>(pair.second)) {
+				enhanceable_buildings.push_back(bld);
+			}
+			if (std::get<1>(pair.second)) {
+				buildable_buildings.push_back(pair.first);
+			}
+		}
+		if (enhanceable_buildings.empty()) {
+			assert(!buildable_buildings.empty());
+			if (build_building_somewhere(buildable_buildings)) {
+				return;
+			}
+		} else {
+			const Widelands::Building* enhance = enhanceable_buildings[std::rand() % enhanceable_buildings.size()];
+			return game().send_player_enhance_building(*enhance, enhance->descr().enhancement());
+		}
+	}
+	} // basic economy
+
+	/* Let's check whether there are two flags that are physically close but far apart in the road network */
+
+
+
+  	/* TODO(Nordfriese, AT ONCE): Do other stuff – micromanage workers and wares, find out if we should build more
+	 * productionsites, warehouses, milsites...
+	 */
+
+	/* TODO(Nordfriese, AT ONCE): We check our borders now. Any field where we can build something and the border is close
+	 * is interesting, even more so if any immovables nearby are owned by an enemy.
+	 * Fields located closely to an enemy warehouse or milsite are also more interesting.
+	 * Fields located closely to an own milsite or milsite-constructionsite are less interesting.
+	 * Consider building a militarysite on an interesting field.
+	 */
 
 }
 
