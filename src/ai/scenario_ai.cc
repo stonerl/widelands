@@ -98,6 +98,14 @@ int32_t ScenarioAI::get_agression_treshold() {
 	return agression_treshold_;
 }
 
+void ScenarioAI::set_road_density(uint32_t d) {
+	road_density_ = d;
+}
+
+uint32_t ScenarioAI::get_road_density() {
+	return road_density_;
+}
+
 /************************************************
  *              Private functions               *
  ************************************************/
@@ -240,20 +248,16 @@ bool ScenarioAI::build_building_somewhere(std::vector<const Widelands::BuildingD
 			float score = 0;
 
 			uint32_t border_distance = 0;
-			{
-				uint32_t d = 1;
-				while (border_distance == 0) {
-					Widelands::MapHollowRegion<Widelands::Area<Widelands::FCoords>> mr(map,
-							Widelands::HollowArea<Widelands::Area<Widelands::FCoords>>(
-							Widelands::Area<Widelands::FCoords>(f, d), d - 1));
-					do {
-						if (enemies_.count(mr.location().field->get_owned_by())) {
-							border_distance = d;
-							break;
-						}
-					} while (mr.advance(map));
-					++d;
-				}
+			for (uint32_t d = 1; border_distance == 0; ++d) {
+				Widelands::MapHollowRegion<Widelands::Area<Widelands::FCoords>> mr(map,
+						Widelands::HollowArea<Widelands::Area<Widelands::FCoords>>(
+						Widelands::Area<Widelands::FCoords>(f, d), d - 1));
+				do {
+					if (enemies_.count(mr.location().field->get_owned_by())) {
+						border_distance = d;
+						break;
+					}
+				} while (mr.advance(map));
 			}
 
 			uint32_t workarea_radius = 0;
