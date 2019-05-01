@@ -36,7 +36,7 @@ p2:scenario_ai_set_warehouse_allowed("empire_warehouse")
 p2:scenario_ai_set_is_enemy(1, true)
 p2:scenario_ai_set_is_enemy(3, true)
 p2:scenario_ai_set_is_enemy(4, false)
-p2.scenario_ai_agression_treshold = 1
+p2.scenario_ai_aggression_treshold = 1
 
 p2:scenario_ai_set_ware_preciousness("granite", 1)
 p2:scenario_ai_set_ware_preciousness("log", 1)
@@ -123,7 +123,7 @@ p4:scenario_ai_set_productionsite_allowed("barbarians_cattlefarm")
 p4:scenario_ai_set_is_enemy(1, true)
 p4:scenario_ai_set_is_enemy(3, true)
 p4:scenario_ai_set_is_enemy(2, false)
-p4.scenario_ai_agression_treshold = -1
+p4.scenario_ai_aggression_treshold = -1
 
 p4:scenario_ai_set_ware_preciousness("log", 1)
 p4:scenario_ai_set_ware_preciousness("granite", 1)
@@ -168,6 +168,12 @@ p4:scenario_ai_set_basic_economy("barbarians_barracks", 1, 2)
 p4:scenario_ai_set_basic_economy("barbarians_battlearena", 1, 2)
 p4:scenario_ai_set_basic_economy("barbarians_trainingcamp", 1, 1)
 p4:scenario_ai_set_basic_economy("barbarians_barrier", 1, 5)
+
+p2.scenario_ai_think_interval = 490
+p4.scenario_ai_think_interval = 510
+
+p2.scenario_ai_active = true
+p4.scenario_ai_active = true
 
 -- =======================================================================
 --                          NOCOM: OUTDATED!

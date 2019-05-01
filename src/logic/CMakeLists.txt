@@ -136,7 +136,6 @@ wl_library(logic
     mapdifferenceregion.h
     mapfringeregion.cc
     mapfringeregion.h
-    maphollowregion.cc
     maphollowregion.h
     mapregion.h
     maptriangleregion.cc

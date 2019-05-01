@@ -27,7 +27,6 @@
 #include "logic/game.h"
 #include "logic/map.h"
 #include "logic/map_objects/checkstep.h"
-#include "logic/map_objects/tribes/warelist.h"
 #include "logic/map_objects/world/world.h"
 #include "logic/maphollowregion.h"
 #include "logic/mapregion.h"
@@ -37,7 +36,9 @@ ScenarioAI::ScenarioAIImpl ScenarioAI::implementation;
 
 ScenarioAI::ScenarioAI(Widelands::Game& ggame, Widelands::PlayerNumber const pid)
    : ComputerPlayer(ggame, pid),
-   agression_treshold_(0),
+   active_(true),
+   think_interval_(250),
+   aggression_treshold_(0),
    road_density_(4),
    did_init_(false),
    last_time_thought_(0) {
@@ -90,12 +91,12 @@ void ScenarioAI::set_is_enemy(Widelands::PlayerNumber player, bool enemy) {
 	allow_or_erase<Widelands::PlayerNumber>(&enemies_, player, enemy);
 }
 
-void ScenarioAI::set_agression_treshold(int32_t t) {
-	agression_treshold_ = t;
+void ScenarioAI::set_aggression_treshold(int32_t t) {
+	aggression_treshold_ = t;
 }
 
-int32_t ScenarioAI::get_agression_treshold() {
-	return agression_treshold_;
+int32_t ScenarioAI::get_aggression_treshold() {
+	return aggression_treshold_;
 }
 
 void ScenarioAI::set_road_density(uint32_t d) {
@@ -104,6 +105,22 @@ void ScenarioAI::set_road_density(uint32_t d) {
 
 uint32_t ScenarioAI::get_road_density() {
 	return road_density_;
+}
+
+void ScenarioAI::set_think_interval(uint32_t i) {
+	think_interval_ = i;
+}
+
+uint32_t ScenarioAI::get_think_interval() {
+	return think_interval_;
+}
+
+void ScenarioAI::set_active(bool a) {
+	active_ = a;
+}
+
+bool ScenarioAI::is_active() {
+	return active_;
 }
 
 /************************************************
@@ -132,44 +149,50 @@ bool ScenarioAI::try_connect_flag(Widelands::FCoords& start, Widelands::FCoords*
 		return false;
 	}
 
+	upcast(Widelands::Flag, flag, start.field->get_immovable());
+	assert(flag);
 	std::vector<Widelands::ImmovableFound> results;
 	map.find_reachable_immovables(Widelands::Area<Widelands::FCoords>(start, flag_connecting_search_radius),
-			&results, cstep, Widelands::FindImmovableType(Widelands::MapObjectType::FLAG));
+			&results, Widelands::CheckStepDefault(Widelands::MOVECAPS_WALK),
+			Widelands::FindImmovableType(Widelands::MapObjectType::FLAG));
 	if (results.empty()) {
 		return false;
 	}
-	std::map<Widelands::Path*, int32_t> paths;
+	std::multimap<int32_t, Widelands::Path> paths;
 	int32_t shortest = std::numeric_limits<int32_t>::max();
 	for (const Widelands::ImmovableFound& r : results) {
-		Widelands::Path* p = new Widelands::Path(start);
-		int32_t cost = map.findpath(start, map.get_fcoords(r.coords), 0, *p, cstep);
+		if (r.coords == start || flag->get_road(*dynamic_cast<Widelands::Flag*>(r.object))) {
+			continue;
+		}
+		Widelands::Path p;
+		int32_t cost = map.findpath(start, map.get_fcoords(r.coords), 0, p, cstep);
 		if (cost > 0) {
-			paths[p] = cost;
+			paths.emplace(cost, p);
 			shortest = std::min(shortest, cost);
 		}
-		else {
-			delete p;
-		}
 	}
-	bool done = false;
-	for (auto pair : paths) {
-		if (pair.second == shortest) {
-			game().send_player_build_road(player_number(), *new Widelands::Path(*pair.first));
-			done = true;
-		}
-		else {
-			delete pair.first;
+	for (const auto& pair : paths) {
+		if (pair.first == shortest) {
+			game().send_player_build_road(player_number(), *new Widelands::Path(pair.second));
+			return true;
 		}
 	}
 
-	return done;
+	return false;
 }
 
-Widelands::WareList* ScenarioAI::get_stock() {
-	Widelands::WareList* stock = new Widelands::WareList();
+Stock ScenarioAI::get_stock() {
+	Stock stock;
+	const auto nr_wares = game().tribes().nrwares();
+	for (Widelands::DescriptionIndex di = 0; di < nr_wares; ++di) {
+		stock.push_back(0);
+	}
 	for (const auto& eco : game().get_player(player_number())->economies()) {
 		for (const Widelands::Warehouse* wh : eco.second->warehouses()) {
-			stock->add(wh->get_wares());
+			const Widelands::WareList& wares = wh->get_wares();
+			for (Widelands::DescriptionIndex di = 0; di < nr_wares; ++di) {
+				stock[di] += wares.stock(di);
+			}
 		}
 	}
 	return stock;
@@ -194,7 +217,7 @@ constexpr uint16_t trainingsite_border_score_offset = 100;
 bool ScenarioAI::build_building_somewhere(std::vector<const Widelands::BuildingDescr*>& buildings) {
 	Widelands::Player& player = *game().get_player(player_number());
 	const Widelands::Map& map = game().map();
-	std::unique_ptr<Widelands::WareList> stock(get_stock());
+	Stock stock = get_stock();
 	const std::vector<Widelands::FCoords> own_fields = owned_fields();
 
 	const Widelands::BuildingDescr* best = nullptr;
@@ -218,7 +241,7 @@ bool ScenarioAI::build_building_somewhere(std::vector<const Widelands::BuildingD
 		bool affordable = true;
 		for (const auto& cost : descr->buildcost()) {
 			score += ware_preciousness_[game().tribes().get_ware_descr(cost.first)->name()] * cost.second;
-			affordable &= stock->stock(cost.first) >= cost.second;
+			affordable &= stock[cost.first] >= cost.second;
 		}
 		score *= (12 * std::exp((descr->get_size() == Widelands::BaseImmovable::SMALL ? 1 :
 				descr->get_size() == Widelands::BaseImmovable::BIG ? -1 : 0) - size_bias) * std::log(12));
@@ -347,16 +370,16 @@ static inline int32_t evaluate_soldier(const Widelands::Soldier& soldier) {
 			soldier.descr().get_health_incr_per_level() * soldier.get_health_level());
 }
 
-// Don't think too often, because we like to wait until our commands have been executed
-constexpr uint32_t kThinkInterval = 200;
-
 void ScenarioAI::think() {
 	const uint32_t time = game().get_gametime();
-	if (time - last_time_thought_ < kThinkInterval) {
+	if (time - last_time_thought_ < think_interval_) {
 		return;
 	}
 	last_time_thought_ = time;
 
+	if (!active_) {
+		return;
+	}
 	if (!did_init_) {
 		return init();
 	}
@@ -369,28 +392,29 @@ void ScenarioAI::think() {
 		Widelands::Field& f = map[i - 1];
 		Widelands::FCoords coords = map.get_fcoords(f);
 		if (f.get_owned_by() == player_number()) {
-			if (upcast(Widelands::Flag, flag, f.get_immovable())) {
-				if (flag->nr_of_roads() < 2) {
-					// Found a flag with at most one road – connect or remove
+			if (Widelands::BaseImmovable* imm = f.get_immovable()) {
+				if (imm->descr().type() == Widelands::MapObjectType::FLAG) {
+					upcast(Widelands::Flag, flag, imm);
+					uint8_t roads = flag->nr_of_roads();
 					if (flag->get_building()) {
-						if (try_connect_flag(coords)) {
+						if (roads == 0 && try_connect_flag(coords)) {
 							return;
 						}
-					} else {
+					} else if (roads < 2) {
 						return game().send_player_bulldoze(*flag);
 					}
-				}
-				for (uint8_t dir = 1; dir <= 6; ++dir) {
-					if (Widelands::Road* r = flag->get_road(dir)) {
-						const size_t max_length = r->get_path().get_nsteps();
-						Widelands::FCoords iterate = map.get_fcoords(r->get_path().get_start());
-						for (size_t id = 0; id < max_length; ++id) {
-							map.get_neighbour(iterate, r->get_path()[id], &iterate);
-							if (iterate.field->nodecaps() & Widelands::BUILDCAPS_FLAG) {
-								return game().send_player_build_flag(player_number(), iterate);
-							}
-							if (id > 2) {
-								return game().send_player_bulldoze(*r);
+					for (uint8_t dir = 1; dir <= 6; ++dir) {
+						if (Widelands::Road* r = flag->get_road(dir)) {
+							const size_t max_length = r->get_path().get_nsteps();
+							Widelands::FCoords iterate = map.get_fcoords(r->get_path().get_start());
+							for (size_t id = 0; id < max_length; ++id) {
+								map.get_neighbour(iterate, r->get_path()[id], &iterate);
+								if (iterate.field->nodecaps() & Widelands::BUILDCAPS_FLAG) {
+									return game().send_player_build_flag(player_number(), iterate);
+								}
+								if (id > 2) {
+									return game().send_player_bulldoze(*r);
+								}
 							}
 						}
 					}
@@ -444,7 +468,7 @@ void ScenarioAI::think() {
 			}
 		}
 	}
-	if (best_eval >= agression_treshold_) {
+	if (best_eval >= aggression_treshold_) {
 		std::vector<Widelands::Building*> best_buildings;
 		for (const auto& pair : attackable) {
 			if (std::get<0>(pair.second) == best_eval) {
@@ -583,10 +607,9 @@ void ScenarioAI::think() {
 	std::map<Widelands::FCoords, Widelands::Flag*> all_flags;
 	for (Widelands::MapIndex i = map.max_index(); i > 0; --i) {
 		Widelands::Field& f = map[i - 1];
-		Widelands::FCoords coords = map.get_fcoords(f);
 		if (f.get_immovable() && f.get_owned_by () == player_number() &&
 				f.get_immovable()->descr().type() == Widelands::MapObjectType::FLAG) {
-			all_flags[coords] = dynamic_cast<Widelands::Flag*>(f.get_immovable());
+			all_flags[map.get_fcoords(f)] = dynamic_cast<Widelands::Flag*>(f.get_immovable());
 		}
 	}
 	std::map<std::pair<const Widelands::FCoords, const Widelands::FCoords>, uint32_t> connect_candidates;
@@ -644,7 +667,8 @@ void ScenarioAI::think() {
 
 	// TODO(Nordfriese): NOCOM – We check our borders now. Any field where we can build something and the border is close
 	// is interesting, even more so if any immovables nearby are owned by an enemy.
-	// Fields located closely to an enemy warehouse or milsite are also more interesting.
+	// Fields located closely to an enemy warehouse or milsite are also much more interesting.
+	// Fields located closely to an own warehouse are a bit more interesting.
 	// Fields located closely to an own milsite or milsite-constructionsite are less interesting.
 	// Consider building a militarysite on an interesting field.
 

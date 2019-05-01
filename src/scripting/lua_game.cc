@@ -123,7 +123,9 @@ const PropertyType<LuaPlayer> LuaPlayer::Properties[] = {
    PROP_RO(LuaPlayer, messages),   PROP_RO(LuaPlayer, inbox),
    PROP_RW(LuaPlayer, team),       PROP_RO(LuaPlayer, tribe),
    PROP_RW(LuaPlayer, see_all),    PROP_RO(LuaPlayer, scenario_ai),
-   PROP_RW(LuaPlayer, scenario_ai_agression_treshold),
+   PROP_RW(LuaPlayer, scenario_ai_active),
+   PROP_RW(LuaPlayer, scenario_ai_think_interval),
+   PROP_RW(LuaPlayer, scenario_ai_aggression_treshold),
    PROP_RW(LuaPlayer, scenario_ai_road_density),
    {nullptr, nullptr, nullptr},
 };
@@ -292,17 +294,51 @@ int LuaPlayer::get_scenario_ai(lua_State* L) {
 }
 
 /* RST
-   .. attribute:: scenario_ai_agression_treshold
+   .. attribute:: scenario_ai_active
 
-      (RW) How agressive the ScenarioAI controlling this player is.
-      Values greater than 0 stand for caution, values less than 0 indicate recklessness.
+      (RW) Whether the ScenarioAI controlling this player is active.
+      It will not do anything whatsoever when inactive.
+      The AI is inactive by default until it is activated by setting this to `true`.
+      Reading or setting this attribute throws an error if this player is not controlled by a ScenarioAI.
 */
-int LuaPlayer::get_scenario_ai_agression_treshold(lua_State* L) {
-	lua_pushinteger(L, scenario_ai(L)->get_agression_treshold());
+int LuaPlayer::get_scenario_ai_active(lua_State* L) {
+	lua_pushboolean(L, scenario_ai(L)->is_active());
 	return 1;
 }
-int LuaPlayer::set_scenario_ai_agression_treshold(lua_State* L) {
-	scenario_ai(L)->set_agression_treshold(luaL_checkint32(L, 2));
+int LuaPlayer::set_scenario_ai_active(lua_State* L) {
+	scenario_ai(L)->set_active(luaL_checkboolean(L, -1));
+	return 0;
+}
+
+/* RST
+   .. attribute:: scenario_ai_think_interval
+
+      (RW) How slowly the ScenarioAI controlling this player thinks (in milliseconds).
+      Defaults to 250.
+      Reading or setting this attribute throws an error if this player is not controlled by a ScenarioAI.
+*/
+int LuaPlayer::get_scenario_ai_think_interval(lua_State* L) {
+	lua_pushinteger(L, scenario_ai(L)->get_think_interval());
+	return 1;
+}
+int LuaPlayer::set_scenario_ai_think_interval(lua_State* L) {
+	scenario_ai(L)->set_think_interval(luaL_checkuint32(L, -1));
+	return 0;
+}
+
+/* RST
+   .. attribute:: scenario_ai_aggression_treshold
+
+      (RW) How aggressive the ScenarioAI controlling this player is.
+      Values greater than 0 stand for caution, values less than 0 indicate recklessness.
+      Reading or setting this attribute throws an error if this player is not controlled by a ScenarioAI.
+*/
+int LuaPlayer::get_scenario_ai_aggression_treshold(lua_State* L) {
+	lua_pushinteger(L, scenario_ai(L)->get_aggression_treshold());
+	return 1;
+}
+int LuaPlayer::set_scenario_ai_aggression_treshold(lua_State* L) {
+	scenario_ai(L)->set_aggression_treshold(luaL_checkint32(L, -1));
 	return 0;
 }
 
@@ -311,13 +347,14 @@ int LuaPlayer::set_scenario_ai_agression_treshold(lua_State* L) {
 
       (RW) How dense the ScenarioAI controlling this player likes to build its roads.
       Lower values mean high density. Defaults to 4.
+      Reading or setting this attribute throws an error if this player is not controlled by a ScenarioAI.
 */
 int LuaPlayer::get_scenario_ai_road_density(lua_State* L) {
 	lua_pushinteger(L, scenario_ai(L)->get_road_density());
 	return 1;
 }
 int LuaPlayer::set_scenario_ai_road_density(lua_State* L) {
-	scenario_ai(L)->set_road_density(luaL_checkuint32(L, 2));
+	scenario_ai(L)->set_road_density(luaL_checkuint32(L, -1));
 	return 0;
 }
 

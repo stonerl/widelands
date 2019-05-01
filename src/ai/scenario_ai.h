@@ -36,8 +36,9 @@
 
 namespace Widelands {
 	class Game;
-	struct WareList;
 }
+
+using Stock = std::vector<Widelands::Quantity>;
 
 struct ScenarioAI : ComputerPlayer {
 
@@ -52,10 +53,14 @@ struct ScenarioAI : ComputerPlayer {
 	void set_basic_economy(const std::string&, uint32_t, uint32_t);
 	void set_ware_preciousness(const std::string&, uint32_t);
 	void set_is_enemy(Widelands::PlayerNumber, bool);
-	void set_agression_treshold(int32_t);
-	int32_t get_agression_treshold();
+	void set_aggression_treshold(int32_t);
+	int32_t get_aggression_treshold();
 	void set_road_density(uint32_t);
 	uint32_t get_road_density();
+	void set_think_interval(uint32_t);
+	uint32_t get_think_interval();
+	void set_active(bool);
+	bool is_active();
 
 	struct ScenarioAIImpl : public ComputerPlayer::Implementation {
 		ScenarioAIImpl()
@@ -81,7 +86,7 @@ private:
 	bool build_building_somewhere(std::vector<const Widelands::BuildingDescr*>&);
 
 	std::vector<Widelands::FCoords> owned_fields();
-	Widelands::WareList* get_stock();
+	Stock get_stock();
 
 	// What we are allowed to build
 	std::set<std::string> allowed_militarysites_;
@@ -95,13 +100,17 @@ private:
 	std::map<std::string, uint32_t> ware_preciousness_;
 
 	std::set<Widelands::PlayerNumber> enemies_;
-	int32_t agression_treshold_;
+	bool active_;
+	uint32_t think_interval_;
+	int32_t aggression_treshold_;
 	uint32_t road_density_;
 
 	bool did_init_;
 	uint32_t last_time_thought_;
 
 	// We do not cache any game-related information so we can react at once when a script changes something
+
+	// TODO(Nordfriese): NOCOM – Saveloading support!!!
 
 };
 
