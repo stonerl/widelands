@@ -1011,8 +1011,19 @@ int LuaPlayer::get_attack_soldiers(lua_State* L) {
 */
 int LuaPlayer::attack(lua_State* L) {
 	if (upcast(Game, game, &get_egbase(L))) {
-		game->send_player_enemyflagaction((*get_base_user_class<LuaBuilding>(L, 2))->get(L, get_egbase(L))->base_flag(),
-				get(L, get_egbase(L)).player_number(), luaL_checkuint32(L, 3));
+		Widelands::Flag& flag = (*get_base_user_class<LuaBuilding>(L, 2))->get(L, get_egbase(L))->base_flag();
+		std::vector<Widelands::Soldier*> all_soldiers;
+		get(L, *game).find_attack_soldiers(flag, &all_soldiers);
+		if (all_soldiers.empty()) {
+			return 0;
+		}
+		const size_t nr_attackers = std::min<size_t>(all_soldiers.size(), luaL_checkuint32(L, 3));
+		std::vector<Widelands::Serial> soldiers;
+		for (size_t i = 0; i < nr_attackers; ++i) {
+			// TODO(Nordfriese): Perform some sorting if we have more soldiers available than desired
+			soldiers.push_back(all_soldiers[i]->serial());
+		}
+		game->send_player_enemyflagaction(flag, get(L, get_egbase(L)).player_number(), soldiers);
 	}
 	return 0;
 }

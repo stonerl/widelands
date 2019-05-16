@@ -78,7 +78,7 @@ void ScenarioAI::set_warehouse_allowed(const std::string& name, bool allow) {
 
 void ScenarioAI::set_basic_economy(const std::string& building, uint32_t amount, uint32_t importance) {
 	if (amount > 0) {
-		basic_economy_[building] = {amount, importance};
+		basic_economy_[building] = std::make_pair(amount, importance);
 	} else {
 		basic_economy_.erase(building);
 	}
@@ -414,7 +414,7 @@ void ScenarioAI::military_stuff() {
 	const Widelands::Map& map = game().map();
 	Widelands::Player& player = *game().get_player(player_number());
 
-	std::map<Widelands::Building*, std::tuple<int32_t, uint32_t>> attackable; // {evaluation, number_of_soldiers}
+	std::map<Widelands::Building*, std::pair<int32_t, std::vector<Widelands::Soldier*>>> attackable; // {evaluation, soldiers}
 	int32_t best_eval = std::numeric_limits<int32_t>::min();
 	for (Widelands::DescriptionIndex di = 0; di < game().tribes().nrbuildings(); ++di) {
 		const Widelands::BuildingDescr& descr = *game().tribes().get_building_descr(di);
@@ -429,21 +429,23 @@ void ScenarioAI::military_stuff() {
 					upcast(Widelands::Building, bld, map[stat.pos].get_immovable());
 					assert(bld);
 					std::vector<Widelands::Soldier*> soldiers;
-					if (uint32_t amount = player.find_attack_soldiers(bld->base_flag(), &soldiers)) {
-						int32_t eval = 0;
-						for (const auto& soldier : soldiers) {
-							eval += evaluate_soldier(*soldier);
-						}
-						if (descr.type() == Widelands::MapObjectType::WAREHOUSE) {
-							eval = eval * 3 / 2;
-						}
-						for (const auto& soldier : bld->soldier_control()->present_soldiers()) {
-							eval -= evaluate_soldier(*soldier);
-						}
-						if (eval > 0) {
-							best_eval = std::max(best_eval, eval);
-							attackable[bld] = {eval, amount};
-						}
+					player.find_attack_soldiers(bld->base_flag(), &soldiers);
+					if (soldiers.empty()) {
+						continue;
+					}
+					int32_t eval = 0;
+					for (const auto& soldier : soldiers) {
+						eval += evaluate_soldier(*soldier);
+					}
+					if (descr.type() == Widelands::MapObjectType::WAREHOUSE) {
+						eval = eval * 3 / 2;
+					}
+					for (const auto& soldier : bld->soldier_control()->present_soldiers()) {
+						eval -= evaluate_soldier(*soldier);
+					}
+					if (eval > 0) {
+						best_eval = std::max(eval, best_eval);
+						attackable[bld] = std::make_pair(eval, soldiers);
 					}
 				}
 			}
@@ -452,14 +454,18 @@ void ScenarioAI::military_stuff() {
 	if (best_eval >= aggression_treshold_) {
 		std::vector<Widelands::Building*> best_buildings;
 		for (const auto& pair : attackable) {
-			if (std::get<0>(pair.second) == best_eval) {
+			if (pair.second.first == best_eval) {
 				best_buildings.push_back(pair.first);
 			}
 		}
 		assert(!best_buildings.empty());
 		Widelands::Building* building_to_attack = best_buildings[random_.rand() % best_buildings.size()];
-		return player.enemyflagaction(building_to_attack->base_flag(), player_number(),
-				std::get<1>(attackable.at(building_to_attack)));
+		std::vector<Widelands::Serial> soldiers_to_send;
+		for (const auto& soldier : attackable.at(building_to_attack).second) {
+			soldiers_to_send.push_back(soldier->serial());
+		}
+		game().send_player_enemyflagaction(building_to_attack->base_flag(), player_number(), soldiers_to_send);
+		return;
 	}
 }
 
@@ -467,15 +473,15 @@ void ScenarioAI::basic_economy() {
 	const Widelands::Map& map = game().map();
 	Widelands::Player& player = *game().get_player(player_number());
 
-	std::map<std::string, std::tuple<uint32_t, uint32_t>> all_missing;
+	std::map<std::string, std::pair<uint32_t, uint32_t>> all_missing;
 	uint32_t most_important_missing = 0;
 	for (const auto& pair : basic_economy_) {
 		const Widelands::DescriptionIndex di = game().tribes().building_index(pair.first);
 		assert(di != Widelands::INVALID_INDEX);
 		size_t amount = player.get_building_statistics(di).size();
-		if (amount < std::get<0>(pair.second)) {
-			uint32_t importance = std::get<1>(pair.second);
-			all_missing[pair.first] = {std::get<0>(pair.second) - amount, importance};
+		if (amount < pair.second.first) {
+			uint32_t importance = pair.second.second;
+			all_missing[pair.first] = std::make_pair(pair.second.first - amount, importance);
 			most_important_missing = std::max(most_important_missing, importance);
 		}
 	}
@@ -484,7 +490,7 @@ void ScenarioAI::basic_economy() {
 		std::map<std::string, std::tuple<uint32_t, bool, std::vector<Widelands::Building*>>> missing_we_can_build;
 		uint32_t highest_amount_missing = 0;
 		for (const auto& pair : all_missing) {
-			if (std::get<1>(pair.second) < most_important_missing) {
+			if (pair.second.second < most_important_missing) {
 				continue;
 			}
 			const Widelands::DescriptionIndex di = game().tribes().building_index(pair.first);
@@ -548,7 +554,7 @@ void ScenarioAI::basic_economy() {
 				}
 			}
 			bool can_build_directly = descr.is_buildable();
-			uint32_t amount = std::get<0>(pair.second);
+			uint32_t amount = pair.second.first;
 			if (can_build_directly || !enhanceable.empty()) {
 				missing_we_can_build[pair.first] = {amount, can_build_directly, enhanceable};
 				highest_amount_missing = std::max(highest_amount_missing, amount);
@@ -559,13 +565,14 @@ void ScenarioAI::basic_economy() {
 		std::vector<Widelands::Building*> enhanceable_buildings;
 		std::vector<const Widelands::BuildingDescr*> buildable_buildings;
 		for (const auto& pair : missing_we_can_build) {
-			if (std::get<0>(pair.second) < highest_amount_missing) {
+			auto[nr_missing, can_build, enhancable] = pair.second;
+			if (nr_missing < highest_amount_missing) {
 				continue;
 			}
-			for (const auto& bld : std::get<2>(pair.second)) {
+			for (const auto& bld : enhancable) {
 				enhanceable_buildings.push_back(bld);
 			}
-			if (std::get<1>(pair.second)) {
+			if (can_build) {
 				const Widelands::DescriptionIndex di = game().tribes().building_index(pair.first);
 				const Widelands::BuildingDescr* descr = game().tribes().get_building_descr(di);
 				buildable_buildings.push_back(descr);
@@ -682,7 +689,9 @@ void ScenarioAI::think() {
 			basic_economy();
 			break;
 		case 4:
-			/* Let's check whether there are two flags that are physically close but far apart in the road network */
+			/* Let's check whether there are two flags that are physically close
+			 * but far apart in the road network
+			 */
 			connect_flags();
 			break;
 		case 5:

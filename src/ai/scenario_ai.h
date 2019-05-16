@@ -100,7 +100,7 @@ private:
 	std::set<std::string> allowed_trainingsites_;
 	std::set<std::string> allowed_warehouses_;
 
-	std::map<std::string, std::tuple<uint32_t, uint32_t>> basic_economy_; // {amount, importance}
+	std::map<std::string, std::pair<uint32_t, uint32_t>> basic_economy_; // {amount, importance}
 
 	// We consider wares important only if they are listed here
 	std::map<std::string, uint32_t> ware_preciousness_;
