@@ -41,7 +41,8 @@ ScenarioAI::ScenarioAI(Widelands::Game& ggame, Widelands::PlayerNumber const pid
    aggression_treshold_(0),
    road_density_(4),
    did_init_(false),
-   last_time_thought_(0) {
+   last_time_thought_(0),
+   phase_(0) {
 }
 
 ScenarioAI::~ScenarioAI() {
@@ -128,6 +129,7 @@ bool ScenarioAI::is_active() {
  ************************************************/
 
 void ScenarioAI::init() {
+	random_.seed(game().get_gametime());
 	// If we ever want to do initialisation stuff like setting economy targets, do it here
 
 	log("ScenarioAI %u initialized\n", player_number());
@@ -370,24 +372,8 @@ static inline int32_t evaluate_soldier(const Widelands::Soldier& soldier) {
 			soldier.descr().get_health_incr_per_level() * soldier.get_health_level());
 }
 
-void ScenarioAI::think() {
-	const uint32_t time = game().get_gametime();
-	if (time - last_time_thought_ < think_interval_) {
-		return;
-	}
-	last_time_thought_ = time;
-
-	if (!active_) {
-		return;
-	}
-	if (!did_init_) {
-		return init();
-	}
-
+void ScenarioAI::cleanup_roads() {
 	const Widelands::Map& map = game().map();
-	Widelands::Player& player = *game().get_player(player_number());
-
-	/* We begin by cleaning up our road network. Long roads are broken into shorter sections, dead-ends are removed. */
 	for (Widelands::MapIndex i = map.max_index(); i; --i) {
 		Widelands::Field& f = map[i - 1];
 		Widelands::FCoords coords = map.get_fcoords(f);
@@ -422,17 +408,12 @@ void ScenarioAI::think() {
 			}
 		}
 	}
+}
 
-	/* Military stuff
-	 * ==============
-	 * We frequently check for enemy militarysites near our border.
-	 * Attackable warehouses (port/HQ) are preferred over other milsites.
-	 * If we see one which can be attacked, we compare strengths:
-	 *   If we are stronger than the enemy, we attack!
-	 *   Otherwise, we construct a new militarysite nearby.
-	 *     (If a new own milsite is already under construction nearby, we ignore that enemy site – for now...)
-	 */
-	{ // military stuff
+void ScenarioAI::military_stuff() {
+	const Widelands::Map& map = game().map();
+	Widelands::Player& player = *game().get_player(player_number());
+
 	std::map<Widelands::Building*, std::tuple<int32_t, uint32_t>> attackable; // {evaluation, number_of_soldiers}
 	int32_t best_eval = std::numeric_limits<int32_t>::min();
 	for (Widelands::DescriptionIndex di = 0; di < game().tribes().nrbuildings(); ++di) {
@@ -476,16 +457,16 @@ void ScenarioAI::think() {
 			}
 		}
 		assert(!best_buildings.empty());
-		Widelands::Building* building_to_attack = best_buildings[std::rand() % best_buildings.size()];
+		Widelands::Building* building_to_attack = best_buildings[random_.rand() % best_buildings.size()];
 		return player.enemyflagaction(building_to_attack->base_flag(), player_number(),
 				std::get<1>(attackable.at(building_to_attack)));
 	}
-	} // military stuff
+}
 
-	/* Now, let's take care of our economy. A script defined our very own "basic economy".
-	 * If we haven't built everything from there yet, we really need to take care of that.
-	 */
-	{ // basic economy
+void ScenarioAI::basic_economy() {
+	const Widelands::Map& map = game().map();
+	Widelands::Player& player = *game().get_player(player_number());
+
 	std::map<std::string, std::tuple<uint32_t, uint32_t>> all_missing;
 	uint32_t most_important_missing = 0;
 	for (const auto& pair : basic_economy_) {
@@ -596,14 +577,16 @@ void ScenarioAI::think() {
 				return;
 			}
 		} else {
-			Widelands::Building* enhance = enhanceable_buildings[std::rand() % enhanceable_buildings.size()];
+			Widelands::Building* enhance = enhanceable_buildings[random_.rand() % enhanceable_buildings.size()];
 			return game().send_player_enhance_building(*enhance, enhance->descr().enhancement());
 		}
 	}
-	} // basic economy
+}
 
-	/* Let's check whether there are two flags that are physically close but far apart in the road network */
-	{ // connect flags
+void ScenarioAI::connect_flags() {
+	const Widelands::Map& map = game().map();
+	Widelands::Player& player = *game().get_player(player_number());
+
 	std::map<Widelands::FCoords, Widelands::Flag*> all_flags;
 	for (Widelands::MapIndex i = map.max_index(); i > 0; --i) {
 		Widelands::Field& f = map[i - 1];
@@ -623,7 +606,8 @@ void ScenarioAI::think() {
 				continue;
 			}
 			Widelands::Route route;
-			bool route_found = i->second->get_economy()->find_route(*i->second, *j->second, &route, Widelands::wwWORKER);
+			bool route_found = (i->second->get_economy() != j->second->get_economy()) ? false :
+					i->second->get_economy()->find_route(*i->second, *j->second, &route, Widelands::wwWORKER);
 			if (!route_found || route.get_totalcost() > road_density_ * distance * 1800L) {
 				uint32_t urgency;
 				if (route_found) {
@@ -640,7 +624,7 @@ void ScenarioAI::think() {
 		std::list<std::pair<const Widelands::FCoords, const Widelands::FCoords>> urgent_candidates;
 		for (const auto& pair : connect_candidates) {
 			if (pair.second >= most_urgent) {
-				if (std::rand() % 2 == 0) {
+				if (random_.rand() % 2 == 0) {
 					urgent_candidates.push_back(pair.first);
 				} else {
 					urgent_candidates.push_front(pair.first);
@@ -657,22 +641,72 @@ void ScenarioAI::think() {
 			urgent_candidates.pop_back();
 		}
 	}
-	}  // connect flags
+}
 
-  	// TODO(Nordfriese): NOCOM – Do other stuff – micromanage workers and wares, find out if we should build more
-	// productionsites, warehouses, milsites...
+void ScenarioAI::think() {
+	const uint32_t time = game().get_gametime();
+	if (time - last_time_thought_ < think_interval_) {
+		return;
+	}
+	last_time_thought_ = time;
 
+	if (!active_) {
+		return;
+	}
+	if (!did_init_) {
+		return init();
+	}
 
+	++phase_;
+	switch (phase_) {
+		case 1:
+			/* We begin by cleaning up our road network. Unconnected building or separate economies
+			 * are connected, long roads are broken into shorter sections, dead-ends are removed.
+			 */
+			cleanup_roads();
+			break;
+		case 2:
+			/* Military stuff
+			 * ==============
+			 * We frequently check for enemy militarysites near our border.
+			 * Attackable warehouses (port/HQ) are preferred over other milsites.
+			 * If we see one which can be attacked, we compare strengths, and
+			 * if we are stronger than the enemy, we attack!
+			 */
+			military_stuff();
+			break;
+		case 3:
+			/* Now, let's take care of our economy. A script defined our very own "basic economy".
+			 * If we haven't built everything from there yet, we really need to take care of that.
+			 */
+			basic_economy();
+			break;
+		case 4:
+			/* Let's check whether there are two flags that are physically close but far apart in the road network */
+			connect_flags();
+			break;
+		case 5:
+		  	// TODO(Nordfriese): NOCOM
+		  	/* Do other stuff – micromanage workers and wares,
+		  	 * find out if we should build more productionsites, warehouses, milsites...
+		  	 */
 
+			break;
+		case 6:
+			// TODO(Nordfriese): NOCOM
+			/* We check our borders now. Any field where we can build something and the border is
+			 * close is interesting, even more so if any immovables nearby are owned by an enemy.
+			 * Fields located closely to an enemy warehouse or milsite are also much more
+			 * interesting. Fields located closely to an own warehouse are a bit more interesting.
+			 * Fields located closely to an own milsite or milsite-constructionsite are less
+			 * interesting. Consider building a militarysite on an interesting field.
+			 */
 
-	// TODO(Nordfriese): NOCOM – We check our borders now. Any field where we can build something and the border is close
-	// is interesting, even more so if any immovables nearby are owned by an enemy.
-	// Fields located closely to an enemy warehouse or milsite are also much more interesting.
-	// Fields located closely to an own warehouse are a bit more interesting.
-	// Fields located closely to an own milsite or milsite-constructionsite are less interesting.
-	// Consider building a militarysite on an interesting field.
-
-
-
+			break;
+		default:
+			/* Sleep phase */
+			phase_ = 0;
+			break;
+	}
 }
 

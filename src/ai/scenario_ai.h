@@ -32,6 +32,7 @@
 #include "base/macros.h"
 #include "logic/widelands.h"
 #include "logic/widelands_geometry.h"
+#include "random/random.h"
 #include "scripting/lua_table.h"
 
 namespace Widelands {
@@ -82,6 +83,11 @@ struct ScenarioAI : ComputerPlayer {
 private:
 
 	void init();
+	void cleanup_roads();
+	void military_stuff();
+	void basic_economy();
+	void connect_flags();
+
 	bool try_connect_flag(Widelands::FCoords&, Widelands::FCoords* = nullptr);
 	bool build_building_somewhere(std::vector<const Widelands::BuildingDescr*>&);
 
@@ -107,6 +113,9 @@ private:
 
 	bool did_init_;
 	uint32_t last_time_thought_;
+	uint8_t phase_;
+
+	RNG random_;
 
 	// We do not cache any game-related information so we can react at once when a script changes something
 
