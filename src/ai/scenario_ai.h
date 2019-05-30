@@ -87,6 +87,8 @@ private:
 	void military_stuff();
 	void basic_economy();
 	void connect_flags();
+	void balance_economy();
+	void check_borders();
 
 	bool try_connect_flag(Widelands::FCoords&, Widelands::FCoords* = nullptr);
 	bool build_building_somewhere(std::vector<const Widelands::BuildingDescr*>&);

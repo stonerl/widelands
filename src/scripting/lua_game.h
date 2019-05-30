@@ -46,6 +46,53 @@ public:
 	}
 };
 
+class LuaScenarioAI : public LuaGameModuleClass {
+public:
+	LUNA_CLASS_HEAD(LuaScenarioAI);
+	~LuaScenarioAI() override {
+	}
+
+	explicit LuaScenarioAI(ScenarioAI* ai) : ai_(ai) {
+	}
+	LuaScenarioAI() : ai_(nullptr) {
+	}
+	explicit LuaScenarioAI(lua_State* L) {
+		report_error(L, "Cannot instantiate a '%s' directly!", className);
+	}
+
+	void __persist(lua_State*) override;
+	void __unpersist(lua_State*) override;
+
+	/*
+	 * Properties
+	 */
+	int set_aggression_treshold(lua_State* L);
+	int get_aggression_treshold(lua_State* L);
+	int set_road_density(lua_State* L);
+	int get_road_density(lua_State* L);
+	int set_active(lua_State* L);
+	int get_active(lua_State* L);
+	int set_think_interval(lua_State* L);
+	int get_think_interval(lua_State* L);
+
+	/*
+	 * Lua Methods
+	 */
+	int set_militarysite_allowed(lua_State* L);
+	int set_productionsite_allowed(lua_State* L);
+	int set_trainingsite_allowed(lua_State* L);
+	int set_warehouse_allowed(lua_State* L);
+	int set_is_enemy(lua_State* L);
+	int set_basic_economy(lua_State* L);
+	int set_ware_preciousness(lua_State* L);
+
+	/*
+	 * C Methods
+	 */
+private:
+	ScenarioAI* ai_;
+};
+
 class LuaPlayer : public LuaBases::LuaPlayerBase {
 public:
 	// Overwritten from LuaPlayerBase, avoid ambiguity when deriving from
@@ -80,15 +127,6 @@ public:
 	int set_see_all(lua_State* L);
 	int get_scenario_ai(lua_State* L);
 
-	int set_scenario_ai_aggression_treshold(lua_State* L);
-	int get_scenario_ai_aggression_treshold(lua_State* L);
-	int set_scenario_ai_road_density(lua_State* L);
-	int get_scenario_ai_road_density(lua_State* L);
-	int set_scenario_ai_active(lua_State* L);
-	int get_scenario_ai_active(lua_State* L);
-	int set_scenario_ai_think_interval(lua_State* L);
-	int get_scenario_ai_think_interval(lua_State* L);
-
 	/*
 	 * Lua methods
 	 */
@@ -114,14 +152,6 @@ public:
 	int attack(lua_State* L);
 	int connect_with_road(lua_State* L);
 
-	int scenario_ai_set_militarysite_allowed(lua_State* L);
-	int scenario_ai_set_productionsite_allowed(lua_State* L);
-	int scenario_ai_set_trainingsite_allowed(lua_State* L);
-	int scenario_ai_set_warehouse_allowed(lua_State* L);
-	int scenario_ai_set_is_enemy(lua_State* L);
-	int scenario_ai_set_basic_economy(lua_State* L);
-	int scenario_ai_set_ware_preciousness(lua_State* L);
-
 	/*
 	 * C methods
 	 */
@@ -130,7 +160,6 @@ private:
 	                         const Widelands::TribeDescr&,
 	                         std::vector<Widelands::DescriptionIndex>&);
 	int allow_forbid_buildings(lua_State* L, bool);
-	ScenarioAI* scenario_ai(lua_State* = nullptr);
 };
 
 class LuaObjective : public LuaGameModuleClass {

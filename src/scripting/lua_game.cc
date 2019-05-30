@@ -107,14 +107,6 @@ const MethodType<LuaPlayer> LuaPlayer::Methods[] = {
    METHOD(LuaPlayer, get_attack_soldiers),
    METHOD(LuaPlayer, attack),
    METHOD(LuaPlayer, connect_with_road),
-
-   METHOD(LuaPlayer, scenario_ai_set_militarysite_allowed),
-   METHOD(LuaPlayer, scenario_ai_set_productionsite_allowed),
-   METHOD(LuaPlayer, scenario_ai_set_trainingsite_allowed),
-   METHOD(LuaPlayer, scenario_ai_set_warehouse_allowed),
-   METHOD(LuaPlayer, scenario_ai_set_is_enemy),
-   METHOD(LuaPlayer, scenario_ai_set_basic_economy),
-   METHOD(LuaPlayer, scenario_ai_set_ware_preciousness),
    {nullptr, nullptr},
 };
 const PropertyType<LuaPlayer> LuaPlayer::Properties[] = {
@@ -123,10 +115,6 @@ const PropertyType<LuaPlayer> LuaPlayer::Properties[] = {
    PROP_RO(LuaPlayer, messages),   PROP_RO(LuaPlayer, inbox),
    PROP_RW(LuaPlayer, team),       PROP_RO(LuaPlayer, tribe),
    PROP_RW(LuaPlayer, see_all),    PROP_RO(LuaPlayer, scenario_ai),
-   PROP_RW(LuaPlayer, scenario_ai_active),
-   PROP_RW(LuaPlayer, scenario_ai_think_interval),
-   PROP_RW(LuaPlayer, scenario_ai_aggression_treshold),
-   PROP_RW(LuaPlayer, scenario_ai_road_density),
    {nullptr, nullptr, nullptr},
 };
 
@@ -286,76 +274,18 @@ int LuaPlayer::get_see_all(lua_State* const L) {
 /* RST
    .. attribute:: scenario_ai
 
-      (RO) Whether this player is controlled by a ScenarioAI.
+      (RO) The ScenarioAI controlling this player, or `nil` if there isn't one.
 */
 int LuaPlayer::get_scenario_ai(lua_State* L) {
-	lua_pushboolean(L, scenario_ai() != nullptr);
+	Game& game = get_game(L);
+	uint8_t pln = get(L, game).player_number();
+	ScenarioAI* ai = dynamic_cast<ScenarioAI*>(game.get_ai(pln));
+	if (ai) {
+		to_lua<LuaScenarioAI>(L, new LuaScenarioAI(ai));
+	} else {
+		lua_pushnil(L);
+	}
 	return 1;
-}
-
-/* RST
-   .. attribute:: scenario_ai_active
-
-      (RW) Whether the ScenarioAI controlling this player is active.
-      It will not do anything whatsoever when inactive.
-      The AI is inactive by default until it is activated by setting this to `true`.
-      Reading or setting this attribute throws an error if this player is not controlled by a ScenarioAI.
-*/
-int LuaPlayer::get_scenario_ai_active(lua_State* L) {
-	lua_pushboolean(L, scenario_ai(L)->is_active());
-	return 1;
-}
-int LuaPlayer::set_scenario_ai_active(lua_State* L) {
-	scenario_ai(L)->set_active(luaL_checkboolean(L, -1));
-	return 0;
-}
-
-/* RST
-   .. attribute:: scenario_ai_think_interval
-
-      (RW) How slowly the ScenarioAI controlling this player thinks (in milliseconds).
-      Defaults to 250.
-      Reading or setting this attribute throws an error if this player is not controlled by a ScenarioAI.
-*/
-int LuaPlayer::get_scenario_ai_think_interval(lua_State* L) {
-	lua_pushinteger(L, scenario_ai(L)->get_think_interval());
-	return 1;
-}
-int LuaPlayer::set_scenario_ai_think_interval(lua_State* L) {
-	scenario_ai(L)->set_think_interval(luaL_checkuint32(L, -1));
-	return 0;
-}
-
-/* RST
-   .. attribute:: scenario_ai_aggression_treshold
-
-      (RW) How aggressive the ScenarioAI controlling this player is.
-      Values greater than 0 stand for caution, values less than 0 indicate recklessness.
-      Reading or setting this attribute throws an error if this player is not controlled by a ScenarioAI.
-*/
-int LuaPlayer::get_scenario_ai_aggression_treshold(lua_State* L) {
-	lua_pushinteger(L, scenario_ai(L)->get_aggression_treshold());
-	return 1;
-}
-int LuaPlayer::set_scenario_ai_aggression_treshold(lua_State* L) {
-	scenario_ai(L)->set_aggression_treshold(luaL_checkint32(L, -1));
-	return 0;
-}
-
-/* RST
-   .. attribute:: scenario_ai_road_density
-
-      (RW) How dense the ScenarioAI controlling this player likes to build its roads.
-      Lower values mean high density. Defaults to 4.
-      Reading or setting this attribute throws an error if this player is not controlled by a ScenarioAI.
-*/
-int LuaPlayer::get_scenario_ai_road_density(lua_State* L) {
-	lua_pushinteger(L, scenario_ai(L)->get_road_density());
-	return 1;
-}
-int LuaPlayer::set_scenario_ai_road_density(lua_State* L) {
-	scenario_ai(L)->set_road_density(luaL_checkuint32(L, -1));
-	return 0;
 }
 
 /*
@@ -1055,138 +985,9 @@ int LuaPlayer::connect_with_road(lua_State* L) {
 
 /*
  ==========================================================
- LUA METHODS for interaction with ScenarioAI
- ==========================================================
- */
-
-/* RST
-   .. method:: scenario_ai_set_militarysite_allowed(name[, allow = true])
-
-      Allow or forbid the ScenarioAI controlling this player to build this building.
-      Throws an error if this player is not controlled by a ScenarioAI.
-*/
-int LuaPlayer::scenario_ai_set_militarysite_allowed(lua_State* L) {
-	ScenarioAI* ai = scenario_ai(L);
-	std::string name = luaL_checkstring(L, 2);
-	bool allow = true;
-	if (lua_gettop(L) > 2) {
-		allow = luaL_checkboolean(L, 3);
-	}
-	ai->set_militarysite_allowed(name, allow);
-	return 0;
-}
-
-/* RST
-   .. method:: scenario_ai_set_productionsite_allowed(name[, allow = true])
-
-      Allow or forbid the ScenarioAI controlling this player to build this building.
-      Throws an error if this player is not controlled by a ScenarioAI.
-*/
-int LuaPlayer::scenario_ai_set_productionsite_allowed(lua_State* L) {
-	ScenarioAI* ai = scenario_ai(L);
-	std::string name = luaL_checkstring(L, 2);
-	bool allow = true;
-	if (lua_gettop(L) > 2) {
-		allow = luaL_checkboolean(L, 3);
-	}
-	ai->set_productionsite_allowed(name, allow);
-	return 0;
-}
-
-/* RST
-   .. method:: scenario_ai_set_trainingsite_allowed(name[, allow = true])
-
-      Allow or forbid the ScenarioAI controlling this player to build this building.
-      Throws an error if this player is not controlled by a ScenarioAI.
-*/
-int LuaPlayer::scenario_ai_set_trainingsite_allowed(lua_State* L) {
-	ScenarioAI* ai = scenario_ai(L);
-	std::string name = luaL_checkstring(L, 2);
-	bool allow = true;
-	if (lua_gettop(L) > 2) {
-		allow = luaL_checkboolean(L, 3);
-	}
-	ai->set_trainingsite_allowed(name, allow);
-	return 0;
-}
-
-/* RST
-   .. method:: scenario_ai_set_warehouse_allowed(name[, allow = true])
-
-      Allow or forbid the ScenarioAI controlling this player to build this building.
-      Throws an error if this player is not controlled by a ScenarioAI.
-*/
-int LuaPlayer::scenario_ai_set_warehouse_allowed(lua_State* L) {
-	ScenarioAI* ai = scenario_ai(L);
-	std::string name = luaL_checkstring(L, 2);
-	bool allow = true;
-	if (lua_gettop(L) > 2) {
-		allow = luaL_checkboolean(L, 3);
-	}
-	ai->set_warehouse_allowed(name, allow);
-	return 0;
-}
-
-/* RST
-   .. method:: scenario_ai_set_is_enemy(playernumber[, enemy = true])
-
-      Set whether the ScenarioAI controlling this player considers the player with the given player number an enemy.
-      Throws an error if this player is not controlled by a ScenarioAI.
-*/
-int LuaPlayer::scenario_ai_set_is_enemy(lua_State* L) {
-	ScenarioAI* ai = scenario_ai(L);
-	uint8_t player = luaL_checkinteger(L, 2);
-	bool enemy = true;
-	if (lua_gettop(L) > 2) {
-		enemy = luaL_checkboolean(L, 3);
-	}
-	ai->set_is_enemy(player, enemy);
-	return 0;
-}
-
-/* RST
-   .. method:: scenario_ai_set_ware_preciousness(ware, value)
-
-      Set how important this ware is to the ScenarioAI controlling this player. Must be >= 0.
-      Throws an error if this player is not controlled by a ScenarioAI.
-*/
-int LuaPlayer::scenario_ai_set_ware_preciousness(lua_State* L) {
-	ScenarioAI* ai = scenario_ai(L);
-	std::string name = luaL_checkstring(L, 2);
-	uint32_t value = luaL_checkuint32(L, 3);
-	ai->set_ware_preciousness(name, value);
-	return 0;
-}
-
-/* RST
-   .. method:: scenario_ai_set_basic_economy(building, amount, importance)
-
-      Set how many buildings of this type the ScenarioAI controlling this player considers essential.
-      Throws an error if this player is not controlled by a ScenarioAI.
-*/
-int LuaPlayer::scenario_ai_set_basic_economy(lua_State* L) {
-	ScenarioAI* ai = scenario_ai(L);
-	std::string name = luaL_checkstring(L, 2);
-	uint32_t amount = luaL_checkuint32(L, 3);
-	uint32_t importance = luaL_checkuint32(L, 4);
-	ai->set_basic_economy(name, amount, importance);
-	return 0;
-}
-
-/*
- ==========================================================
  C METHODS
  ==========================================================
  */
-ScenarioAI* LuaPlayer::scenario_ai(lua_State* L) {
-	Game& game = get_game(L);
-	uint8_t pln = get(L, game).player_number();
-	ScenarioAI* ai = dynamic_cast<ScenarioAI*>(game.get_ai(pln));
-	if (L && !ai) {
-		report_error(L, "Attempted to access ScenarioAI for player %u who is not controlled by a ScenarioAI!", pln);
-	}
-	return ai;
-}
 
 void LuaPlayer::parse_building_list(lua_State* L,
                                     const TribeDescr& tribe,
@@ -1578,6 +1379,220 @@ const Message& LuaMessage::get(lua_State* L, Widelands::Game& game) {
 }
 
 /* RST
+ScenarioAI
+---------
+
+.. class:: ScenarioAI
+
+   This class represents a ScenarioAI, which is an AI type that takes order from scripts.
+*/
+const char LuaScenarioAI::className[] = "ScenarioAI";
+const MethodType<LuaScenarioAI> LuaScenarioAI::Methods[] = {
+   METHOD(LuaScenarioAI, set_militarysite_allowed),
+   METHOD(LuaScenarioAI, set_productionsite_allowed),
+   METHOD(LuaScenarioAI, set_trainingsite_allowed),
+   METHOD(LuaScenarioAI, set_warehouse_allowed),
+   METHOD(LuaScenarioAI, set_is_enemy),
+   METHOD(LuaScenarioAI, set_basic_economy),
+   METHOD(LuaScenarioAI, set_ware_preciousness),
+   {nullptr, nullptr},
+};
+const PropertyType<LuaScenarioAI> LuaScenarioAI::Properties[] = {
+   PROP_RW(LuaScenarioAI, aggression_treshold),
+   PROP_RW(LuaScenarioAI, road_density),
+   PROP_RW(LuaScenarioAI, active),
+   PROP_RW(LuaScenarioAI, think_interval),
+   {nullptr, nullptr, nullptr},
+};
+
+void LuaScenarioAI::__persist(lua_State* L) {
+	PERS_UINT32("player", ai_ ? ai_->player_number() : 0);
+}
+void LuaScenarioAI::__unpersist(lua_State* L) {
+	uint32_t p;
+	UNPERS_UINT32("player", p)
+	ai_ = dynamic_cast<ScenarioAI*>(get_game(L).get_ai(p));
+}
+
+/*
+ ==========================================================
+ PROPERTIES
+ ==========================================================
+ */
+
+/* RST
+   .. attribute:: active
+
+      (RW) Whether this AI is active. It will not do anything whatsoever when inactive.
+      The AI is inactive by default until it is activated by setting this to `true`.
+*/
+int LuaScenarioAI::get_active(lua_State* L) {
+	lua_pushboolean(L, ai_->is_active());
+	return 1;
+}
+int LuaScenarioAI::set_active(lua_State* L) {
+	ai_->set_active(luaL_checkboolean(L, -1));
+	return 0;
+}
+
+/* RST
+   .. attribute:: think_interval
+
+      (RW) How slowly this AI thinks (in milliseconds).
+      Defaults to 250.
+*/
+int LuaScenarioAI::get_think_interval(lua_State* L) {
+	lua_pushinteger(L, ai_->get_think_interval());
+	return 1;
+}
+int LuaScenarioAI::set_think_interval(lua_State* L) {
+	ai_->set_think_interval(luaL_checkuint32(L, -1));
+	return 0;
+}
+
+/* RST
+   .. attribute:: aggression_treshold
+
+      (RW) How aggressive this AI is.
+      Values greater than 0 stand for caution, values less than 0 indicate recklessness.
+*/
+int LuaScenarioAI::get_aggression_treshold(lua_State* L) {
+	lua_pushinteger(L, ai_->get_aggression_treshold());
+	return 1;
+}
+int LuaScenarioAI::set_aggression_treshold(lua_State* L) {
+	ai_->set_aggression_treshold(luaL_checkint32(L, -1));
+	return 0;
+}
+
+/* RST
+   .. attribute:: road_density
+
+      (RW) How dense this AI likes to build its roads.
+      Lower values mean high density. Defaults to 4.
+*/
+int LuaScenarioAI::get_road_density(lua_State* L) {
+	lua_pushinteger(L, ai_->get_road_density());
+	return 1;
+}
+int LuaScenarioAI::set_road_density(lua_State* L) {
+	ai_->set_road_density(luaL_checkuint32(L, -1));
+	return 0;
+}
+
+/*
+ ==========================================================
+ LUA METHODS
+ ==========================================================
+ */
+
+/* RST
+   .. method:: set_militarysite_allowed(name[, allow = true])
+
+      Allow or forbid this AI to build this building.
+*/
+int LuaScenarioAI::set_militarysite_allowed(lua_State* L) {
+	std::string name = luaL_checkstring(L, 2);
+	bool allow = true;
+	if (lua_gettop(L) > 2) {
+		allow = luaL_checkboolean(L, 3);
+	}
+	ai_->set_militarysite_allowed(name, allow);
+	return 0;
+}
+
+/* RST
+   .. method:: set_trainingsite_allowed(name[, allow = true])
+
+      Allow or forbid this AI to build this building.
+*/
+int LuaScenarioAI::set_trainingsite_allowed(lua_State* L) {
+	std::string name = luaL_checkstring(L, 2);
+	bool allow = true;
+	if (lua_gettop(L) > 2) {
+		allow = luaL_checkboolean(L, 3);
+	}
+	ai_->set_trainingsite_allowed(name, allow);
+	return 0;
+}
+
+/* RST
+   .. method:: set_productionsite_allowed(name[, allow = true])
+
+      Allow or forbid this AI to build this building.
+*/
+int LuaScenarioAI::set_productionsite_allowed(lua_State* L) {
+	std::string name = luaL_checkstring(L, 2);
+	bool allow = true;
+	if (lua_gettop(L) > 2) {
+		allow = luaL_checkboolean(L, 3);
+	}
+	ai_->set_productionsite_allowed(name, allow);
+	return 0;
+}
+
+/* RST
+   .. method:: set_warehouse_allowed(name[, allow = true])
+
+      Allow or forbid this AI to build this building.
+*/
+int LuaScenarioAI::set_warehouse_allowed(lua_State* L) {
+	std::string name = luaL_checkstring(L, 2);
+	bool allow = true;
+	if (lua_gettop(L) > 2) {
+		allow = luaL_checkboolean(L, 3);
+	}
+	ai_->set_warehouse_allowed(name, allow);
+	return 0;
+}
+
+/* RST
+   .. method:: set_is_enemy(playernumber[, enemy = true])
+
+      Set whether this AI considers the player with the given player number an enemy.
+*/
+int LuaScenarioAI::set_is_enemy(lua_State* L) {
+	uint8_t player = luaL_checkinteger(L, 2);
+	bool enemy = true;
+	if (lua_gettop(L) > 2) {
+		enemy = luaL_checkboolean(L, 3);
+	}
+	ai_->set_is_enemy(player, enemy);
+	return 0;
+}
+
+/* RST
+   .. method:: set_ware_preciousness(ware, value)
+
+      Set how important this ware is to this AI. Must be >= 0.
+*/
+int LuaScenarioAI::set_ware_preciousness(lua_State* L) {
+	std::string name = luaL_checkstring(L, 2);
+	uint32_t value = luaL_checkuint32(L, 3);
+	ai_->set_ware_preciousness(name, value);
+	return 0;
+}
+
+/* RST
+   .. method:: set_basic_economy(building, amount, importance)
+
+      Set how many buildings of this type this AI considers essential.
+*/
+int LuaScenarioAI::set_basic_economy(lua_State* L) {
+	std::string name = luaL_checkstring(L, 2);
+	uint32_t amount = luaL_checkuint32(L, 3);
+	uint32_t importance = luaL_checkuint32(L, 4);
+	ai_->set_basic_economy(name, amount, importance);
+	return 0;
+}
+
+/*
+ ==========================================================
+ C METHODS
+ ==========================================================
+ */
+
+/* RST
 .. function:: report_result(plr, result[, info = ""])
 
    Reports the game ending to the metaserver if this is an Internet
@@ -1627,5 +1642,6 @@ void luaopen_wlgame(lua_State* L) {
 
 	register_class<LuaObjective>(L, "game");
 	register_class<LuaMessage>(L, "game");
+	register_class<LuaScenarioAI>(L, "game");
 }
 }  // namespace LuaGame

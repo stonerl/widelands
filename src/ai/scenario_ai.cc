@@ -565,14 +565,13 @@ void ScenarioAI::basic_economy() {
 		std::vector<Widelands::Building*> enhanceable_buildings;
 		std::vector<const Widelands::BuildingDescr*> buildable_buildings;
 		for (const auto& pair : missing_we_can_build) {
-			auto[nr_missing, can_build, enhancable] = pair.second;
-			if (nr_missing < highest_amount_missing) {
+			if (std::get<0>(pair.second) < highest_amount_missing) {
 				continue;
 			}
-			for (const auto& bld : enhancable) {
+			for (const auto& bld : std::get<2>(pair.second)) {
 				enhanceable_buildings.push_back(bld);
 			}
-			if (can_build) {
+			if (std::get<1>(pair.second)) {
 				const Widelands::DescriptionIndex di = game().tribes().building_index(pair.first);
 				const Widelands::BuildingDescr* descr = game().tribes().get_building_descr(di);
 				buildable_buildings.push_back(descr);
@@ -650,6 +649,14 @@ void ScenarioAI::connect_flags() {
 	}
 }
 
+void ScenarioAI::balance_economy() {
+	log("NOCOM: ScenarioAI::balance_economy not yet implemented\n");
+}
+
+void ScenarioAI::check_borders() {
+	log("NOCOM: ScenarioAI::check_borders not yet implemented\n");
+}
+
 void ScenarioAI::think() {
 	const uint32_t time = game().get_gametime();
 	if (time - last_time_thought_ < think_interval_) {
@@ -699,7 +706,7 @@ void ScenarioAI::think() {
 		  	/* Do other stuff – micromanage workers and wares,
 		  	 * find out if we should build more productionsites, warehouses, milsites...
 		  	 */
-
+		  	balance_economy();
 			break;
 		case 6:
 			// TODO(Nordfriese): NOCOM
@@ -710,7 +717,7 @@ void ScenarioAI::think() {
 			 * Fields located closely to an own milsite or milsite-constructionsite are less
 			 * interesting. Consider building a militarysite on an interesting field.
 			 */
-
+		  	check_borders();
 			break;
 		default:
 			/* Sleep phase */
