@@ -46,6 +46,7 @@ constexpr uint32_t kStatisticsSampleTime = 30000;
 // See forester_cache_
 constexpr int16_t kInvalidForesterEntry = -1;
 
+class ConstructionSite;
 struct Flag;
 struct Path;
 struct PlayerImmovable;
@@ -56,6 +57,7 @@ struct Ship;
 struct PlayerEndStatus;
 class TrainingSite;
 class MilitarySite;
+enum class StockPolicy;
 
 enum {
 	gs_notrunning = 0,  // game is being prepared
@@ -248,7 +250,7 @@ public:
 
 	void enqueue_command(Command* const);
 
-	void send_player_command(Widelands::PlayerCommand&);
+	void send_player_command(Widelands::PlayerCommand*);
 
 	void send_player_bulldoze(PlayerImmovable&, bool recurse = false);
 	void send_player_dismantle(PlayerImmovable&);
@@ -262,6 +264,7 @@ public:
 
 	void send_player_enhance_building(Building&, DescriptionIndex);
 	void send_player_evict_worker(Worker&);
+	void send_player_set_stock_policy(Building&, WareWorker, DescriptionIndex, StockPolicy);
 	void send_player_set_ware_priority(PlayerImmovable&,
 	                                   int32_t type,
 	                                   DescriptionIndex index,
