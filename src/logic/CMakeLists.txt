@@ -62,8 +62,8 @@ wl_library(logic_game_controller
     logic
     logic_commands
     logic_game_settings
-    profile
     ui_basic
+    widelands_ball_of_mud
     wui
 )
 
@@ -123,6 +123,7 @@ wl_library(logic_map
     maptriangleregion.cc
     maptriangleregion.h
     nodecaps.h
+    note_map_options.h
     path.cc
     path.h
     pathfield.cc
@@ -232,6 +233,7 @@ wl_library(logic
     graphic_playercolor
     io_fileread
     io_filesystem
+    io_profile
     io_stream
     logic_commands
     logic_constants
@@ -248,7 +250,6 @@ wl_library(logic
     map_io_map_loader
     note_sound
     notifications
-    profile
     random
     scripting_logic # TODO(GunChleoc): Circular dependency
     scripting_lua_interface
@@ -256,6 +257,7 @@ wl_library(logic
     sound
     sound_constants
     ui_basic
+    widelands_ball_of_mud
     wui # TODO(GunChleoc): Circular dependency
 )
 
