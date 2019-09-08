@@ -24,13 +24,13 @@
 #include <boost/lexical_cast.hpp>
 
 #include "graphic/graphic.h"
+#include "io/profile.h"
 #include "logic/editor_game_base.h"
 #include "logic/filesystem_constants.h"
 #include "logic/map_objects/tribes/ware_descr.h"
 #include "logic/map_objects/tribes/worker_descr.h"
 #include "logic/player.h"
 #include "logic/playercommand.h"
-#include "profile/profile.h"
 #include "ui_basic/messagebox.h"
 
 static const char pic_tab_wares[] = "images/wui/buildings/menu_tab_wares.png";
@@ -124,7 +124,7 @@ EconomyOptionsWindow::EconomyOptionsWindow(UI::Panel* parent,
 	main_box_.add_space(8);
 	main_box_.add(&dropdown_box_, UI::Box::Resizing::kAlign, UI::Align::kCenter);
 
-	economy->set_has_window(true);
+	economy->set_options_window(static_cast<void*>(this));
 	economynotes_subscriber_ = Notifications::subscribe<Widelands::NoteEconomy>(
 	   [this](const Widelands::NoteEconomy& note) { on_economy_note(note); });
 	profilenotes_subscriber_ =
@@ -145,7 +145,7 @@ EconomyOptionsWindow::EconomyOptionsWindow(UI::Panel* parent,
 EconomyOptionsWindow::~EconomyOptionsWindow() {
 	Widelands::Economy* economy = player_->get_economy(serial_);
 	if (economy != nullptr) {
-		economy->set_has_window(false);
+		economy->set_options_window(nullptr);
 	}
 	if (save_profile_dialog_) {
 		save_profile_dialog_->unset_parent();
@@ -162,7 +162,7 @@ void EconomyOptionsWindow::on_economy_note(const Widelands::NoteEconomy& note) {
 				die();
 				return;
 			}
-			economy->set_has_window(true);
+			economy->set_options_window(static_cast<void*>(this));
 			ware_panel_->set_economy(note.new_economy);
 			worker_panel_->set_economy(note.new_economy);
 			move_to_top();
