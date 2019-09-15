@@ -154,7 +154,7 @@ bool ScenarioAI::try_connect_flag(Widelands::FCoords& start, Widelands::FCoords*
 	upcast(Widelands::Flag, flag, start.field->get_immovable());
 	assert(flag);
 	std::vector<Widelands::ImmovableFound> results;
-	map.find_reachable_immovables(Widelands::Area<Widelands::FCoords>(start, flag_connecting_search_radius),
+	map.find_reachable_immovables(game(), Widelands::Area<Widelands::FCoords>(start, flag_connecting_search_radius),
 			&results, Widelands::CheckStepDefault(Widelands::MOVECAPS_WALK),
 			Widelands::FindImmovableType(Widelands::MapObjectType::FLAG));
 	if (results.empty()) {
